@@ -1,0 +1,64 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-20 22:29:09.740213",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "irrigation_block",
+  "irrometer_1ft_reading",
+  "irrometer_2ft_reading",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date"
+  },
+  {
+   "fieldname": "irrometer_1ft_reading",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Irrometer 1ft Reading"
+  },
+  {
+   "fieldname": "irrometer_2ft_reading",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Irrometer 2ft Reading"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Wet\nDry"
+  },
+  {
+   "fieldname": "irrigation_block",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Irrigation Block",
+   "options": "Irrigation Block"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-04-20 22:40:08.507793",
+ "modified_by": "Administrator",
+ "module": "Upande Irrigation",
+ "name": "Irrometer Reading",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
