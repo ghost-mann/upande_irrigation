@@ -1,0 +1,324 @@
+{% extends "templates/web.html" %}
+
+{% block title %}Irrigation Control{% endblock %}
+
+{% block page_content %}
+<style>
+  :root {
+    --ic-bg: #f8fafc;
+    --ic-card: #ffffff;
+    --ic-border: #e2e8f0;
+    --ic-text: #0f172a;
+    --ic-muted: #64748b;
+    --ic-on: #16a34a;
+    --ic-on-bg: rgba(22,163,74,0.10);
+    --ic-off: #94a3b8;
+    --ic-off-bg: rgba(148,163,184,0.10);
+    --ic-forced: #d97706;
+    --ic-forced-bg: rgba(217,119,6,0.10);
+    --ic-accent: #0891b2;
+  }
+
+  .ic-wrap { font-family: var(--font-stack, -apple-system, system-ui, sans-serif); color: var(--ic-text); padding: 16px; max-width: 1400px; margin: 0 auto; }
+  .ic-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+  .ic-title { font-size: 20px; font-weight: 700; margin: 0; }
+  .ic-sub { color: var(--ic-muted); font-size: 12px; margin-top: 2px; }
+  .ic-meta { display:flex; gap:14px; align-items:center; flex-wrap:wrap; font-size: 12px; color: var(--ic-muted); }
+  .ic-meta b { color: var(--ic-text); font-weight:600; }
+  .ic-meta select { padding: 4px 8px; border: 1px solid var(--ic-border); border-radius: 4px; font-size: 12px; background: var(--ic-card); }
+  .ic-now { font-family: ui-monospace, "SF Mono", Menlo, monospace; padding: 4px 10px; background: var(--ic-card); border: 1px solid var(--ic-border); border-radius: 4px; }
+
+  .ic-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .ic-stat { background: var(--ic-card); border: 1px solid var(--ic-border); border-radius: 8px; padding: 12px 14px; }
+  .ic-stat-label { font-size: 11px; color: var(--ic-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .ic-stat-value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  .ic-stat .swatch-on  { color: var(--ic-on); }
+  .ic-stat .swatch-off { color: var(--ic-off); }
+  .ic-stat .swatch-forced { color: var(--ic-forced); }
+
+  .ic-group { background: var(--ic-card); border: 1px solid var(--ic-border); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+  .ic-group-head { display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--ic-border); }
+  .ic-group-title { font-size: 14px; font-weight: 700; display:flex; align-items:center; gap:8px; }
+  .ic-group-meta { font-size: 11px; color: var(--ic-muted); }
+
+  .ic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .ic-card { border: 1px solid var(--ic-border); border-radius: 8px; padding: 12px; transition: transform 0.08s, box-shadow 0.08s; position: relative; }
+  .ic-card:hover { box-shadow: 0 2px 8px rgba(15,23,42,0.06); }
+  .ic-card.state-on  { border-left: 3px solid var(--ic-on); background: var(--ic-on-bg); }
+  .ic-card.state-off { border-left: 3px solid var(--ic-off); }
+  .ic-card.state-forced { border-left: 3px solid var(--ic-forced); }
+
+  .ic-card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px; }
+  .ic-valve-name { font-size: 12px; font-weight: 700; }
+  .ic-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .ic-pill-on  { background: var(--ic-on);  color: white; }
+  .ic-pill-off { background: var(--ic-off); color: white; }
+  .ic-pill-forced { background: var(--ic-forced); color: white; }
+
+  .ic-card-row { font-size: 11px; color: var(--ic-muted); display:flex; justify-content:space-between; gap:6px; line-height: 1.5; }
+  .ic-card-row b { color: var(--ic-text); font-weight: 500; }
+
+  .ic-actions { display:flex; gap:4px; margin-top: 10px; }
+  .ic-btn { flex: 1; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--ic-border); background: var(--ic-card); cursor: pointer; font-size: 11px; font-weight: 500; color: var(--ic-text); transition: background 0.1s, border-color 0.1s; }
+  .ic-btn:hover { border-color: var(--ic-accent); }
+  .ic-btn.active.on { background: var(--ic-on); color: white; border-color: var(--ic-on); }
+  .ic-btn.active.off { background: var(--ic-off); color: white; border-color: var(--ic-off); }
+  .ic-btn.active.auto { background: var(--ic-accent); color: white; border-color: var(--ic-accent); }
+  .ic-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .ic-empty { text-align:center; color: var(--ic-muted); padding: 28px; font-style: italic; }
+  .ic-loading { text-align:center; padding: 40px; color: var(--ic-muted); font-style: italic; }
+  .ic-error { background: rgba(220,38,38,0.10); border: 1px solid #dc2626; color: #b91c1c; padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; }
+
+  @media (max-width: 720px) {
+    .ic-summary { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+
+<div class="ic-wrap">
+  <div class="ic-head">
+    <div>
+      <h1 class="ic-title">Irrigation Control</h1>
+      <div class="ic-sub">Valves grouped by tank · auto-refresh every 30 s · operator override</div>
+    </div>
+    <div class="ic-meta">
+      <label>Farm
+        <select id="ic-farm">
+          <option value="">All Farms</option>
+        </select>
+      </label>
+      <span>Now: <span class="ic-now" id="ic-now">—</span></span>
+      <button id="ic-refresh" class="ic-btn" style="flex:0 0 auto; padding: 6px 14px;">Refresh</button>
+    </div>
+  </div>
+
+  <div id="ic-status"></div>
+
+  <div class="ic-summary" id="ic-summary"></div>
+
+  <div id="ic-body">
+    <div class="ic-loading">Loading…</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const API_LIST = '/api/method/upande_irrigation.api.valves.list_states';
+  const API_SET  = '/api/method/upande_irrigation.api.valves.set_override';
+  const POLL_MS  = 30000;
+  let pollTimer = null;
+  let currentFarm = '';
+  let allFarms = new Set();
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  function csrf(){
+    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+
+  function setStatus(msg, kind){
+    const el = $('ic-status');
+    if(!msg){ el.innerHTML = ''; return; }
+    el.innerHTML = `<div class="ic-error">${esc(msg)}</div>`;
+  }
+
+  async function fetchStates(farm){
+    let url = API_LIST;
+    if(farm) url += '?farm=' + encodeURIComponent(farm);
+    const r = await fetch(url, {
+      method:'GET', credentials:'same-origin',
+      headers:{'Accept':'application/json','X-Frappe-CSRF-Token':csrf(),'X-Requested-With':'XMLHttpRequest'}
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return (await r.json()).message;
+  }
+
+  async function setOverride(valve, state){
+    const body = new URLSearchParams({valve, state}).toString();
+    const r = await fetch(API_SET, {
+      method:'POST', credentials:'same-origin',
+      headers:{
+        'Accept':'application/json',
+        'Content-Type':'application/x-www-form-urlencoded',
+        'X-Frappe-CSRF-Token':csrf(),
+        'X-Requested-With':'XMLHttpRequest',
+      },
+      body,
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return (await r.json()).message;
+  }
+
+  function fmtTime(s){
+    if(!s) return '—';
+    const d = new Date(s.replace(' ', 'T'));
+    if(isNaN(d)) return s;
+    return d.toLocaleString();
+  }
+
+  function fmtClock(s){
+    if(!s) return '—';
+    const d = new Date(s.replace(' ', 'T'));
+    if(isNaN(d)) return s;
+    return d.toLocaleTimeString();
+  }
+
+  function populateFarms(valves){
+    const next = new Set(valves.map(v => v.farm).filter(Boolean));
+    if(next.size === allFarms.size && [...next].every(f => allFarms.has(f))) return;
+    allFarms = next;
+    const sel = $('ic-farm');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All Farms</option>' + [...next].sort().map(f =>
+      `<option value="${esc(f)}">${esc(f)}</option>`
+    ).join('');
+    sel.value = cur;
+  }
+
+  function renderSummary(valves){
+    const total = valves.length;
+    const on = valves.filter(v => v.effective_state === 'ON').length;
+    const off = total - on;
+    const forced = valves.filter(v => v.override_active).length;
+    $('ic-summary').innerHTML = `
+      <div class="ic-stat">
+        <div class="ic-stat-label">Total Valves</div>
+        <div class="ic-stat-value">${total}</div>
+      </div>
+      <div class="ic-stat">
+        <div class="ic-stat-label">Currently On</div>
+        <div class="ic-stat-value swatch-on">${on}</div>
+      </div>
+      <div class="ic-stat">
+        <div class="ic-stat-label">Currently Off</div>
+        <div class="ic-stat-value swatch-off">${off}</div>
+      </div>
+      <div class="ic-stat">
+        <div class="ic-stat-label">Operator Overrides</div>
+        <div class="ic-stat-value swatch-forced">${forced}</div>
+      </div>
+    `;
+  }
+
+  function valveCard(v){
+    const stateClass = v.override_active ? 'state-forced' : (v.effective_state === 'ON' ? 'state-on' : 'state-off');
+    const pillClass  = v.override_active ? 'ic-pill-forced' : (v.effective_state === 'ON' ? 'ic-pill-on' : 'ic-pill-off');
+    const pillText   = v.effective_state + (v.override_active ? ' (override)' : '');
+
+    let info = '';
+    if(v.effective_state === 'ON' && v.schedule_planner){
+      info = `<div class="ic-card-row"><span>Ends</span><b>${esc(fmtClock(v.schedule_ends_at))}</b></div>`;
+    } else if(v.next_scheduled_at){
+      info = `<div class="ic-card-row"><span>Next on</span><b>${esc(fmtTime(v.next_scheduled_at))}</b></div>`;
+    }
+
+    return `
+      <div class="ic-card ${stateClass}" data-valve="${esc(v.name)}">
+        <div class="ic-card-head">
+          <div class="ic-valve-name">${esc(v.asset_label || v.name)}</div>
+          <span class="ic-pill ${pillClass}">${esc(pillText)}</span>
+        </div>
+        <div class="ic-card-row"><span>Block</span><b>${esc(v.block || '—')}</b></div>
+        <div class="ic-card-row"><span>Schedule</span><b>${esc(v.schedule_state)}</b></div>
+        ${info}
+        ${v.override_active ? `<div class="ic-card-row"><span>Override by</span><b>${esc(v.override_set_by || '—')}</b></div>` : ''}
+        <div class="ic-actions">
+          <button class="ic-btn ${v.manual_state === 'Auto'         ? 'active auto' : ''}" data-state="Auto">Auto</button>
+          <button class="ic-btn ${v.manual_state === 'Forced Open'  ? 'active on'   : ''}" data-state="Forced Open">On</button>
+          <button class="ic-btn ${v.manual_state === 'Forced Closed'? 'active off'  : ''}" data-state="Forced Closed">Off</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function groupByTank(valves, tanks){
+    const groups = {};
+    const tankLabel = {};
+    tanks.forEach(t => { tankLabel[t.name] = t.asset_label || t.name; });
+    valves.forEach(v => {
+      const key = v.tank || '__no_tank__';
+      if(!groups[key]) groups[key] = [];
+      groups[key].push(v);
+    });
+    return {groups, tankLabel};
+  }
+
+  function renderGroups(data){
+    const {groups, tankLabel} = groupByTank(data.valves || [], data.tanks || []);
+    const body = $('ic-body');
+    const keys = Object.keys(groups).sort((a,b) => a === '__no_tank__' ? 1 : b === '__no_tank__' ? -1 : a.localeCompare(b));
+    if(!keys.length){
+      body.innerHTML = '<div class="ic-empty">No valves match the current filter.</div>';
+      return;
+    }
+    body.innerHTML = keys.map(k => {
+      const valves = groups[k];
+      const label = k === '__no_tank__' ? 'Valves with no Tank assigned' : (tankLabel[k] || k);
+      const onCount = valves.filter(v => v.effective_state === 'ON').length;
+      return `
+        <div class="ic-group">
+          <div class="ic-group-head">
+            <div class="ic-group-title">💧 ${esc(label)}</div>
+            <div class="ic-group-meta">${valves.length} valve${valves.length===1?'':'s'} · ${onCount} on</div>
+          </div>
+          <div class="ic-grid">${valves.map(valveCard).join('')}</div>
+        </div>
+      `;
+    }).join('');
+
+    // Wire override buttons
+    body.querySelectorAll('.ic-card').forEach(card => {
+      const valve = card.getAttribute('data-valve');
+      card.querySelectorAll('.ic-btn[data-state]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const state = btn.getAttribute('data-state');
+          card.querySelectorAll('.ic-btn').forEach(b => b.disabled = true);
+          setStatus('');
+          try {
+            await setOverride(valve, state);
+            await refresh(false);
+          } catch (err) {
+            setStatus('Override failed: ' + (err.message || err));
+          } finally {
+            card.querySelectorAll('.ic-btn').forEach(b => b.disabled = false);
+          }
+        });
+      });
+    });
+  }
+
+  async function refresh(showLoading){
+    if(showLoading){
+      $('ic-body').innerHTML = '<div class="ic-loading">Loading…</div>';
+    }
+    setStatus('');
+    try {
+      const data = await fetchStates(currentFarm);
+      $('ic-now').textContent = fmtClock(data.now);
+      populateFarms(data.valves || []);
+      renderSummary(data.valves || []);
+      renderGroups(data);
+    } catch (err) {
+      setStatus('Could not load valves: ' + (err.message || err));
+    }
+  }
+
+  function schedulePolling(){
+    if(pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => refresh(false), POLL_MS);
+  }
+
+  // Wiring
+  $('ic-refresh').addEventListener('click', () => refresh(false));
+  $('ic-farm').addEventListener('change', e => {
+    currentFarm = e.target.value;
+    refresh(true);
+  });
+
+  refresh(true);
+  schedulePolling();
+})();
+</script>
+{% endblock %}

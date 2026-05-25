@@ -1,0 +1,11 @@
+.navbar.navbar-light {
+  display: none !important;
+}
+
+.navbar.navbar-primary {
+  display: none !important;
+}
+
+.web-footer {
+  display: none !important;
+}

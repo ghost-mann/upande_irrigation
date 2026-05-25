@@ -137,34 +137,34 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Irrigation Planner": {
+		"before_save": "upande_irrigation.events.irrigation_planner.compute_shift",
+	},
+	"Weather Reading": {
+		"before_save": "upande_irrigation.events.weather_reading.compute_derived",
+	},
+}
+
+# Client-side form scripts (DB Client Scripts moved into app source)
+doctype_js = {
+	"Irrigation Planner":        "public/js/irrigation_planner.js",
+	"Irrigation Scheduler":      "public/js/irrigation_scheduler.js",
+	"Reservoir Pumping Record":  "public/js/reservoir_pumping_record.js",
+}
 
 # Scheduled Tasks
 # ---------------
+scheduler_events = {
+	"cron": {
+		# Friday 06:00 — weekly irrigation planner generation
+		"0 6 * * 5": [
+			"upande_irrigation.scheduled.weekly.run_weekly_scheduler",
+		],
+	},
+}
 
-# scheduler_events = {
-# 	"all": [
-# 		"upande_irrigation.tasks.all"
-# 	],
-# 	"daily": [
-# 		"upande_irrigation.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"upande_irrigation.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"upande_irrigation.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"upande_irrigation.tasks.monthly"
-# 	],
-# }
+# Fixtures consolidated below near end of file.
 
 # Testing
 # -------
@@ -248,14 +248,13 @@ app_license = "mit"
 # ignore_translatable_strings_from = []
 
 fixtures = [
+    # Custom DocTypes (and their fields, captured inline) in the Upande Irrigation module
+    {"doctype": "DocType",         "filters": [["module", "=", "Upande Irrigation"]]},
+    {"doctype": "Custom Field",    "filters": [["module", "=", "Upande Irrigation"]]},
+    {"doctype": "Property Setter", "filters": [["module", "=", "Upande Irrigation"]]},
+    # Custom HTML Blocks owned by this module
     {
         "doctype": "Custom HTML Block",
-        "filters": [
-            [
-                "name", "in", [
-                   "Smart Irrigation Dashboard"
-                ]
-            ]
-        ]
-    }
+        "filters": [["name", "in", ["Smart Irrigation Dashboard"]]],
+    },
 ]

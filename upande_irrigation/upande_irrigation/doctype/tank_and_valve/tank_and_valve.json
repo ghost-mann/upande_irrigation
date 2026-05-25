@@ -1,0 +1,180 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:asset_label",
+ "creation": "2026-05-24 17:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "asset_type",
+  "asset_label",
+  "column_break_layout",
+  "farm",
+  "block",
+  "tank",
+  "section_geometry",
+  "height",
+  "radius",
+  "column_break_geom",
+  "location_geojson",
+  "section_state",
+  "manual_state",
+  "column_break_state",
+  "manual_state_set_at",
+  "manual_state_set_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "asset_type",
+   "fieldtype": "Select",
+   "label": "Asset Type",
+   "options": "Tank\nValve",
+   "reqd": 1,
+   "default": "Valve",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "asset_label",
+   "fieldtype": "Data",
+   "label": "Asset Label",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_layout",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "farm",
+   "fieldtype": "Link",
+   "label": "Farm",
+   "options": "Farm",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "block",
+   "fieldtype": "Link",
+   "label": "Block (Warehouse)",
+   "options": "Warehouse",
+   "depends_on": "eval:doc.asset_type=='Valve'",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "tank",
+   "fieldtype": "Link",
+   "label": "Tank",
+   "options": "Tank And Valve",
+   "description": "The tank that supplies this valve. Filter to asset_type=Tank.",
+   "depends_on": "eval:doc.asset_type=='Valve'",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "section_geometry",
+   "fieldtype": "Section Break",
+   "label": "Geometry"
+  },
+  {
+   "fieldname": "height",
+   "fieldtype": "Float",
+   "label": "Height (m)",
+   "default": "3.0"
+  },
+  {
+   "fieldname": "radius",
+   "fieldtype": "Float",
+   "label": "Radius (m)",
+   "default": "0.5"
+  },
+  {
+   "fieldname": "column_break_geom",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "location_geojson",
+   "fieldtype": "Long Text",
+   "label": "Location (GeoJSON)"
+  },
+  {
+   "fieldname": "section_state",
+   "fieldtype": "Section Break",
+   "label": "Operator Override",
+   "depends_on": "eval:doc.asset_type=='Valve'"
+  },
+  {
+   "fieldname": "manual_state",
+   "fieldtype": "Select",
+   "label": "Manual State",
+   "options": "Auto\nForced Open\nForced Closed",
+   "default": "Auto",
+   "description": "Auto = follow the irrigation schedule. Forced = override.",
+   "depends_on": "eval:doc.asset_type=='Valve'",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_state",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "manual_state_set_at",
+   "fieldtype": "Datetime",
+   "label": "Override Set At",
+   "read_only": 1,
+   "depends_on": "eval:doc.asset_type=='Valve' && doc.manual_state && doc.manual_state!='Auto'"
+  },
+  {
+   "fieldname": "manual_state_set_by",
+   "fieldtype": "Link",
+   "label": "Override Set By",
+   "options": "User",
+   "read_only": 1,
+   "depends_on": "eval:doc.asset_type=='Valve' && doc.manual_state && doc.manual_state!='Auto'"
+  }
+ ],
+ "links": [],
+ "modified": "2026-05-24 17:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Irrigation",
+ "name": "Tank And Valve",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Agriculture Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Agriculture User",
+   "share": 1
+  }
+ ],
+ "search_fields": "asset_label,farm,block",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "asset_label",
+ "track_changes": 1
+}
