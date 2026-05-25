@@ -7,12 +7,18 @@ the rest. Returns a dict the UI can render.
 
 Was previously the `Irrigation Scheduler Run` Server Script.
 Callable as: frappe.call({method: 'upande_irrigation.api.scheduler.run'})
+
+Also exposes `live_sections` — a read-only view of which section/shift is
+being irrigated right now, with the next few upcoming shifts queued behind
+it. Powers the /irrigation-now operator dashboard.
 """
 
 import frappe
 
 _DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 _DAY_INDEX = {n: i for i, n in enumerate(_DAY_NAMES)}
+
+_UPCOMING_PER_SECTION = 3
 
 
 @frappe.whitelist()
@@ -309,4 +315,124 @@ def run(triggered_by="Manual"):
 		"created": total_created,
 		"skipped": total_skipped,
 		"failed":  total_failed,
+	}
+
+
+def _section_of(shift_name):
+	if shift_name and " - SHIFT " in shift_name:
+		return shift_name.split(" - SHIFT ")[0]
+	return shift_name or "?"
+
+
+@frappe.whitelist()
+def live_sections(farm=None):
+	"""Per-section live view: which shift is irrigating now + the queue.
+
+	Returns:
+	  {
+	    farms: [{
+	      farm,
+	      sections: [{
+	        section,
+	        current: {planner, shift, started_at, ends_at, shift_hours,
+	                  seconds_remaining, pct_complete} | null,
+	        upcoming: [{planner, shift, starts_at, ends_at, shift_hours}, ...]
+	      }]
+	    }],
+	    generated_at, now, farm_filter
+	  }
+	"""
+	now_dt = frappe.utils.now_datetime()
+	now_str = frappe.utils.get_datetime_str(now_dt)
+
+	args = {"now": now_str}
+	farm_clause = ""
+	if farm:
+		farm_clause = " AND p.farm = %(farm)s"
+		args["farm"] = farm
+
+	active = frappe.db.sql(f"""
+		SELECT
+			p.name            AS planner,
+			p.farm            AS farm,
+			p.block           AS shift,
+			p.scheduled_start AS started_at,
+			p.scheduled_end   AS ends_at,
+			p.shift_hours     AS shift_hours
+		FROM `tabIrrigation Planner` p
+		WHERE p.docstatus < 2
+		  AND p.scheduled_start IS NOT NULL
+		  AND p.scheduled_end IS NOT NULL
+		  AND %(now)s BETWEEN p.scheduled_start AND p.scheduled_end
+		  {farm_clause}
+		ORDER BY p.farm, p.block
+	""", args, as_dict=True)
+
+	upcoming = frappe.db.sql(f"""
+		SELECT
+			p.name            AS planner,
+			p.farm            AS farm,
+			p.block           AS shift,
+			p.scheduled_start AS starts_at,
+			p.scheduled_end   AS ends_at,
+			p.shift_hours     AS shift_hours
+		FROM `tabIrrigation Planner` p
+		WHERE p.docstatus < 2
+		  AND p.scheduled_start IS NOT NULL
+		  AND p.scheduled_start > %(now)s
+		  {farm_clause}
+		ORDER BY p.scheduled_start ASC
+	""", args, as_dict=True)
+
+	farms_map = {}
+
+	def ensure_section(fname, sec):
+		fmap = farms_map.setdefault(fname, {})
+		if sec not in fmap:
+			fmap[sec] = {"section": sec, "current": None, "upcoming": []}
+		return fmap[sec]
+
+	for row in active:
+		sec = ensure_section(row["farm"], _section_of(row["shift"]))
+		started_at = row["started_at"]
+		ends_at = row["ends_at"]
+		seconds_remaining = max(0, int((ends_at - now_dt).total_seconds()))
+		total_seconds = max(1, int((ends_at - started_at).total_seconds()))
+		elapsed = total_seconds - seconds_remaining
+		pct = round(100.0 * elapsed / total_seconds, 1)
+		sec["current"] = {
+			"planner":           row["planner"],
+			"shift":             row["shift"],
+			"started_at":        str(started_at),
+			"ends_at":           str(ends_at),
+			"shift_hours":       float(row["shift_hours"] or 0),
+			"seconds_remaining": seconds_remaining,
+			"pct_complete":      pct,
+		}
+
+	for row in upcoming:
+		sec = ensure_section(row["farm"], _section_of(row["shift"]))
+		if len(sec["upcoming"]) >= _UPCOMING_PER_SECTION:
+			continue
+		sec["upcoming"].append({
+			"planner":     row["planner"],
+			"shift":       row["shift"],
+			"starts_at":   str(row["starts_at"]),
+			"ends_at":     str(row["ends_at"]),
+			"shift_hours": float(row["shift_hours"] or 0),
+		})
+
+	farms_out = []
+	for fname in sorted(farms_map.keys()):
+		sections = farms_map[fname]
+		farms_out.append({
+			"farm":     fname,
+			"sections": [sections[k] for k in sorted(sections.keys())],
+		})
+
+	return {
+		"farms":        farms_out,
+		"generated_at": now_str,
+		"now":          now_str,
+		"farm_filter":  farm or "all",
 	}
