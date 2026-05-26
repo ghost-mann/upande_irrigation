@@ -1,4 +1,4 @@
-"""Irrigation Control — valve state API.
+"""Irrigation Control — valve state + geometry API.
 
 For each Valve in `Tank And Valve` (asset_type='Valve'):
 
@@ -20,7 +20,15 @@ GET  /api/method/upande_irrigation.api.valves.list_states
 POST /api/method/upande_irrigation.api.valves.set_override
         args: {valve, state}  where state in {Auto, Forced Open, Forced Closed}
         → {ok, valve, manual_state, by, at}
+
+GET  /api/method/upande_irrigation.api.valves.geojson
+        → FeatureCollection of every Tank And Valve row that has a
+          location_geojson set. Drop-in replacement for the
+          upande_scp.serverscripts.get_tanks_valves.get_tanks_valves_geojson
+          endpoint the dashboard used to call.
 """
+
+import json
 
 import frappe
 
@@ -178,4 +186,86 @@ def set_override(valve, state):
 		"manual_state": doc.manual_state,
 		"set_by":       doc.manual_state_set_by,
 		"set_at":       str(doc.manual_state_set_at or ""),
+	}
+
+
+@frappe.whitelist(allow_guest=False)
+def geojson(farm=None, asset_type=None):
+	"""Return a FeatureCollection of every Tank And Valve row.
+
+	Each stored `location_geojson` is itself a GeoJSON Feature with a Point
+	(or any geometry) and empty properties. We keep the geometry verbatim
+	and inject the row's identifying columns into `properties` so the map
+	can label, group, and link.
+
+	Rows with missing / unparseable geojson are skipped silently — the
+	dashboard treats `features` length as the source-of-truth count.
+	"""
+	filters = {}
+	if farm:
+		filters["farm"] = farm
+	if asset_type:
+		filters["asset_type"] = asset_type  # 'Valve' or 'Tank'
+
+	rows = frappe.get_all(
+		"Tank And Valve",
+		filters=filters,
+		fields=[
+			"name", "asset_type", "asset_label", "farm", "block", "tank",
+			"height", "radius", "location_geojson",
+		],
+		order_by="asset_type asc, name asc",
+		limit_page_length=0,
+	)
+
+	features = []
+	skipped = 0
+	for r in rows:
+		raw = r.get("location_geojson")
+		if not raw:
+			skipped += 1
+			continue
+		try:
+			feat = json.loads(raw)
+		except (ValueError, TypeError):
+			skipped += 1
+			continue
+
+		# Accept either a Feature wrapper or a bare geometry.
+		if isinstance(feat, dict) and feat.get("type") == "Feature":
+			geometry = feat.get("geometry")
+		elif isinstance(feat, dict) and feat.get("type") in ("Point", "Polygon", "MultiPolygon", "LineString"):
+			geometry = feat
+		else:
+			skipped += 1
+			continue
+
+		if not geometry:
+			skipped += 1
+			continue
+
+		features.append({
+			"type":     "Feature",
+			"geometry": geometry,
+			"properties": {
+				"asset_name":  r["name"],
+				"asset_label": r.get("asset_label"),
+				"asset_type":  r.get("asset_type"),
+				"farm":        r.get("farm"),
+				"block":       r.get("block"),
+				"tank":        r.get("tank"),
+				"height":      r.get("height"),
+				"radius":      r.get("radius"),
+			},
+		})
+
+	return {
+		"type": "FeatureCollection",
+		"features": features,
+		"meta": {
+			"total":   len(rows),
+			"emitted": len(features),
+			"skipped": skipped,
+			"filters": {"farm": farm, "asset_type": asset_type},
+		},
 	}

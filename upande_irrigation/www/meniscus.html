@@ -554,13 +554,37 @@
     <!-- Section usage + pump sessions -->
     <section class="grid-2">
       <div class="card">
-        <div class="card-head"><div class="card-title">Water Usage by Section</div><div class="card-tag" id="r-sec-period">this period</div></div>
+        <div class="card-head"><div class="card-title">Water Usage by Section</div><div class="card-tag" id="r-sec-period">period · tick = target</div></div>
         <div id="r-section-bars" class="sec-usage-row"></div>
       </div>
       <div class="card">
         <div class="card-head"><div class="card-title">Recent Pump Sessions</div><div class="blk-count" id="r-pump-count" style="font-family:var(--f-mono);font-size:9px;color:var(--text-3);background:var(--bg-3);padding:2px 8px;border-radius:3px;border:1px solid var(--border)">—</div></div>
         <div class="timeline" id="r-timeline"></div>
       </div>
+    </section>
+
+    <!-- Electricity by Section bars -->
+    <section class="grid-2">
+      <div class="card">
+        <div class="card-head"><div class="card-title">Electricity by Section</div><div class="card-tag">period · tick = target</div></div>
+        <div id="r-section-bars-elec" class="sec-usage-row"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Targets · Irrigation Pump Profile</div>
+          <div class="card-tag">weekly budgets · per section</div>
+        </div>
+        <div id="r-targets-table"></div>
+      </div>
+    </section>
+
+    <!-- Section Performance vs Target (per-section weekly bars + threshold) -->
+    <section class="card full">
+      <div class="card-head">
+        <div class="card-title">Section Performance vs Target</div>
+        <div class="card-tag">weekly · dashed line = weekly budget</div>
+      </div>
+      <div id="r-section-perf" class="iot-grid"></div>
     </section>
 
     <!-- Daily trends -->
@@ -1387,11 +1411,28 @@ function renderFlowDiagram(kpis,bySection){
   host.innerHTML=html;
 }
 
-function renderSectionBars(bySection){
-  const host=$('r-section-bars');
+// Renders the horizontal section bars. `metric` selects the target field:
+//   "water" → water_target_m3_per_week (default)
+//   "elec"  → kwh_target_per_week
+function renderSectionBars(bySection, hostId, opts){
+  const host=$(hostId||'r-section-bars');
+  const profiles=(opts&&opts.profiles)||{};
+  const weeks=Math.max((opts&&opts.weeks)||1, 0.01);
+  const metric=(opts&&opts.metric)||'water';
+  const unit=metric==='elec'?'kWh':'m³';
+  const targetField=metric==='elec'?'kwh_target_per_week':'water_target_m3_per_week';
   const entries=Object.entries(bySection||{});
-  if(!entries.length){host.innerHTML='<div style="color:var(--text-3);font-style:italic;font-size:12px">No water meter data in this period.</div>';return;}
-  const maxVal=Math.max(...entries.map(([,v])=>v.total),1);
+  if(!entries.length){host.innerHTML=`<div style="color:var(--text-3);font-style:italic;font-size:12px">No ${metric==='elec'?'electricity':'water meter'} data in this period.</div>`;return;}
+  // Bar scale must fit BOTH actual usage and the period target so the tick lands inside the track.
+  const targetTotalFor=(secName)=>{
+    const p=profiles[secName]||{};
+    return (Number(p[targetField])||0)*weeks;
+  };
+  const maxVal=Math.max(
+    ...entries.map(([,v])=>v.total),
+    ...entries.map(([n,])=>targetTotalFor(n)),
+    1,
+  );
   entries.sort(([a],[b])=>{
     const ai=SEC_ORDER.findIndex(k=>a.toUpperCase().includes(k));
     const bi=SEC_ORDER.findIndex(k=>b.toUpperCase().includes(k));
@@ -1399,14 +1440,169 @@ function renderSectionBars(bySection){
   });
   host.innerHTML=entries.map(([name,data])=>{
     const color=secColor(name);
-    const pct=Math.round((data.total/maxVal)*100);
+    const pct=Math.max(0,Math.min(100,(data.total/maxVal)*100));
+    const tgtTotal=targetTotalFor(name);
+    const tgtPct=tgtTotal>0?Math.max(0,Math.min(100,(tgtTotal/maxVal)*100)):null;
+    const over=tgtTotal>0 && data.total>tgtTotal;
+    const valColor=over?'var(--bad)':color;
     const short=secShort(name);
+    const tickHtml=tgtPct!=null
+      ? `<div title="weekly target × ${weeks.toFixed(1)} wk = ${fmtNum(tgtTotal)} ${unit}" style="position:absolute;left:${tgtPct}%;top:-2px;bottom:-2px;width:2px;background:var(--text);box-shadow:0 0 0 1px var(--bg-2)"></div>`
+      : '';
+    const pctOfTarget=tgtTotal>0?` · ${Math.round((data.total/tgtTotal)*100)}%`:'';
     return`<div class="sec-bar-item">
       <div class="sec-bar-name">${esc(short)}</div>
-      <div class="sec-bar-track"><div class="sec-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-      <div class="sec-bar-val" style="color:${color}">${fmtNum(data.total)} <span style="font-size:9px;color:var(--text-3)">m³</span></div>
+      <div class="sec-bar-track" style="position:relative;overflow:visible">
+        <div class="sec-bar-fill" style="width:${pct}%;background:${color}"></div>
+        ${tickHtml}
+      </div>
+      <div class="sec-bar-val" style="color:${valColor}">${fmtNum(data.total)} <span style="font-size:9px;color:var(--text-3)">${unit}${pctOfTarget}</span></div>
     </div>`;
   }).join('');
+}
+
+// ── Per-section performance vs weekly target ──
+// Buckets readings into 7-day windows anchored to `start_date`. Each
+// section card shows two mini-charts (water + electricity) with bars for
+// weekly totals and a dashed horizontal line at the weekly target.
+function secSlug(name){
+  return String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'sec';
+}
+function weeklyBuckets(readings, startISO, weeksCount){
+  // Returns array of length weeksCount, each = total units_used for that
+  // 7-day window. Anchored to startISO (yyyy-mm-dd).
+  const start=new Date(startISO+'T00:00:00');
+  const buckets=Array(Math.max(1,weeksCount)).fill(0);
+  (readings||[]).forEach(r=>{
+    if(r.units_used==null) return;
+    const d=new Date(String(r.date).slice(0,10)+'T00:00:00');
+    if(isNaN(d)) return;
+    const dayIdx=Math.floor((d-start)/86400000);
+    const wkIdx=Math.floor(dayIdx/7);
+    if(wkIdx<0 || wkIdx>=buckets.length) return;
+    buckets[wkIdx]=+(buckets[wkIdx]+(r.units_used||0)).toFixed(2);
+  });
+  return buckets;
+}
+function weekLabels(startISO, weeksCount){
+  const start=new Date(startISO+'T00:00:00');
+  const out=[];
+  for(let i=0;i<weeksCount;i++){
+    const d=new Date(start.getTime()+i*7*86400000);
+    out.push(d.toISOString().slice(0,10));
+  }
+  return out;
+}
+
+function renderSectionPerformance(data){
+  const host=$('r-section-perf');
+  const profiles=data.profiles||{};
+  const water=data.water&&data.water.by_section||{};
+  const elec=data.electricity&&data.electricity.by_section||{};
+  const startISO=(data.meta&&data.meta.start_date)||'';
+  const endISO=(data.meta&&data.meta.end_date)||'';
+  const days=(data.meta&&data.meta.days)||30;
+  const weeks=Math.max(1, Math.ceil(days/7));
+  const xLabels=weekLabels(startISO, weeks);
+  // Union of section keys across profiles, water, elec — so we render any
+  // section that has either a target or recorded data.
+  const sectionKeys=Array.from(new Set([
+    ...Object.keys(profiles),
+    ...Object.keys(water),
+    ...Object.keys(elec),
+  ])).filter(s=>s && s!=='Unknown');
+  sectionKeys.sort((a,b)=>{
+    const ai=SEC_ORDER.findIndex(k=>a.toUpperCase().includes(k));
+    const bi=SEC_ORDER.findIndex(k=>b.toUpperCase().includes(k));
+    return(ai<0?99:ai)-(bi<0?99:bi);
+  });
+  if(!sectionKeys.length){host.innerHTML='<div style="color:var(--text-3);font-style:italic;padding:12px">No section data.</div>';return;}
+
+  const W=420, H=130;
+  host.innerHTML=sectionKeys.map(secName=>{
+    const color=secColor(secName);
+    const short=secShort(secName);
+    const p=profiles[secName]||{};
+    const wTarget=Number(p.water_target_m3_per_week)||0;
+    const eTarget=Number(p.kwh_target_per_week)||0;
+    const wReadings=(water[secName]&&water[secName].readings)||[];
+    const eReadings=(elec[secName]&&elec[secName].readings)||[];
+    const wWeekly=weeklyBuckets(wReadings, startISO, weeks);
+    const eWeekly=weeklyBuckets(eReadings, startISO, weeks);
+    const wMax=Math.max(...wWeekly, wTarget, 1);
+    const eMax=Math.max(...eWeekly, eTarget, 1);
+    const wTotal=wWeekly.reduce((a,b)=>a+b,0);
+    const eTotal=eWeekly.reduce((a,b)=>a+b,0);
+    const wAvg=wTotal/Math.max(1,weeks);
+    const eAvg=eTotal/Math.max(1,weeks);
+    const wPct=wTarget>0?Math.round((wAvg/wTarget)*100):null;
+    const ePct=eTarget>0?Math.round((eAvg/eTarget)*100):null;
+    const wStatus=wTarget>0?(wAvg>wTarget?'over':'under'):'no target';
+    const eStatus=eTarget>0?(eAvg>eTarget?'over':'under'):'no target';
+    return`<div class="card" style="border-left:3px solid ${color}">
+      <div class="card-head" style="margin-bottom:6px">
+        <div class="card-title" style="font-size:13px">${esc(short)}</div>
+        <div class="card-tag">${weeks} wk · ${esc(p.pump_name||'no profile')}</div>
+      </div>
+      <div style="font-family:var(--f-mono);font-size:10px;color:var(--text-2);margin-bottom:4px;display:flex;justify-content:space-between">
+        <span style="color:var(--water)"><strong style="color:var(--water)">${fmtNum(wAvg)}</strong> m³/wk avg · target ${fmtNum(wTarget)} ${wPct!=null?`· <strong style="color:${wStatus==='over'?'var(--bad)':'var(--good)'}">${wPct}%</strong>`:''}</span>
+      </div>
+      <div id="r-perf-w-${secSlug(secName)}"></div>
+      <div style="font-family:var(--f-mono);font-size:10px;color:var(--text-2);margin:8px 0 4px;display:flex;justify-content:space-between">
+        <span style="color:var(--elec)"><strong style="color:var(--elec)">${fmtNum(eAvg)}</strong> kWh/wk avg · target ${fmtNum(eTarget)} ${ePct!=null?`· <strong style="color:${eStatus==='over'?'var(--bad)':'var(--good)'}">${ePct}%</strong>`:''}</span>
+      </div>
+      <div id="r-perf-e-${secSlug(secName)}"></div>
+    </div>`;
+  }).join('');
+
+  // Paint each pair of charts after the DOM is in place.
+  sectionKeys.forEach(secName=>{
+    const p=profiles[secName]||{};
+    const wTarget=Number(p.water_target_m3_per_week)||0;
+    const eTarget=Number(p.kwh_target_per_week)||0;
+    const wReadings=(water[secName]&&water[secName].readings)||[];
+    const eReadings=(elec[secName]&&elec[secName].readings)||[];
+    const wWeekly=weeklyBuckets(wReadings, startISO, weeks);
+    const eWeekly=weeklyBuckets(eReadings, startISO, weeks);
+    const wHost=document.getElementById(`r-perf-w-${secSlug(secName)}`);
+    const eHost=document.getElementById(`r-perf-e-${secSlug(secName)}`);
+    if(wHost){
+      const series=[{label:'m³/wk',color:'#22d3ee',type:'bar',values:wWeekly,unit:'m³'}];
+      if(wTarget>0) series.push({label:'target',color:'#0e7490',values:Array(weeks).fill(wTarget),dash:'5 3',width:1.5,unit:'m³',noPoints:true});
+      mkChart(wHost, series, W, H, {xLabels, tooltip:true, margin:{t:8,r:12,b:24,l:38}});
+    }
+    if(eHost){
+      const series=[{label:'kWh/wk',color:'#fbbf24',type:'bar',values:eWeekly,unit:'kWh'}];
+      if(eTarget>0) series.push({label:'target',color:'#b45309',values:Array(weeks).fill(eTarget),dash:'5 3',width:1.5,unit:'kWh',noPoints:true});
+      mkChart(eHost, series, W, H, {xLabels, tooltip:true, margin:{t:8,r:12,b:24,l:38}});
+    }
+  });
+}
+
+// Small summary table of the active pump profiles → weekly budgets.
+function renderTargetsTable(profiles){
+  const host=$('r-targets-table');
+  if(!host) return;
+  const entries=Object.entries(profiles||{});
+  if(!entries.length){host.innerHTML='<div style="color:var(--text-3);font-style:italic;font-size:12px;padding:8px">No Irrigation Pump Profile rows.</div>';return;}
+  entries.sort(([a],[b])=>{
+    const ai=SEC_ORDER.findIndex(k=>a.toUpperCase().includes(k));
+    const bi=SEC_ORDER.findIndex(k=>b.toUpperCase().includes(k));
+    return(ai<0?99:ai)-(bi<0?99:bi);
+  });
+  host.innerHTML=`<table><thead><tr>
+    <th>Section</th><th>Pump</th>
+    <th style="text-align:right">Water m³/wk</th>
+    <th style="text-align:right">kWh/wk</th>
+  </tr></thead><tbody>${entries.map(([sec,p])=>{
+    const c=secColor(sec);
+    return`<tr>
+      <td><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${c};flex:none"></span>${esc(secShort(sec))}</span></td>
+      <td>${esc(p.pump_name||'—')}</td>
+      <td style="text-align:right;font-weight:600;color:var(--water)">${fmtNum(p.water_target_m3_per_week||0)}</td>
+      <td style="text-align:right;font-weight:600;color:var(--elec)">${fmtNum(p.kwh_target_per_week||0)}</td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
 }
 
 function renderTimeline(sessions){
@@ -1511,7 +1707,12 @@ async function renderResources(){
     populateSections(data.sections||[]);
     renderResKpis(data.kpis,data);
     renderFlowDiagram(data.kpis,data.water.by_section);
-    renderSectionBars(data.water.by_section);
+    const weeks=(data.meta && data.meta.days ? data.meta.days/7 : days/7);
+    const profiles=data.profiles||{};
+    renderSectionBars(data.water.by_section,       'r-section-bars',      {profiles,weeks,metric:'water'});
+    renderSectionBars(data.electricity.by_section, 'r-section-bars-elec', {profiles,weeks,metric:'elec'});
+    renderTargetsTable(profiles);
+    renderSectionPerformance(data);
     renderTimeline(data.pumping.all_readings||[]);
     renderMonthlyCharts(data.pumping.all_readings||[],data.electricity.all_readings||[]);
     renderDailyCharts(data);
@@ -1825,7 +2026,7 @@ loadChartJs(()=>{ loadCmpData(); });
 // ════════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
 
-const VALVE_API  = '/api/method/upande_scp.serverscripts.get_tanks_valves.get_tanks_valves_geojson';
+const VALVE_API  = '/api/method/upande_irrigation.api.valves.geojson';
 // Block boundaries are read directly from Warehouse via frappe.client.get_list
 // — meniscus is a Web Page with no Jinja context, and we want zero new
 // server-side endpoints. Each block's polygon lives in custom_raw_geojson.

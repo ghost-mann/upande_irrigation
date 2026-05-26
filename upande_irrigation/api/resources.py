@@ -52,6 +52,38 @@ def fetch(days=30, section=None, farm=None):
 		for s in sections_raw
 	]
 
+	# ── 1b. Irrigation Pump Profile targets ──────────────────────
+	# Keyed by irrigation_section so the dashboard can render
+	# threshold lines on each section's chart.
+	pp_filters = {}
+	if farm:
+		pp_filters["farm"] = farm
+	profile_rows = frappe.get_all(
+		"Irrigation Pump Profile",
+		fields=[
+			"name", "farm", "irrigation_section", "pump_name",
+			"pump_flow_rate_m3_per_hr", "pump_kwh_per_hr",
+			"water_target_m3_per_week", "kwh_target_per_week",
+		],
+		filters=pp_filters,
+		limit_page_length=0,
+	)
+	profiles = {}
+	for p in profile_rows:
+		sec = p.get("irrigation_section")
+		if not sec:
+			continue
+		# Last profile wins if multiple — should normally be one per section
+		profiles[sec] = {
+			"name":                       p["name"],
+			"farm":                       p.get("farm"),
+			"pump_name":                  p.get("pump_name"),
+			"pump_flow_rate_m3_per_hr":   p.get("pump_flow_rate_m3_per_hr") or 0,
+			"pump_kwh_per_hr":            p.get("pump_kwh_per_hr") or 0,
+			"water_target_m3_per_week":   p.get("water_target_m3_per_week") or 0,
+			"kwh_target_per_week":        p.get("kwh_target_per_week") or 0,
+		}
+
 	# ── 2. Water Meter Readings ──────────────────────────────────
 	wm_filters = {"date": [">=", start_date]}
 	if section:
@@ -180,6 +212,7 @@ def fetch(days=30, section=None, farm=None):
 			"farm":       farm,
 		},
 		"sections": sections,
+		"profiles": profiles,
 		"water": {
 			"total_m3":     water_total,
 			"by_section":   water_by_section,
