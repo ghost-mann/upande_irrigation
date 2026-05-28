@@ -55,8 +55,24 @@
   .in-shift { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
   .in-countdown { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 22px; font-weight: 700; color: var(--in-on); margin-bottom: 6px; }
   .in-times { font-size: 11px; color: var(--in-muted); display:flex; justify-content:space-between; margin-bottom: 8px; }
-  .in-progress { height: 6px; background: var(--in-track); border-radius: 3px; overflow: hidden; }
+  .in-progress { position: relative; height: 8px; background: var(--in-track); border-radius: 3px; overflow: hidden; }
   .in-progress-fill { height: 100%; background: var(--in-on); transition: width 1s linear; }
+  .in-cycle-sep { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--in-card); }
+
+  .in-cycle { display:flex; align-items:center; gap:6px; font-size: 11px; color: var(--in-muted); margin-bottom: 6px; }
+  .in-cycle b { color: var(--in-text); font-weight: 600; }
+  .in-cycle-badge { display:inline-flex; align-items:center; padding: 1px 7px; border-radius: 999px; background: var(--in-on); color:#fff; font-weight: 600; font-size: 10px; }
+  .in-up-cycle { color: var(--in-muted); font-size: 11px; }
+
+  .in-cycle-steps { display:flex; flex-wrap:wrap; gap:6px; margin: 8px 0 2px; }
+  .in-cstep { display:flex; flex-direction:column; align-items:center; gap:2px; padding: 4px 8px; border-radius:6px; border:1px solid var(--in-border); font-size:10px; min-width: 56px; }
+  .in-cstep .cn { font-weight:700; font-size:11px; }
+  .in-cstep .ct { color: var(--in-muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .in-cstep.done    { background: var(--in-on-bg); border-color: var(--in-on); color: var(--in-on); }
+  .in-cstep.running { background: var(--in-on); border-color: var(--in-on); color:#fff; }
+  .in-cstep.running .ct { color: rgba(255,255,255,0.85); }
+  .in-cstep.upcoming{ background: var(--in-card); color: var(--in-muted); }
+  .in-cstep .arrow { color: var(--in-border); }
 
   .in-idle-msg { font-size: 12px; color: var(--in-muted); font-style: italic; padding: 8px 0; }
 
@@ -229,6 +245,49 @@
     return {seconds_remaining: remaining, pct};
   }
 
+  // Which cycle is running now (cycles are equal-length and back-to-back).
+  function liveCycle(current){
+    const n = current.cycles_count || 0;
+    const each = current.cycle_hours_each || 0;
+    if(n <= 1 || each <= 0) return {n, each, idx: n ? 1 : 0};
+    const start = parseDt(current.started_at);
+    if(!start) return {n, each, idx: current.current_cycle || 1};
+    const elapsedH = Math.max(0, (new Date() - start) / 3600000);
+    const idx = Math.min(n, Math.floor(elapsedH / each) + 1);
+    return {n, each, idx};
+  }
+
+  function cycleSeparators(n){
+    if(!n || n < 2) return '';
+    let out = '';
+    for(let i = 1; i < n; i++){
+      out += `<div class="in-cycle-sep" style="left:${(100 * i / n).toFixed(2)}%"></div>`;
+    }
+    return out;
+  }
+
+  // State of one cycle right now, recomputed client-side so it ticks live.
+  function cycleStateNow(startStr, endStr){
+    const s = parseDt(startStr), e = parseDt(endStr), now = new Date();
+    if(!s || !e) return 'upcoming';
+    if(now >= e) return 'done';
+    if(now < s) return 'upcoming';
+    return 'running';
+  }
+
+  // Ordered cycle chain: each cycle a step that follows the previous one.
+  function cycleStepsHtml(current){
+    const cs = current.cycles || [];
+    if(cs.length <= 1) return '';
+    return `<div class="in-cycle-steps" data-csteps>` + cs.map(c => {
+      const st = cycleStateNow(c.starts_at, c.ends_at);
+      return `<div class="in-cstep ${st}" data-cstart="${esc(c.starts_at)}" data-cend="${esc(c.ends_at)}">
+                <span class="cn">cyc ${c.n}</span>
+                <span class="ct">${esc(fmtClock(c.starts_at))}</span>
+              </div>`;
+    }).join('') + `</div>`;
+  }
+
   function sectionCard(s){
     const active = !!s.current;
     const cls = active ? 'is-on' : 'is-idle';
@@ -238,17 +297,29 @@
     let body = '';
     if(active){
       const t = liveTiming(s.current);
+      const c = liveCycle(s.current);
+      let cycleLine = '';
+      if(c.n >= 1){
+        const plan = `${c.n} cycle${c.n === 1 ? '' : 's'} × ${c.each.toFixed(2)} hr`;
+        const running = c.n > 1 ? `<span class="in-cycle-badge" data-cycle>cycle ${c.idx} of ${c.n}</span>` : '';
+        cycleLine = `<div class="in-cycle"><b>${esc(plan)}</b> ${running}</div>`;
+      }
       body = `
         <div class="in-current">
           <div class="in-shift">${esc(s.current.shift)}</div>
           <div class="in-countdown" data-countdown data-started="${esc(s.current.started_at)}" data-ends="${esc(s.current.ends_at)}">
             ${fmtCountdown(t.seconds_remaining)} left
           </div>
+          ${cycleLine}
           <div class="in-times">
             <span>Started ${esc(fmtClock(s.current.started_at))}</span>
             <span>Ends ${esc(fmtClock(s.current.ends_at))}</span>
           </div>
-          <div class="in-progress"><div class="in-progress-fill" data-progress style="width:${t.pct.toFixed(1)}%"></div></div>
+          <div class="in-progress" data-cycles="${s.current.cycles_count || 0}" data-started="${esc(s.current.started_at)}" data-each="${s.current.cycle_hours_each || 0}">
+            <div class="in-progress-fill" data-progress style="width:${t.pct.toFixed(1)}%"></div>
+            ${cycleSeparators(s.current.cycles_count || 0)}
+          </div>
+          ${cycleStepsHtml(s.current)}
         </div>
       `;
     } else {
@@ -264,6 +335,7 @@
           ${s.upcoming.map(u => `
             <div class="in-up-row">
               <span class="in-up-shift">${esc(u.shift)}</span>
+              <span class="in-up-cycle">${(u.cycles_count || 0) > 1 ? (u.cycles_count + '×' + (u.cycle_hours_each || 0).toFixed(1) + 'h') : ''}</span>
               <span class="in-up-time">${esc(fmtDayClock(u.starts_at))}</span>
               <span class="in-up-hours">${(u.shift_hours || 0).toFixed(1)} hr</span>
             </div>
@@ -323,6 +395,25 @@
       const t = liveTiming({started_at: started, ends_at: ends});
       cd.textContent = fmtCountdown(t.seconds_remaining) + ' left';
       pf.style.width = t.pct.toFixed(1) + '%';
+
+      // Live cycle badge: recompute which cycle is running.
+      const badge = card.querySelector('[data-cycle]');
+      const prog = card.querySelector('[data-cycles]');
+      if(badge && prog){
+        const c = liveCycle({
+          started_at: prog.getAttribute('data-started'),
+          cycles_count: parseInt(prog.getAttribute('data-cycles'), 10) || 0,
+          cycle_hours_each: parseFloat(prog.getAttribute('data-each')) || 0,
+        });
+        if(c.n > 1) badge.textContent = `cycle ${c.idx} of ${c.n}`;
+      }
+
+      // Step the cycle chain (done / running / upcoming) live.
+      card.querySelectorAll('.in-cstep').forEach(step => {
+        const st = cycleStateNow(step.getAttribute('data-cstart'), step.getAttribute('data-cend'));
+        step.classList.remove('done', 'running', 'upcoming');
+        step.classList.add(st);
+      });
 
       // If a shift has just ended, force a poll so we pick up the next one.
       if(t.seconds_remaining === 0 && Date.now() - lastFetchEpoch > 5000){

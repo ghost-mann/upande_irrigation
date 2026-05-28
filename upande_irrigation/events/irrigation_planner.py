@@ -16,6 +16,8 @@ Model v3.2:
   - Unmet deficit carries forward per-shift (per zone).
 """
 
+import math
+
 import frappe
 
 CHRONIC_DEFICIT_THRESHOLD_MM = 50.0
@@ -199,6 +201,31 @@ def compute_shift(doc, method=None):
 	doc.shift_hours        = shift_hours
 	doc.delivered_depth_mm = delivered_depth_mm
 	doc.unmet_deficit_mm   = round(unmet_deficit, 2)
+
+	# ── Cycles ───────────────────────────────────────────────────
+	# Split the shift into equal, back-to-back cycles so no single cycle
+	# runs longer than auto_cycle_threshold_hrs. cycles_when_above_threshold
+	# acts as a floor (a shift just over the threshold still gets ≥ that many),
+	# cycles_when_below_threshold sets the count for short shifts.
+	cycle_threshold = float(settings.auto_cycle_threshold_hrs or 5.0)
+	cycles_below    = max(1, int(settings.cycles_when_below_threshold or 1))
+	cycles_above    = max(1, int(settings.cycles_when_above_threshold or 2))
+
+	if shift_hours <= 0:
+		cycles_count = 0
+	elif shift_hours <= cycle_threshold:
+		cycles_count = cycles_below
+	else:
+		by_cap = math.ceil(shift_hours / cycle_threshold) if cycle_threshold > 0 else cycles_above
+		cycles_count = max(by_cap, cycles_above)
+
+	doc.cycles_count = cycles_count
+	if cycles_count:
+		doc.cycle_hours_each = round(shift_hours / cycles_count, 2)
+		doc.cycle_plan = f"{cycles_count} × {doc.cycle_hours_each:.2f} hr"
+	else:
+		doc.cycle_hours_each = 0.0
+		doc.cycle_plan = ""
 
 	# ── Warnings ─────────────────────────────────────────────────
 	warnings = []

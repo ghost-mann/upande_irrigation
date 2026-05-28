@@ -13,12 +13,47 @@ being irrigated right now, with the next few upcoming shifts queued behind
 it. Powers the /irrigation-now operator dashboard.
 """
 
+from datetime import timedelta
+
 import frappe
 
 _DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 _DAY_INDEX = {n: i for i, n in enumerate(_DAY_NAMES)}
 
 _UPCOMING_PER_SECTION = 3
+
+# Each day's irrigation begins at this clock hour (same time every day).
+_DAILY_ANCHOR_HOUR = 0
+
+
+def assign_daily_blocks(from_date, shift_hours_list, day_anchor_hour=_DAILY_ANCHOR_HOUR):
+	"""Distribute a section's shifts across 7 daily blocks.
+
+	Shift i is assigned to day floor(i * 7 / N); each day's shifts run
+	back-to-back from that day's anchor time. This spreads a section's run
+	over the whole week — light weeks put one short shift per day, heavy
+	weeks pack 2-3 shifts/day (approaching 24 h = continuous). Returns a
+	list of (start_dt, end_dt) aligned with shift_hours_list.
+	"""
+	n = len(shift_hours_list)
+	result = [None] * n
+	if n == 0:
+		return result
+
+	base = frappe.utils.get_datetime(f"{from_date} 00:00:00")
+	by_day = {}
+	for i in range(n):
+		by_day.setdefault((i * 7) // n, []).append(i)
+
+	for day, idxs in by_day.items():
+		cursor = frappe.utils.add_to_date(base, days=day, hours=day_anchor_hour)
+		for i in idxs:
+			hours = float(shift_hours_list[i] or 0)
+			start = cursor
+			end = frappe.utils.add_to_date(cursor, hours=hours)
+			result[i] = (start, end)
+			cursor = end
+	return result
 
 
 @frappe.whitelist()
@@ -179,8 +214,10 @@ def run(triggered_by="Manual"):
 			log(f"  [{prefix}] {len(shifts)} active shifts")
 			sections_touched.add(prefix)
 
-			cursor_dt = frappe.utils.get_datetime(f"{schedule_from} 00:00:00")
+			base_dt = frappe.utils.get_datetime(f"{schedule_from} 00:00:00")
 
+			# ── Pass 1: insert all shifts (temp schedule), capture shift_hours ──
+			created = []  # ordered list of {name, block, shift_hours}
 			for s in shifts:
 				if aborted:
 					break
@@ -208,14 +245,14 @@ def run(triggered_by="Manual"):
 						})
 						continue
 
-				# Try insert
+				# Try insert (scheduled_start gets finalised in pass 2)
 				try:
 					planner = frappe.new_doc("Irrigation Planner")
 					planner.farm            = farm
 					planner.block           = block_name
 					planner.from_date       = str(schedule_from)
 					planner.to_date         = str(schedule_to)
-					planner.scheduled_start = frappe.utils.get_datetime_str(cursor_dt)
+					planner.scheduled_start = frappe.utils.get_datetime_str(base_dt)
 
 					planner.insert(ignore_permissions=True)
 					frappe.db.commit()
@@ -224,14 +261,12 @@ def run(triggered_by="Manual"):
 					total_created += 1
 					log(f"    OK    {block_name}  ({round(sh, 2)} hr)")
 
+					created.append({"name": planner.name, "block": block_name, "shift_hours": sh})
 					shift_results.append({
 						"farm": farm, "section": prefix, "block": block_name,
 						"status": "Created", "planner": planner.name,
 						"shift_hours": sh, "message": "",
 					})
-
-					if sh > 0:
-						cursor_dt = frappe.utils.add_to_date(cursor_dt, hours=sh)
 
 				except Exception as e:
 					frappe.db.rollback()
@@ -251,6 +286,19 @@ def run(triggered_by="Manual"):
 						    f"max_errors_before_abort ({max_errors})")
 						aborted = True
 						break
+
+			# ── Pass 2: distribute this section's shifts across 7 daily blocks ──
+			if created:
+				slots = assign_daily_blocks(schedule_from, [c["shift_hours"] for c in created])
+				for c, slot in zip(created, slots):
+					if not slot:
+						continue
+					start_dt, end_dt = slot
+					frappe.db.set_value("Irrigation Planner", c["name"], {
+						"scheduled_start": frappe.utils.get_datetime_str(start_dt),
+						"scheduled_end":   frappe.utils.get_datetime_str(end_dt),
+					}, update_modified=False)
+				frappe.db.commit()
 
 			log("")
 
@@ -353,12 +401,14 @@ def live_sections(farm=None):
 
 	active = frappe.db.sql(f"""
 		SELECT
-			p.name            AS planner,
-			p.farm            AS farm,
-			p.block           AS shift,
-			p.scheduled_start AS started_at,
-			p.scheduled_end   AS ends_at,
-			p.shift_hours     AS shift_hours
+			p.name             AS planner,
+			p.farm             AS farm,
+			p.block            AS shift,
+			p.scheduled_start  AS started_at,
+			p.scheduled_end    AS ends_at,
+			p.shift_hours      AS shift_hours,
+			p.cycles_count     AS cycles_count,
+			p.cycle_hours_each AS cycle_hours_each
 		FROM `tabIrrigation Planner` p
 		WHERE p.docstatus < 2
 		  AND p.scheduled_start IS NOT NULL
@@ -370,12 +420,14 @@ def live_sections(farm=None):
 
 	upcoming = frappe.db.sql(f"""
 		SELECT
-			p.name            AS planner,
-			p.farm            AS farm,
-			p.block           AS shift,
-			p.scheduled_start AS starts_at,
-			p.scheduled_end   AS ends_at,
-			p.shift_hours     AS shift_hours
+			p.name             AS planner,
+			p.farm             AS farm,
+			p.block            AS shift,
+			p.scheduled_start  AS starts_at,
+			p.scheduled_end    AS ends_at,
+			p.shift_hours      AS shift_hours,
+			p.cycles_count     AS cycles_count,
+			p.cycle_hours_each AS cycle_hours_each
 		FROM `tabIrrigation Planner` p
 		WHERE p.docstatus < 2
 		  AND p.scheduled_start IS NOT NULL
@@ -400,6 +452,30 @@ def live_sections(farm=None):
 		total_seconds = max(1, int((ends_at - started_at).total_seconds()))
 		elapsed = total_seconds - seconds_remaining
 		pct = round(100.0 * elapsed / total_seconds, 1)
+		cycles_count = int(row["cycles_count"] or 0)
+		cycle_hours_each = float(row["cycle_hours_each"] or 0)
+		current_cycle = 0
+		cycles = []
+		if cycles_count and cycle_hours_each > 0:
+			elapsed_hours = elapsed / 3600.0
+			current_cycle = min(cycles_count, int(elapsed_hours // cycle_hours_each) + 1)
+			cyc_seconds = cycle_hours_each * 3600.0
+			for k in range(cycles_count):
+				c_start = started_at + timedelta(seconds=k * cyc_seconds)
+				c_end   = started_at + timedelta(seconds=(k + 1) * cyc_seconds)
+				if now_dt >= c_end:
+					state = "done"
+				elif now_dt < c_start:
+					state = "upcoming"
+				else:
+					state = "running"
+				cycles.append({
+					"n":         k + 1,
+					"starts_at": str(c_start),
+					"ends_at":   str(c_end),
+					"hours":     round(cycle_hours_each, 2),
+					"state":     state,
+				})
 		sec["current"] = {
 			"planner":           row["planner"],
 			"shift":             row["shift"],
@@ -408,6 +484,10 @@ def live_sections(farm=None):
 			"shift_hours":       float(row["shift_hours"] or 0),
 			"seconds_remaining": seconds_remaining,
 			"pct_complete":      pct,
+			"cycles_count":      cycles_count,
+			"cycle_hours_each":  cycle_hours_each,
+			"current_cycle":     current_cycle,
+			"cycles":            cycles,
 		}
 
 	for row in upcoming:
@@ -415,11 +495,13 @@ def live_sections(farm=None):
 		if len(sec["upcoming"]) >= _UPCOMING_PER_SECTION:
 			continue
 		sec["upcoming"].append({
-			"planner":     row["planner"],
-			"shift":       row["shift"],
-			"starts_at":   str(row["starts_at"]),
-			"ends_at":     str(row["ends_at"]),
-			"shift_hours": float(row["shift_hours"] or 0),
+			"planner":          row["planner"],
+			"shift":            row["shift"],
+			"starts_at":        str(row["starts_at"]),
+			"ends_at":          str(row["ends_at"]),
+			"shift_hours":      float(row["shift_hours"] or 0),
+			"cycles_count":     int(row["cycles_count"] or 0),
+			"cycle_hours_each": float(row["cycle_hours_each"] or 0),
 		})
 
 	farms_out = []
