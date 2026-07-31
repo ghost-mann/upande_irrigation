@@ -122,7 +122,7 @@ export class Shell {
 			filters: this.filters,
 			user: this.boot.user || "",
 			setFarms: (farms) => this.setFarms(farms),
-			setStats: (rows) => this.setStats(rows),
+			setStats: (rows, label) => this.setStats(rows, label),
 			onFilterChange: (fn) => {
 				this.filterListeners.add(fn);
 				return () => this.filterListeners.delete(fn);

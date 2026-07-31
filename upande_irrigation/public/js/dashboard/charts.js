@@ -534,3 +534,245 @@ export function mkMultiLine(host, labels, datasets, W, H, opts = {}) {
 		margin: { t: 14, r: 18, b: 32, l: 48 },
 	});
 }
+
+/* ══════════════════════════════════════════════ fleet time series
+ *
+ * A tab of identical sensors is 28 lines, which reads as spaghetti and hides
+ * the thing an operator wants: is the fleet normal, and is this device an
+ * outlier? So the fleet is drawn as a p10–p90 envelope with the median through
+ * it, and only the devices explicitly picked are overlaid as accent lines.
+ */
+
+function quantile(sorted, q) {
+	if (!sorted.length) return null;
+	const pos = (sorted.length - 1) * q;
+	const lo = Math.floor(pos);
+	const hi = Math.ceil(pos);
+	if (lo === hi) return sorted[lo];
+	return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+/* Per time-slot spread across every device in the tab. */
+export function fleetStats(devices) {
+	const n = Math.max(0, ...devices.map((d) => (d.series || []).length));
+	const lo = [];
+	const mid = [];
+	const hi = [];
+	const count = [];
+	for (let i = 0; i < n; i++) {
+		const col = devices
+			.map((d) => (d.series || [])[i])
+			.filter((v) => v != null && !isNaN(v))
+			.sort((a, b) => a - b);
+		count.push(col.length);
+		if (!col.length) {
+			lo.push(null);
+			mid.push(null);
+			hi.push(null);
+			continue;
+		}
+		lo.push(+quantile(col, 0.1).toFixed(3));
+		mid.push(+quantile(col, 0.5).toFixed(3));
+		hi.push(+quantile(col, 0.9).toFixed(3));
+	}
+	return { lo, mid, hi, count, points: n };
+}
+
+/* Adaptive time labels: a multi-week window wants dates, a single day wants
+ * clock times, and a couple of days wants both. */
+function timeTicks(labels, maxTicks = 7) {
+	const dates = labels.map((l) => new Date(String(l).replace(" ", "T")));
+	const valid = dates.filter((d) => !isNaN(d));
+	if (!valid.length) return { fmt: (i) => String(labels[i] || ""), idx: [] };
+	const spanHours = (valid[valid.length - 1] - valid[0]) / 3600000;
+	const fmt = (i) => {
+		const d = dates[i];
+		if (!d || isNaN(d)) return "";
+		if (spanHours <= 30) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+		if (spanHours <= 24 * 6) {
+			return `${d.getDate()} ${MONTHS[d.getMonth()]} ${String(d.getHours()).padStart(2, "0")}:00`;
+		}
+		return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+	};
+	const step = Math.max(1, Math.ceil(labels.length / maxTicks));
+	const idx = [];
+	for (let i = 0; i < labels.length; i += step) idx.push(i);
+	if (idx.length && idx[idx.length - 1] !== labels.length - 1) {
+		if (labels.length - 1 - idx[idx.length - 1] < step * 0.6) idx[idx.length - 1] = labels.length - 1;
+		else idx.push(labels.length - 1);
+	}
+	return { fmt, idx };
+}
+
+/* opts: {labels[], stats:{lo,mid,hi}, picks:[{label,color,values}], unit,
+ *        bandColor, medianColor, W, H} */
+export function mkFleetChart(host, opts) {
+	if (!host) return;
+	const labels = opts.labels || [];
+	const stats = opts.stats || { lo: [], mid: [], hi: [] };
+	const picks = opts.picks || [];
+	const W = opts.W || 1180;
+	const H = opts.H || 340;
+	const M = { t: 18, r: 18, b: 34, l: 52 };
+	const iw = W - M.l - M.r;
+	const ih = H - M.t - M.b;
+	const n = labels.length;
+
+	if (!n) {
+		host.innerHTML = '<div class="empty small">No readings in this window.</div>';
+		return;
+	}
+
+	const all = []
+		.concat(stats.lo, stats.hi, stats.mid, ...picks.map((p) => p.values || []))
+		.filter((v) => v != null && !isNaN(v));
+	if (!all.length) {
+		host.innerHTML = '<div class="empty small">No readings in this window.</div>';
+		return;
+	}
+	let yMin = Math.min(...all);
+	let yMax = Math.max(...all);
+	const pad = (yMax - yMin || 1) * 0.12;
+	yMin -= pad;
+	yMax += pad;
+	const span = yMax - yMin || 1;
+
+	const x = (i) => M.l + (n > 1 ? (iw * i) / (n - 1) : iw / 2);
+	const y = (v) => M.t + ih - ((v - yMin) / span) * ih;
+
+	const bandColor = opts.bandColor || "var(--trap-500)";
+	const medianColor = opts.medianColor || "var(--ink)";
+	const gid = nextId();
+	let defs = `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${bandColor}" stop-opacity=".40"/><stop offset="100%" stop-color="${bandColor}" stop-opacity=".12"/></linearGradient>`;
+	let body = "";
+
+	/* Gridlines and axis */
+	const fmtAxis = axisFormatter(span);
+	for (let i = 0; i <= 4; i++) {
+		const v = yMin + (span * i) / 4;
+		const yy = y(v);
+		body += `<line class="grid-line" x1="${M.l}" y1="${yy.toFixed(1)}" x2="${W - M.r}" y2="${yy.toFixed(1)}"/>`;
+		body += `<text class="ax" x="${M.l - 8}" y="${(yy + 3.5).toFixed(1)}" text-anchor="end">${fmtAxis(v)}</text>`;
+	}
+	body += `<line class="axis-line" x1="${M.l}" y1="${(M.t + ih).toFixed(1)}" x2="${W - M.r}" y2="${(M.t + ih).toFixed(1)}"/>`;
+	if (opts.unit) {
+		body += `<text class="ax" x="${M.l - 8}" y="${M.t - 6}" text-anchor="end">${esc(opts.unit)}</text>`;
+	}
+
+	/* Envelope, split at gaps so a silent stretch stays empty. */
+	const runs = [];
+	let run = [];
+	for (let i = 0; i < n; i++) {
+		if (stats.lo[i] == null || stats.hi[i] == null) {
+			if (run.length > 1) runs.push(run);
+			run = [];
+			continue;
+		}
+		run.push(i);
+	}
+	if (run.length > 1) runs.push(run);
+
+	runs.forEach((r) => {
+		const top = r.map((i) => `${x(i).toFixed(1)},${y(stats.hi[i]).toFixed(1)}`).join(" L ");
+		const bot = r
+			.slice()
+			.reverse()
+			.map((i) => `${x(i).toFixed(1)},${y(stats.lo[i]).toFixed(1)}`)
+			.join(" L ");
+		body += `<path class="ui-fade" d="M ${top} L ${bot} Z" fill="url(#${gid})"/>`;
+	});
+
+	/* Median through the band. */
+	const medRuns = [];
+	run = [];
+	for (let i = 0; i < n; i++) {
+		if (stats.mid[i] == null) {
+			if (run.length > 1) medRuns.push(run);
+			run = [];
+			continue;
+		}
+		run.push(`${x(i).toFixed(1)},${y(stats.mid[i]).toFixed(1)}`);
+	}
+	if (run.length > 1) medRuns.push(run);
+	if (medRuns.length) {
+		body += `<path class="ui-draw" d="${medRuns.map((r) => `M ${r.join(" L ")}`).join(" ")}" fill="none" stroke="${medianColor}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+	}
+
+	/* Picked devices on top. */
+	picks.forEach((p, pi) => {
+		const vals = p.values || [];
+		const segs = [];
+		let seg = [];
+		for (let i = 0; i < n; i++) {
+			if (vals[i] == null) {
+				if (seg.length > 1) segs.push(seg);
+				seg = [];
+				continue;
+			}
+			seg.push(`${x(i).toFixed(1)},${y(vals[i]).toFixed(1)}`);
+		}
+		if (seg.length > 1) segs.push(seg);
+		if (!segs.length) return;
+		body += `<path class="ui-draw" style="animation-delay:${120 + pi * 90}ms" d="${segs.map((sg) => `M ${sg.join(" L ")}`).join(" ")}" fill="none" stroke="${p.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
+		/* Mark the newest reading so the eye lands on "now". */
+		for (let i = n - 1; i >= 0; i--) {
+			if (vals[i] != null) {
+				body += `<circle class="ui-pop" cx="${x(i).toFixed(1)}" cy="${y(vals[i]).toFixed(1)}" r="4.5" fill="${p.color}" stroke="var(--surface-2)" stroke-width="2"/>`;
+				break;
+			}
+		}
+	});
+
+	/* Time axis */
+	const ticks = timeTicks(labels);
+	ticks.idx.forEach((i) => {
+		body += `<text class="ax" x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${esc(ticks.fmt(i))}</text>`;
+	});
+
+	/* Hover */
+	body += `<line class="ui-crosshair" x1="0" y1="${M.t}" x2="0" y2="${M.t + ih}" style="opacity:0"/>`;
+	const step = n > 1 ? iw / (n - 1) : iw;
+	for (let i = 0; i < n; i++) {
+		const xx = i === 0 ? M.l : x(i) - step / 2;
+		const ww = i === 0 || i === n - 1 ? step / 2 : step;
+		body += `<rect class="tooltip-hit" x="${xx.toFixed(1)}" y="${M.t}" width="${Math.max(1, ww).toFixed(1)}" height="${ih}" data-i="${i}"/>`;
+	}
+
+	host.classList.add("chart");
+	host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img"><defs>${defs}</defs>${body}</svg>`;
+	animatePaths(host);
+
+	const cross = host.querySelector(".ui-crosshair");
+	host.querySelectorAll(".tooltip-hit").forEach((el) => {
+		el.addEventListener("mousemove", (e) => {
+			const i = +el.getAttribute("data-i");
+			if (cross) {
+				cross.setAttribute("x1", x(i).toFixed(1));
+				cross.setAttribute("x2", x(i).toFixed(1));
+				cross.style.opacity = "1";
+			}
+			const u = opts.unit ? ` ${opts.unit}` : "";
+			const rows = [];
+			if (stats.mid[i] != null) {
+				rows.push(
+					`<span class="sw" style="background:${medianColor}"></span><span class="k">Fleet median</span> ${fmtNum(stats.mid[i])}${u}`
+				);
+				rows.push(
+					`<span class="sw" style="background:${bandColor};opacity:.5"></span><span class="k">p10–p90</span> ${fmtNum(stats.lo[i])} – ${fmtNum(stats.hi[i])}${u}`
+				);
+				if (stats.count) rows.push(`<span class="k">Reporting</span> ${stats.count[i]}`);
+			}
+			picks.forEach((p) => {
+				const v = (p.values || [])[i];
+				rows.push(
+					`<span class="sw" style="background:${p.color}"></span><span class="k">${esc(p.label)}</span> ${v != null ? `${fmtNum(v)}${u}` : "—"}`
+				);
+			});
+			showTip(`<span class="d">${esc(ticks.fmt(i))}</span>${rows.join("<br>")}`, e.clientX, e.clientY);
+		});
+		el.addEventListener("mouseleave", () => {
+			if (cross) cross.style.opacity = "0";
+			hideTip();
+		});
+	});
+}
