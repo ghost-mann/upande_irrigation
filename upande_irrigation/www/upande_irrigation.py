@@ -45,8 +45,26 @@ def get_context(context):
     context.site_label = _site_label()
     context.farms = _irrigation_farms()
     context.asset_version = _asset_version()
+    context.user_label = _user_label()
+    context.user_initials = _initials(context.user_label)
 
     return context
+
+
+def _user_label():
+    """Full name for the sidebar's user block, falling back to the login."""
+    name = frappe.db.get_value("User", frappe.session.user, "full_name")
+    return name or frappe.session.user
+
+
+def _initials(label):
+    """"Teddy Waweru" → "TW"; a bare login → its first two letters."""
+    parts = [p for p in str(label or "").replace(".", " ").split() if p]
+    if len(parts) >= 2:
+        return (parts[0][0] + parts[1][0]).upper()
+    if parts:
+        return parts[0][:2].upper()
+    return "??"
 
 
 def _asset_version():

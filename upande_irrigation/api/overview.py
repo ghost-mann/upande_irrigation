@@ -187,14 +187,6 @@ def fetch(farm=None):
             "tone": "hot" if float(totals.get("unmet") or 0) > 0 else "ok",
         },
         {
-            "key": "rain_et",
-            "label": "Rain vs ET crop",
-            "value": round(float(totals.get("rainfall") or 0), 1),
-            "unit": "mm",
-            "note": f"against {round(float(totals.get('et_crop') or 0), 1):g} mm ET crop",
-            "tone": "rain",
-        },
-        {
             "key": "valves",
             "label": "Valves open",
             "value": valves["on"],
@@ -226,7 +218,7 @@ def fetch(farm=None):
         carry = sum(float(r["unmet_deficit_mm"] or 0) for r in rows)
         return _alert(
             "warn",
-            f"{len(rows)} shift(s) capped by pump capacity",
+            _plural(len(rows), "shift", "shifts") + " capped by pump capacity",
             f"{round(carry, 1)} mm carries to next week. Review Irrigation Pump Profile "
             f"targets or the shift split for these sections.",
             route="/app/irrigation-planner?capacity_warning=%25Pump%20capacity%20capped%25",
@@ -254,7 +246,8 @@ def fetch(farm=None):
         worst = rows[0]
         return _alert(
             "hot",
-            f"{len(rows)} shift(s) over the {CHRONIC_DEFICIT_THRESHOLD_MM:.0f} mm deficit threshold",
+            _plural(len(rows), "shift", "shifts")
+            + f" over the {CHRONIC_DEFICIT_THRESHOLD_MM:.0f} mm deficit threshold",
             f"Worst: {worst['block']} at {round(float(worst['unmet_deficit_mm'] or 0), 1)} mm unmet. "
             "Trees may be stressed.",
             route=f"/app/irrigation-planner/{worst['name']}",
@@ -280,7 +273,7 @@ def fetch(farm=None):
             return None
         return _alert(
             "hot",
-            f"{len(rows)} shift(s) carrying deficit for 3+ weeks",
+            _plural(len(rows), "shift", "shifts") + " carrying deficit for 3+ weeks",
             "Pump capacity, coverage or the shift schedule needs review — this is not "
             "recovering on its own.",
             route=f"/app/irrigation-planner/{rows[0]['name']}",
@@ -363,7 +356,7 @@ def fetch(farm=None):
         worst = rows[0]
         return _alert(
             "warn",
-            f"{len(rows)} sensor(s) silent over {_STALE_SENSOR_HOURS} h",
+            _plural(len(rows), "sensor", "sensors") + f" silent over {_STALE_SENSOR_HOURS} h",
             f"Longest: {worst['sensor_name'] or worst['deveui']} at "
             f"{int(worst['hours_silent'] or 0)} h.",
             route="/upande-irrigation#iot",
@@ -554,6 +547,8 @@ def fetch(farm=None):
             "planners": int(totals.get("planners") or 0),
             "farms": int(totals.get("farms") or 0),
             "shift_hours": round(float(totals.get("hours") or 0), 1),
+            "rainfall_mm": round(float(totals.get("rainfall") or 0), 1),
+            "et_crop_mm": round(float(totals.get("et_crop") or 0), 1),
         },
         "tiles": tiles,
         "alerts": alerts,

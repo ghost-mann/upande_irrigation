@@ -30,12 +30,12 @@ ${pagehead(
 	"Valve Control",
 	"Valve state",
 	"Auto-refresh every 30 s · operator override takes precedence over the schedule",
-	`<span class="ui-sev ink" id="vc-clock">—</span>
-	 <button class="ui-btn ghost" id="vc-refresh" type="button">${icon("refresh")}Refresh</button>`
+	`<span class="sev ink" id="vc-clock">—</span>
+	 <button class="btn ghost" id="vc-refresh" type="button">${icon("refresh")}Refresh</button>`
 )}
-<div class="ui-status" id="vc-status"></div>
-<div class="ui-kpis ui-stagger" id="vc-kpis"></div>
-<div id="vc-body"><div class="ui-loading">Loading…</div></div>`;
+<div class="status" id="vc-status"></div>
+<div class="kpi-grid stagger" id="vc-kpis"></div>
+<div id="vc-body"><div class="loading">Loading…</div></div>`;
 
 		el.querySelector("#vc-refresh").addEventListener("click", () => this.refresh());
 		this.unsubscribe = ctx.onFilterChange(() => {});
@@ -76,7 +76,7 @@ ${pagehead(
 
 		const body = this.el.querySelector("#vc-body");
 		if (!valves.length) {
-			body.innerHTML = '<div class="ui-card"><div class="ui-empty">No valves match the current filter. Valves are Tank And Valve records with asset_type = Valve.</div></div>';
+			body.innerHTML = '<div class="card"><div class="empty">No valves match the current filter. Valves are Tank And Valve records with asset_type = Valve.</div></div>';
 			return;
 		}
 
@@ -119,19 +119,19 @@ ${pagehead(
 		if (eyebrow) eyebrow.textContent = noTanks ? "Grouped by block" : "Grouped by tank";
 		body.innerHTML =
 			(noTanks
-				? `<div class="ui-alert muted" style="margin-bottom:14px">${icon("drop")}<span>No valve has a tank assigned, so these are grouped by block name. Set the Tank field on Tank And Valve to group by supply instead.</span></div>`
+				? `<div class="alert muted" style="margin-bottom:14px">${icon("drop")}<span>No valve has a tank assigned, so these are grouped by block name. Set the Tank field on Tank And Valve to group by supply instead.</span></div>`
 				: "") +
 			keys
 				.map((k) => {
 					const list = groups[k];
 					const onCount = list.filter((v) => v.effective_state === "ON").length;
 					const overrides = list.filter((v) => v.override_active).length;
-					return `<div class="ui-card">
-	<div class="ui-cardhead">
+					return `<div class="card">
+	<div class="card__head">
 		<h3>${icon("drop")}${charts.esc(labels[k])}</h3>
 		<span class="meta">${list.length} valve${list.length === 1 ? "" : "s"} · ${onCount} open${overrides ? ` · ${overrides} override${overrides === 1 ? "" : "s"}` : ""}</span>
 	</div>
-	<div class="ui-valve-grid ui-stagger">${list.map((v, i) => this.valveCard(v, i)).join("")}</div>
+	<div class="valve-grid stagger">${list.map((v, i) => this.valveCard(v, i)).join("")}</div>
 </div>`;
 				})
 				.join("");
@@ -147,22 +147,22 @@ ${pagehead(
 
 		let timing = "";
 		if (v.effective_state === "ON" && v.schedule_ends_at) {
-			timing = `<div class="ui-valve-row"><span>Ends</span><b>${charts.esc(charts.fmtClock(v.schedule_ends_at))}</b></div>`;
+			timing = `<div class="valve-row"><span>Ends</span><b>${charts.esc(charts.fmtClock(v.schedule_ends_at))}</b></div>`;
 		} else if (v.next_scheduled_at) {
-			timing = `<div class="ui-valve-row"><span>Next on</span><b>${charts.esc(charts.fmtDayClock(v.next_scheduled_at))}</b></div>`;
+			timing = `<div class="valve-row"><span>Next on</span><b>${charts.esc(charts.fmtDayClock(v.next_scheduled_at))}</b></div>`;
 		}
 
-		return `<div class="ui-valve ${cls}" data-valve="${charts.esc(v.name)}" style="--i:${Math.min(i, 12)}">
-	<div class="ui-valve-head">
+		return `<div class="valve ${cls}" data-valve="${charts.esc(v.name)}">
+	<div class="valve-head">
 		<div class="n">${charts.esc(v.asset_label || v.name)}</div>
-		<span class="ui-sev ${sev}">${charts.esc(pill)}</span>
+		<span class="sev ${sev}">${charts.esc(pill)}</span>
 	</div>
-	<div class="ui-valve-row"><span>Block</span><b>${charts.esc(v.block || "—")}</b></div>
-	<div class="ui-valve-row"><span>Schedule</span><b>${charts.esc(v.schedule_state)}</b></div>
+	<div class="valve-row"><span>Block</span><b>${charts.esc(v.block || "—")}</b></div>
+	<div class="valve-row"><span>Schedule</span><b>${charts.esc(v.schedule_state)}</b></div>
 	${timing}
-	${v.override_active ? `<div class="ui-valve-row"><span>Override by</span><b>${charts.esc(v.override_set_by || "—")}</b></div>` : ""}
-	<div class="ui-valve-actions">
-		${STATES.map(([state, label, kind]) => `<button class="ui-vbtn ${kind}${v.manual_state === state ? " active" : ""}" data-state="${state}" type="button">${label}</button>`).join("")}
+	${v.override_active ? `<div class="valve-row"><span>Override by</span><b>${charts.esc(v.override_set_by || "—")}</b></div>` : ""}
+	<div class="valve-actions">
+		${STATES.map(([state, label, kind]) => `<button class="vbtn ${kind}${v.manual_state === state ? " active" : ""}" data-state="${state}" type="button">${label}</button>`).join("")}
 	</div>
 </div>`;
 	},
@@ -171,12 +171,12 @@ ${pagehead(
 		const { api } = this.ctx;
 		const status = this.el.querySelector("#vc-status");
 
-		this.el.querySelectorAll(".ui-valve").forEach((card) => {
+		this.el.querySelectorAll(".valve").forEach((card) => {
 			const valve = card.getAttribute("data-valve");
-			card.querySelectorAll(".ui-vbtn[data-state]").forEach((btn) => {
+			card.querySelectorAll(".vbtn[data-state]").forEach((btn) => {
 				btn.addEventListener("click", async () => {
 					const state = btn.getAttribute("data-state");
-					const buttons = card.querySelectorAll(".ui-vbtn");
+					const buttons = card.querySelectorAll(".vbtn");
 					buttons.forEach((b) => {
 						b.disabled = true;
 					});

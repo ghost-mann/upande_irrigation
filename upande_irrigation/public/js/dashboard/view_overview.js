@@ -43,42 +43,42 @@ ${pagehead(
 	"Overview",
 	"Upande Irrigation",
 	'<span id="ov-week">Loading this week…</span>',
-	`<button class="ui-btn ghost" id="ov-refresh" type="button">${icon("refresh")}Refresh</button>`
+	`<button class="btn ghost" id="ov-refresh" type="button">${icon("refresh")}Refresh</button>`
 )}
-<div class="ui-status" id="ov-status"></div>
-<div class="ui-kpis ui-stagger" id="ov-tiles">
-	${'<div class="ui-skel ui-skel-kpi"></div>'.repeat(6)}
+<div class="status" id="ov-status"></div>
+<div class="kpi-grid stagger" id="ov-tiles">
+	${'<div class="skel skel-kpi"></div>'.repeat(5)}
 </div>
 
-<div class="ui-card" id="ov-week-card">
-	<div class="ui-cardhead">
+<div class="card" id="ov-week-card">
+	<div class="card__head">
 		<h3>${icon("calendar")}This week's schedule</h3>
 		<span class="meta">one column per day · each block is a shift, labelled with its hours</span>
 	</div>
-	<div id="ov-week-grid"><div class="ui-skel ui-skel-card" style="height:170px"></div></div>
+	<div id="ov-week-grid"><div class="skel skel-card" style="height:170px"></div></div>
 </div>
 
-<div class="ui-row2">
-	<div class="ui-card">
-		<div class="ui-cardhead">
+<div class="row-2">
+	<div class="card">
+		<div class="card__head">
 			<h3>${icon("alert")}Needs attention</h3>
 			<span class="meta" id="ov-alert-meta"></span>
 		</div>
-		<div id="ov-alerts"><div class="ui-skel ui-skel-row"></div><div class="ui-skel ui-skel-row"></div><div class="ui-skel ui-skel-row"></div></div>
+		<div id="ov-alerts"><div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div></div>
 	</div>
-	<div class="ui-card">
-		<div class="ui-cardhead"><h3>${icon("drop")}Water delivered</h3><span class="meta">this week</span></div>
+	<div class="card">
+		<div class="card__head"><h3>${icon("drop")}Water delivered</h3><span class="meta">this week</span></div>
 		<div id="ov-donut"></div>
 	</div>
 </div>
 
-<div class="ui-row2eq">
-	<div class="ui-card">
-		<div class="ui-cardhead"><h3>${icon("target")}Demand met by section</h3><span class="meta">delivered ÷ required</span></div>
+<div class="row-2-eq">
+	<div class="card">
+		<div class="card__head"><h3>${icon("target")}Demand met by section</h3><span class="meta">delivered ÷ required</span></div>
 		<div id="ov-coverage"></div>
 	</div>
-	<div class="ui-card">
-		<div class="ui-cardhead"><h3>${icon("trend")}Deficit carried</h3><span class="meta">mm unmet, recent weeks</span></div>
+	<div class="card">
+		<div class="card__head"><h3>${icon("trend")}Deficit carried</h3><span class="meta">mm unmet, recent weeks</span></div>
 		<div id="ov-trend"></div>
 	</div>
 </div>`;
@@ -109,9 +109,13 @@ ${pagehead(
 			const span = `Week of ${charts.fmtDate(week.from_date)} – ${charts.fmtDate(week.to_date)}`;
 			/* "0 planners across 0 farms · 0 shift hours" is noise; say the one
 			 * thing that is true instead. */
+			const rain = week.rainfall_mm;
+			const et = week.et_crop_mm;
+			const water =
+				rain != null && et != null ? ` · ${charts.fmtNum(rain)} mm rain against ${charts.fmtNum(et)} mm ET crop` : "";
 			weekEl.textContent = week.planners
 				? `${span} · ${week.planners} planner${week.planners === 1 ? "" : "s"} across ` +
-					`${week.farms} farm${week.farms === 1 ? "" : "s"} · ${week.shift_hours} shift hours`
+					`${week.farms} farm${week.farms === 1 ? "" : "s"} · ${week.shift_hours} shift hours${water}`
 				: `${span} · no planners generated yet`;
 		}
 
@@ -135,14 +139,14 @@ ${pagehead(
 				const isInt = typeof t.value === "number" && Number.isInteger(t.value);
 				const shown = typeof t.value === "number" ? charts.fmtNum(t.value, isInt ? 0 : 1) : charts.esc(t.value);
 				return kpi(TONES[t.tone] || TONES.ink, t.label, shown, t.unit, t.note).replace(
-					'<div class="ui-kpi"',
-					`<div class="ui-kpi" style="--i:${i}"`
+					'<div class="kpi"',
+					`<div class="kpi"`
 				);
 			})
 			.join("");
 
 		/* Count the numeric tiles up so the row animates as one gesture. */
-		host.querySelectorAll(".ui-kpi").forEach((card, i) => {
+		host.querySelectorAll(".kpi").forEach((card, i) => {
 			const t = tiles[i];
 			if (!t || typeof t.value !== "number") return;
 			const vEl = card.querySelector(".v");
@@ -161,42 +165,42 @@ ${pagehead(
 		const { charts } = this.ctx;
 		const host = this.el.querySelector("#ov-week-grid");
 		if (!schedule || !(schedule.sections || []).length) {
-			host.innerHTML = `<div class="ui-empty lg">
+			host.innerHTML = `<div class="empty lg">
 	<div class="ic">${icon("calendar")}</div>
 	<h4>No shifts scheduled this week</h4>
 	<p>The scheduler builds the week's planners every Friday at 06:00. Run it now to fill this week.</p>
 	<div class="acts">
-		<a class="ui-btn" href="/app/irrigation-scheduler">Open scheduler</a>
-		<a class="ui-btn ghost" href="/app/irrigation-planner">See all planners</a>
+		<a class="btn" href="/app/irrigation-scheduler">Open scheduler</a>
+		<a class="btn ghost" href="/app/irrigation-planner">See all planners</a>
 	</div>
 </div>`;
 			return;
 		}
 
 		const days = schedule.days || [];
-		let g = `<div class="ui-week-grid"><div></div>${days
-			.map((d) => `<div class="ui-week-head${d.today ? " today" : ""}">${charts.esc(d.label)}</div>`)
+		let g = `<div class="week__grid"><div></div>${days
+			.map((d) => `<div class="week__head${d.today ? " today" : ""}">${charts.esc(d.label)}</div>`)
 			.join("")}`;
 
 		schedule.sections.forEach((sec) => {
-			g += `<div class="ui-week-row-label" title="${charts.esc(sec.section)}">${charts.esc(shortSection(sec.section))}</div>`;
+			g += `<div class="week__row" title="${charts.esc(sec.section)}">${charts.esc(shortSection(sec.section))}</div>`;
 			(sec.days || []).forEach((shifts, di) => {
 				const today = days[di] && days[di].today ? " today" : "";
 				const blocks = (shifts || []).length
 					? shifts
 							.map(
 								(s) =>
-									`<div class="ui-week-shift ${s.state}" title="${charts.esc(s.shift)} · ${s.hours} hr${s.cycles > 1 ? ` · ${s.cycles} cycles` : ""}">${s.state === "dry" ? "no water" : `${s.hours}h`}</div>`
+									`<div class="week__shift ${s.state}" title="${charts.esc(s.shift)} · ${s.hours} hr${s.cycles > 1 ? ` · ${s.cycles} cycles` : ""}">${s.state === "dry" ? "no water" : `${s.hours}h`}</div>`
 							)
 							.join("")
-					: '<div class="ui-week-shift dry">—</div>';
-				g += `<div class="ui-week-cell${today}">${blocks}</div>`;
+					: '<div class="week__shift dry">—</div>';
+				g += `<div class="week__cell${today}">${blocks}</div>`;
 			});
 		});
 		g += "</div>";
 
-		host.innerHTML = `<div class="ui-week">${g}</div>
-<div class="ui-legend row" style="margin-top:14px">
+		host.innerHTML = `<div class="week">${g}</div>
+<div class="clegend" style="margin-top:14px">
 	<span><i style="background:var(--ui-clay)"></i>Scheduled</span>
 	<span><i style="background:var(--ui-ok)"></i>Running now</span>
 	<span><i style="background:var(--ui-warn)"></i>Pump-capped</span>
@@ -213,18 +217,18 @@ ${pagehead(
 
 		const host = this.el.querySelector("#ov-alerts");
 		if (!alerts.length) {
-			host.innerHTML = `<div class="ui-empty">${icon("check")}Nothing needs attention — deficits are covered, sensors are reporting and the scheduler is healthy.</div>`;
+			host.innerHTML = `<div class="empty">${icon("check")}Nothing needs attention — deficits are covered, sensors are reporting and the scheduler is healthy.</div>`;
 			return;
 		}
 
-		host.innerHTML = `<div class="ui-inbox ui-stagger">${alerts
+		host.innerHTML = `<div class="list stagger">${alerts
 			.map((a, i) => {
 				const glyph = SEV_GLYPH[a.severity] || "alert";
 				const action = a.route
-					? `<a class="ui-btn ghost small" href="${charts.esc(a.route)}" style="text-decoration:none">Open</a>`
+					? `<a class="btn ghost small" href="${charts.esc(a.route)}" style="text-decoration:none">Open</a>`
 					: "";
-				return `<div class="ui-inboxrow" style="--i:${i}">
-	<div class="ic ${charts.esc(a.severity)}">${icon(glyph)}</div>
+				return `<div class="list__row">
+	<div class="list__ic ${charts.esc(a.severity)}">${icon(glyph)}</div>
 	<div>
 		<div class="t">${charts.esc(a.title)}</div>
 		<div class="m">${charts.esc(a.detail)}</div>
@@ -252,7 +256,7 @@ ${pagehead(
 		const delivered = get("delivered");
 		const unmet = get("unmet");
 		if (delivered <= 0 && unmet <= 0) {
-			host.innerHTML = '<div class="ui-empty small">No demand recorded this week, so nothing to split.</div>';
+			host.innerHTML = '<div class="empty small">No demand recorded this week, so nothing to split.</div>';
 			return;
 		}
 		const pct = Math.round((100 * delivered) / (delivered + unmet || 1));
@@ -277,7 +281,7 @@ ${pagehead(
 				value: `${Math.round(s.coverage_pct)}%`,
 			}));
 		if (!rows.length) {
-			host.innerHTML = '<div class="ui-empty small">Coverage appears once this week\'s planners carry a water demand.</div>';
+			host.innerHTML = '<div class="empty small">Coverage appears once this week\'s planners carry a water demand.</div>';
 			return;
 		}
 		charts.healthBars(host, rows);
@@ -287,13 +291,13 @@ ${pagehead(
 		const { charts } = this.ctx;
 		const host = this.el.querySelector("#ov-trend");
 		if (!trend || !(trend.values || []).length) {
-			host.innerHTML = '<div class="ui-empty small">Needs a few weeks of planners before a trend means anything.</div>';
+			host.innerHTML = '<div class="empty small">Needs a few weeks of planners before a trend means anything.</div>';
 			return;
 		}
 		/* An all-zero series plots as five "0" gridlines and a flat line, which
 		 * looks like a broken axis. The fact itself is good news — say it. */
 		if (trend.values.every((v) => !v)) {
-			host.innerHTML = `<div class="ui-empty">${icon("check")}No deficit carried in the last ${trend.values.length} weeks — every shift met its demand.</div>`;
+			host.innerHTML = `<div class="empty">${icon("check")}No deficit carried in the last ${trend.values.length} weeks — every shift met its demand.</div>`;
 			return;
 		}
 		charts.mkChart(

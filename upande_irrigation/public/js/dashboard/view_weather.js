@@ -52,55 +52,55 @@ export default {
 		this.el = el;
 		el.innerHTML = `
 ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span>')}
-<div class="ui-status" id="wx-status"></div>
+<div class="status" id="wx-status"></div>
 
-<div class="ui-card" id="wx-entry-card">
-	<div class="ui-cardhead">
+<div class="card" id="wx-entry-card">
+	<div class="card__head">
 		<h3>${icon("weather")}Today's reading</h3>
 		<span class="meta">ET, SWD and the Z-value are computed on save</span>
 	</div>
-	<div id="wx-entry"><div class="ui-empty small">Loading…</div></div>
+	<div id="wx-entry"><div class="empty small">Loading…</div></div>
 </div>
 
-<div class="ui-kpis ui-stagger" id="wx-kpis"></div>
+<div class="kpi-grid stagger" id="wx-kpis"></div>
 
-<div class="ui-card">
-	<div class="ui-cardhead"><h3>Rainfall</h3><span class="meta" id="wx-wetdry">mm · daily, against reference ETo</span></div>
+<div class="card">
+	<div class="card__head"><h3>Rainfall</h3><span class="meta" id="wx-wetdry">mm · daily, against reference ETo</span></div>
 	<div id="wx-rain"></div>
-	<div class="ui-legend row">
+	<div class="clegend">
 		<span><i style="background:${T.rain}"></i>Rainfall</span>
 		<span><i class="ln" style="background:${T.eto}"></i>Reference ETo</span>
 	</div>
 </div>
 
-<div class="ui-card">
-	<div class="ui-cardhead"><h3>Temperature</h3><span class="meta">°C · min / mean / max</span></div>
+<div class="card">
+	<div class="card__head"><h3>Temperature</h3><span class="meta">°C · min / mean / max</span></div>
 	<div id="wx-temp"></div>
-	<div class="ui-legend row">
+	<div class="clegend">
 		<span><i class="ln" style="background:${T.cool}"></i>Min</span>
 		<span><i class="ln" style="background:${T.clay}"></i>Mean</span>
 		<span><i class="ln" style="background:${T.heat}"></i>Max</span>
 	</div>
 </div>
 
-<div class="ui-row2eq">
-	<div class="ui-card">
-		<div class="ui-cardhead"><h3>Pan evaporation</h3><span class="meta">mm/day</span></div>
+<div class="row-2-eq">
+	<div class="card">
+		<div class="card__head"><h3>Pan evaporation</h3><span class="meta">mm/day</span></div>
 		<div id="wx-evap"></div>
 	</div>
-	<div class="ui-card">
-		<div class="ui-cardhead"><h3>Soil water deficit</h3><span class="meta">mm · running balance</span></div>
+	<div class="card">
+		<div class="card__head"><h3>Soil water deficit</h3><span class="meta">mm · running balance</span></div>
 		<div id="wx-swd"></div>
 	</div>
 </div>
 
-<div class="ui-card">
-	<div class="ui-cardhead">
+<div class="card">
+	<div class="card__head">
 		<h3>Anthracnose risk (Z)</h3>
-		<span class="meta"><span class="ui-sev ink" id="wx-z-badge">—</span> &nbsp; z = −58.99 + 3.22·T̄ + 0.18·rain₇d</span>
+		<span class="meta"><span class="sev ink" id="wx-z-badge">—</span> &nbsp; z = −58.99 + 3.22·T̄ + 0.18·rain₇d</span>
 	</div>
 	<div id="wx-z"></div>
-	<div class="ui-legend row">
+	<div class="clegend">
 		<span><i class="ln" style="background:${T.ok}"></i>&lt; 5 low</span>
 		<span><i class="ln" style="background:${T.warn}"></i>5–15 spore release</span>
 		<span><i class="ln" style="background:${T.clay}"></i>15–20 infection risk</span>
@@ -108,14 +108,14 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 	</div>
 </div>
 
-<div class="ui-card">
-	<div class="ui-cardhead">
+<div class="card">
+	<div class="card__head">
 		<h3>Soil tension · irrometers</h3>
 		<span class="meta">centibars · latest reading per block</span>
 	</div>
-	<div class="ui-tabs" id="wx-irro-tabs"></div>
-	<div class="ui-scrollbox"><div class="ui-irro-grid ui-stagger" id="wx-irro"></div></div>
-	<div class="ui-legend row" style="margin-top:12px">
+	<div class="stabs" id="wx-irro-tabs"></div>
+	<div class="scrollbox"><div class="irro-grid stagger" id="wx-irro"></div></div>
+	<div class="clegend" style="margin-top:12px">
 		<span><i style="background:${T.ok}"></i>0–20 wet</span>
 		<span><i style="background:${T.warn}"></i>20–40 optimal</span>
 		<span><i style="background:${T.clay}"></i>40–60 drying</span>
@@ -123,10 +123,10 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 	</div>
 </div>
 
-<div class="ui-card">
-	<div class="ui-cardhead"><h3>Blocks</h3><span class="meta" id="wx-blocks-count"></span></div>
-	<div class="ui-tablewrap scroll">
-		<table class="ui-table">
+<div class="card">
+	<div class="card__head"><h3>Blocks</h3><span class="meta" id="wx-blocks-count"></span></div>
+	<div class="tablewrap scroll">
+		<table class="table">
 			<thead><tr><th>Block</th><th>Section</th><th>1 ft</th><th>2 ft</th><th>Read on</th><th class="num">Status</th></tr></thead>
 			<tbody id="wx-blocks"></tbody>
 		</table>
@@ -155,8 +155,8 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		if (todays.length) {
 			const r = todays[0];
 			host.innerHTML = `
-<div class="ui-alert ok" style="margin-bottom:12px">${icon("check")}<span>Logged for ${charts.esc(r.farm || farm)} on ${charts.esc(today)}.</span></div>
-<div class="ui-logged">
+<div class="alert ok" style="margin-bottom:12px">${icon("check")}<span>Logged for ${charts.esc(r.farm || farm)} on ${charts.esc(today)}.</span></div>
+<div class="logged">
 	<div><small>Rainfall</small><b>${charts.fmtNum(r.rainfall_mm)} mm</b></div>
 	<div><small>Pan depth</small><b>${charts.fmtNum(r.pan_depth_mm)} mm</b></div>
 	<div><small>ET crop</small><b>${charts.fmtNum(r.et_crop, 2)} mm</b></div>
@@ -164,8 +164,8 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 	<div><small>Z value</small><b>${charts.fmtNum(r.z_value, 1)}</b></div>
 	<div><small>GDD</small><b>${charts.fmtNum(r.cumulative_temperature, 0)}</b></div>
 </div>
-<div class="ui-toolbar" style="margin-top:12px">
-	<a class="ui-btn ghost small" href="/app/weather-reading/${encodeURIComponent(r.name)}" style="text-decoration:none">Open record</a>
+<div class="card__tools" style="margin-top:12px">
+	<a class="btn ghost small" href="/app/weather-reading/${encodeURIComponent(r.name)}" style="text-decoration:none">Open record</a>
 </div>`;
 			return;
 		}
@@ -177,7 +177,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		const farmField = farms.length
 			? `<div>
 	<label for="wx-f-farm">Farm</label>
-	<select class="ui-select" id="wx-f-farm">
+	<select class="select" id="wx-f-farm">
 		${farm ? "" : '<option value="">Choose a farm…</option>'}
 		${farms.map((f) => `<option value="${charts.esc(f)}"${f === farm ? " selected" : ""}>${charts.esc(f)}</option>`).join("")}
 	</select>
@@ -185,33 +185,33 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 			: "";
 
 		host.innerHTML = `
-<div class="ui-entry">
+<div class="entry">
 	${farmField}
 	<div>
 		<label for="wx-f-date">Date</label>
-		<input class="ui-input" type="date" id="wx-f-date" value="${today}" max="${today}">
+		<input class="input" type="date" id="wx-f-date" value="${today}" max="${today}">
 	</div>
 	<div>
 		<label for="wx-f-rain">Rainfall (mm)</label>
-		<input class="ui-input" type="number" id="wx-f-rain" step="0.1" min="0" placeholder="0.0">
+		<input class="input" type="number" id="wx-f-rain" step="0.1" min="0" placeholder="0.0">
 	</div>
 	<div>
 		<label for="wx-f-cups">Pan cups</label>
-		<input class="ui-input" type="number" id="wx-f-cups" step="0.1" placeholder="0.0">
+		<input class="input" type="number" id="wx-f-cups" step="0.1" placeholder="0.0">
 	</div>
 	<div>
 		<label for="wx-f-min">Min temp (°C)</label>
-		<input class="ui-input" type="number" id="wx-f-min" step="0.1" placeholder="—">
+		<input class="input" type="number" id="wx-f-min" step="0.1" placeholder="—">
 	</div>
 	<div>
 		<label for="wx-f-max">Max temp (°C)</label>
-		<input class="ui-input" type="number" id="wx-f-max" step="0.1" placeholder="—">
+		<input class="input" type="number" id="wx-f-max" step="0.1" placeholder="—">
 	</div>
-	<div class="ui-entry-actions">
-		<button class="ui-btn" id="wx-f-save" type="button">Log reading</button>
+	<div class="entry__actions">
+		<button class="btn" id="wx-f-save" type="button">Log reading</button>
 	</div>
 </div>
-<div id="wx-entry-status" class="ui-status" style="margin-top:12px"></div>`;
+<div id="wx-entry-status" class="status" style="margin-top:12px"></div>`;
 
 		host.querySelector("#wx-f-save").addEventListener("click", () => this.submitEntry());
 	},
@@ -261,7 +261,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 			/* msgprint output — the negative pan-evaporation anomaly warning —
 			 * matters to the operator, so show it rather than dropping it. */
 			if (serverMessages && serverMessages.length) {
-				status.innerHTML = `<div class="ui-alert warn">${icon("alert")}<span>${charts.esc(serverMessages.join(" "))}</span></div>`;
+				status.innerHTML = `<div class="alert warn">${icon("alert")}<span>${charts.esc(serverMessages.join(" "))}</span></div>`;
 			}
 			await this.refresh({ keepStatus: serverMessages && serverMessages.length > 0 });
 		} catch (err) {
@@ -300,7 +300,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 
 		const period = this.el.querySelector("#wx-period");
 		if (period) {
-			period.textContent = `${meta.start_date} → ${meta.end_date} · ${weather.length} reading(s)`;
+			period.textContent = `${meta.start_date} → ${meta.end_date} · ${weather.length} ${weather.length === 1 ? "reading" : "readings"}`;
 		}
 		if (data.blocks_error) {
 			statusStrip(status, `Block data unavailable: ${data.blocks_error}`, "warn");
@@ -317,20 +317,20 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		const { charts } = this.ctx;
 		const host = this.el.querySelector("#wx-kpis");
 		if (!kpis || !kpis.reading_count) {
-			host.innerHTML = `<div class="ui-kpi" style="grid-column:1/-1"><div class="ui-empty">No readings in this period.</div></div>`;
+			host.innerHTML = `<div class="kpi" style="grid-column:1/-1"><div class="empty">No readings in this period.</div></div>`;
 			return;
 		}
 		const sp = (vals, color) => charts.sparkline(vals, color);
 		const range =
 			kpis.min_temperature != null ? `${kpis.min_temperature}° – ${kpis.max_temperature}°` : "—";
-		const idx = (html, i) => html.replace('<div class="ui-kpi"', `<div class="ui-kpi" style="--i:${i}"`);
+		const idx = (html, i) => html.replace('<div class="kpi"', `<div class="kpi"`);
 		host.innerHTML = [
 			kpi(T.rain, "Rainfall", charts.fmtNum(kpis.total_rainfall), "mm", `${kpis.wet_days} wet · ${kpis.dry_days} dry`, sp(weather.map((r) => r.rainfall_mm || 0), T.rain)),
 			kpi(T.eto, "Pan evap", charts.fmtNum(kpis.total_evaporation), "mm", `${kpis.reading_count} readings`, sp(weather.map((r) => r.daily_evaporation || 0), T.eto)),
 			kpi(T.clay, "Reference ETo", charts.fmtNum(kpis.total_eto), "mm", "K-pan 0.75", sp(weather.map((r) => r.eto || 0), T.clay)),
 			kpi(T.violet, "Mean temp", charts.fmtNum(kpis.avg_mean_temperature), "°C", range, sp(weather.map((r) => r.mean_temperature).filter((v) => v != null), T.violet)),
 			kpi(kpis.water_deficit > 0 ? T.heat : T.ok, "Deficit", charts.fmtNum(kpis.water_deficit), "mm", kpis.water_deficit > 0 ? "irrigation needed" : "crop demand met", sp(weather.map((r) => Math.max(0, (r.eto || 0) - (r.rainfall_mm || 0))), T.heat)),
-		].map(idx).join("");
+		].join("");
 	},
 
 	/* Every chart here shares one continuous daily axis spanning the selected
@@ -371,7 +371,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		const tempHost = this.el.querySelector("#wx-temp");
 		const anyTemp = lo.some((v) => v != null) || hi.some((v) => v != null);
 		if (!anyTemp) {
-			tempHost.innerHTML = '<div class="ui-empty small">No temperature readings in this period.</div>';
+			tempHost.innerHTML = '<div class="empty small">No temperature readings in this period.</div>';
 		} else {
 			const loVals = lo.filter((v) => v != null);
 			const hiVals = hi.filter((v) => v != null);
@@ -420,17 +420,17 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 				}
 			);
 		} else {
-			swdHost.innerHTML = '<div class="ui-empty small">No soil water deficit recorded yet.</div>';
+			swdHost.innerHTML = '<div class="empty small">No soil water deficit recorded yet.</div>';
 		}
 
 		const zVals = axis.pick("z_value");
 		const badge = this.el.querySelector("#wx-z-badge");
 		const zHost = this.el.querySelector("#wx-z");
 		if (!zVals.some((v) => v != null)) {
-			zHost.innerHTML = '<div class="ui-empty small">The Z-value needs a temperature reading to compute.</div>';
+			zHost.innerHTML = '<div class="empty small">The Z-value needs a temperature reading to compute.</div>';
 			if (badge) {
 				badge.textContent = "—";
-				badge.className = "ui-sev ink";
+				badge.className = "sev ink";
 			}
 			return;
 		}
@@ -439,7 +439,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		const zv = Number(latest.z_value) || 0;
 		if (badge) {
 			badge.textContent = `${zv.toFixed(1)} · ${latest.z_risk_level || "—"}`;
-			badge.className = `ui-sev ${zTone(zv).cls}`;
+			badge.className = `sev ${zTone(zv).cls}`;
 		}
 		const n = dates.length;
 		charts.mkChart(
@@ -466,7 +466,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 
 		if (!blocks.length) {
 			tabsHost.innerHTML = "";
-			host.innerHTML = '<div class="ui-empty small">No blocks are mapped to a section yet.</div>';
+			host.innerHTML = '<div class="empty small">No blocks are mapped to a section yet.</div>';
 			return;
 		}
 
@@ -486,7 +486,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 			.map((s) => {
 				const list = grouped[s];
 				const withData = list.filter((b) => b.irrometer_1ft != null).length;
-				return `<button class="ui-tab${s === this.irroSection ? " on" : ""}" type="button" data-section="${charts.esc(s)}" title="${charts.esc(s)}">
+				return `<button class="stab${s === this.irroSection ? " on" : ""}" type="button" data-section="${charts.esc(s)}" title="${charts.esc(s)}">
 	${charts.esc(shortSection(s))}<span class="n">${withData || list.length}</span>
 </button>`;
 			})
@@ -502,7 +502,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		const list = grouped[this.irroSection] || [];
 		const withData = list.filter((b) => b.irrometer_1ft != null);
 		if (!withData.length) {
-			host.innerHTML = `<div class="ui-empty">${icon("drop")}No irrometer readings logged for ${charts.esc(shortSection(this.irroSection))} yet. Readings are entered on the Weather Reading form.</div>`;
+			host.innerHTML = `<div class="empty">${icon("drop")}No irrometer readings logged for ${charts.esc(shortSection(this.irroSection))} yet. Readings are entered on the Weather Reading form.</div>`;
 			return;
 		}
 
@@ -510,12 +510,12 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 			.map((b, i) => {
 				const t1 = tension(b.irrometer_1ft);
 				const t2 = tension(b.irrometer_2ft);
-				return `<div class="ui-irro" style="border-left-color:${t1.color};--i:${i}">
-	<div class="ui-irro-name">
+				return `<div class="irro" style="border-left-color:${t1.color}">
+	<div class="irro-name">
 		<span title="${charts.esc(b.name)}">${charts.esc(b.block_name || b.name)}</span>
-		<span class="ui-sev ${t1.cls}">${t1.label}</span>
+		<span class="sev ${t1.cls}">${t1.label}</span>
 	</div>
-	<div class="ui-irro-gauges">
+	<div class="irro-gauges">
 		<div>
 			${charts.arcGauge(b.irrometer_1ft, t1.color)}
 			<b style="color:${t1.color}">${b.irrometer_1ft != null ? b.irrometer_1ft : "—"}</b>
@@ -537,9 +537,9 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		const { charts } = this.ctx;
 		const body = this.el.querySelector("#wx-blocks");
 		const count = this.el.querySelector("#wx-blocks-count");
-		count.textContent = `${blocks.length} block(s)`;
+		count.textContent = `${blocks.length} ${blocks.length === 1 ? "block" : "blocks"}`;
 		if (!blocks.length) {
-			body.innerHTML = '<tr><td colspan="6"><div class="ui-empty small">no blocks</div></td></tr>';
+			body.innerHTML = '<tr><td colspan="6"><div class="empty small">no blocks</div></td></tr>';
 			return;
 		}
 		body.innerHTML = blocks
@@ -548,7 +548,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 				/* No reading means no status — a row of "—" pills reads as data. */
 				const status =
 					b.irrometer_1ft != null
-						? `<span class="ui-sev ${t.cls}">${t.label}</span>`
+						? `<span class="sev ${t.cls}">${t.label}</span>`
 						: '<span style="color:var(--ui-mute)">not read</span>';
 				return `<tr>
 	<td><b>${charts.esc(b.block_name || b.name)}</b></td>

@@ -170,7 +170,7 @@ let tipEl = null;
 function tip() {
 	if (!tipEl) {
 		tipEl = document.createElement("div");
-		tipEl.className = "ui-tooltip";
+		tipEl.className = "tooltip";
 		document.body.appendChild(tipEl);
 	}
 	return tipEl;
@@ -250,7 +250,7 @@ export function mkChart(host, series, W, H, opts = {}) {
 	const ySpan = yMax - yMin || 1;
 	const n = Math.max(...series.map((s) => (s.values || []).length), 0);
 	if (!n) {
-		host.innerHTML = '<div class="ui-empty small">Nothing recorded in this period.</div>';
+		host.innerHTML = '<div class="empty small">Nothing recorded in this period.</div>';
 		return;
 	}
 	const step = n > 1 ? iw / (n - 1) : 0;
@@ -324,7 +324,7 @@ export function mkChart(host, series, W, H, opts = {}) {
 			.filter((r) => r.length === 1)
 			.forEach((r) => {
 				const [cx, cy] = r[0].split(",");
-				body += `<circle class="ui-pop" cx="${cx}" cy="${cy}" r="4" fill="${s.color}" stroke="var(--ui-card)" stroke-width="2"/>`;
+				body += `<circle class="ui-pop" cx="${cx}" cy="${cy}" r="4" fill="${s.color}" stroke="var(--card)" stroke-width="2"/>`;
 			});
 		if (!drawable.length) return;
 
@@ -351,7 +351,7 @@ export function mkChart(host, series, W, H, opts = {}) {
 		if (!s.noPoints && n <= 20) {
 			vals.forEach((v, i) => {
 				if (v == null) return;
-				body += `<circle class="ui-pop" style="--d:${(i * 14).toFixed(0)}ms" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" fill="${s.color}" stroke="var(--ui-card)" stroke-width="2"/>`;
+				body += `<circle class="ui-pop" style="--d:${(i * 14).toFixed(0)}ms" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" fill="${s.color}" stroke="var(--card)" stroke-width="2"/>`;
 			});
 		}
 	});
@@ -372,7 +372,7 @@ export function mkChart(host, series, W, H, opts = {}) {
 		}
 	}
 
-	host.classList.add("ui-chart");
+	host.classList.add("chart");
 	host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img">${defs ? `<defs>${defs}</defs>` : ""}${body}</svg>`;
 	animatePaths(host);
 
@@ -410,7 +410,7 @@ export function donut(host, entries, { total, unit, colors } = {}) {
 	if (!host) return;
 	const list = (entries || []).filter(([, v]) => Number(v) > 0);
 	if (!list.length) {
-		host.innerHTML = '<div class="ui-empty small">Nothing to split yet.</div>';
+		host.innerHTML = '<div class="empty small">Nothing to split yet.</div>';
 		return;
 	}
 	const palette = colors || DONUT_COLORS;
@@ -433,11 +433,11 @@ export function donut(host, entries, { total, unit, colors } = {}) {
 		.join("");
 	const centre = total == null ? fmtNum(sum, 0) : total;
 	host.innerHTML = `
-<div class="ui-pie">
+<div class="piewrap">
 	<svg viewBox="0 0 300 300"><g transform="translate(150 150)">${arcs}</g></svg>
-	<div class="center"><b data-countup="${esc(String(centre))}">${esc(String(centre))}</b><small>${esc(unit || "")}</small></div>
+	<div class="piewrap__center"><b>${esc(String(centre))}</b><small>${esc(unit || "")}</small></div>
 </div>
-<div class="ui-legend row">${legend}</div>`;
+<div class="clegend">${legend}</div>`;
 }
 
 /* ══════════════════════════════════════════════ health bars */
@@ -446,17 +446,22 @@ export function donut(host, entries, { total, unit, colors } = {}) {
 export function healthBars(host, rows) {
 	if (!host) return;
 	if (!rows || !rows.length) {
-		host.innerHTML = '<div class="ui-empty small">No sections to compare yet.</div>';
+		host.innerHTML = '<div class="empty small">No sections to compare yet.</div>';
 		return;
 	}
 	host.innerHTML = rows
 		.map((r, i) => {
 			const pct = Math.max(0, Math.min(100, Number(r.pct) || 0));
-			const tone = r.tone || (pct >= 90 ? "ok" : pct >= 70 ? "warn" : "hot");
-			return `<div class="ui-hb">
-	<div class="n">${esc(r.label)}</div>
-	<div class="lane"><i class="${tone} ui-grow" style="--w:${pct}%;--d:${i * 60}ms"></i></div>
-	<div class="p">${esc(r.value != null ? r.value : `${Math.round(pct)}%`)}</div>
+			/* high = meeting target, low = badly short — matches the reference. */
+			const tone = r.tone || (pct >= 90 ? "high" : pct >= 70 ? "mid" : "low");
+			return `<div class="hb">
+	<div class="hb__name" title="${esc(r.label)}">${esc(r.label)}</div>
+	<div class="hb__lane">
+		<div class="hb__est" style="width:100%"></div>
+		<div class="hb__act ${tone} ui-grow" style="--w:${pct}%;--d:${i * 60}ms"></div>
+		${r.tick != null ? `<div class="hb__tick" style="left:${Math.max(0, Math.min(100, Number(r.tick)))}%" title="target"></div>` : ""}
+	</div>
+	<div class="hb__pct">${esc(r.value != null ? r.value : `${Math.round(pct)}%`)}</div>
 </div>`;
 		})
 		.join("");
@@ -499,7 +504,7 @@ export function arcGauge(val, color, size = 46) {
 		val != null
 			? `<path class="ui-draw" d="M ${x1.toFixed(1)},${y1.toFixed(1)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(1)},${y2.toFixed(1)}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"/>`
 			: "";
-	return `<svg class="ui-gauge" width="${size}" height="${h}" viewBox="0 0 ${size} ${h}">${track}${fill}</svg>`;
+	return `<svg class="gauge" width="${size}" height="${h}" viewBox="0 0 ${size} ${h}">${track}${fill}</svg>`;
 }
 
 /* Run after inserting gauges so their arcs sweep in. */

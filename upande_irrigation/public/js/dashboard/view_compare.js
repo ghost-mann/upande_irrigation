@@ -97,34 +97,34 @@ export default {
 
 		el.innerHTML = `
 ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
-<div class="ui-status" id="cmp-status"></div>
-<div class="ui-card">
-	<div class="ui-cardhead">
+<div class="status" id="cmp-status"></div>
+<div class="card">
+	<div class="card__head">
 		<h3>${icon("compare")}<span id="cmp-title">Rainfall</span></h3>
-		<div class="ui-toolbar">
-			<select class="ui-select" id="cmp-metric">
+		<div class="card__tools">
+			<select class="select" id="cmp-metric">
 				${METRICS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}
 			</select>
-			<select class="ui-select" id="cmp-gran">
+			<select class="select" id="cmp-gran">
 				<option value="monthly" selected>Monthly</option>
 				<option value="weekly">Weekly</option>
 			</select>
-			<select class="ui-select" id="cmp-mode">
+			<select class="select" id="cmp-mode">
 				<option value="period" selected>Period total</option>
 				<option value="cumulative">Cumulative</option>
 				<option value="avg">Average</option>
 			</select>
-			<button class="ui-btn ghost" id="cmp-reload" type="button">${icon("refresh")}Reload</button>
+			<button class="btn ghost" id="cmp-reload" type="button">${icon("refresh")}Reload</button>
 		</div>
 	</div>
-	<div class="ui-yearpills" id="cmp-years"></div>
+	<div class="side__chips" id="cmp-years"></div>
 	<div id="cmp-chart"></div>
-	<div class="ui-legend row" id="cmp-legend"></div>
+	<div class="clegend" id="cmp-legend"></div>
 </div>
-<div class="ui-card tight">
-	<div class="ui-cardhead"><h3>Season totals</h3><span class="meta">selected years · current metric</span></div>
-	<div class="ui-tablewrap">
-		<table class="ui-table">
+<div class="card tight">
+	<div class="card__head"><h3>Season totals</h3><span class="meta">selected years · current metric</span></div>
+	<div class="tablewrap">
+		<table class="table">
 			<thead><tr><th>Year</th><th class="num">Total</th><th class="num">Mean</th><th class="num">Peak</th><th class="num">Buckets with data</th></tr></thead>
 			<tbody id="cmp-table"></tbody>
 		</table>
@@ -156,7 +156,7 @@ ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
 		if (!force && this.rows.length && farm === this.loadedFarm) return;
 
 		statusStrip(status, "");
-		this.el.querySelector("#cmp-chart").innerHTML = '<div class="ui-loading">Loading full history…</div>';
+		this.el.querySelector("#cmp-chart").innerHTML = '<div class="loading">Loading full history…</div>';
 
 		let data;
 		try {
@@ -190,11 +190,11 @@ ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
 
 		this.el.querySelector("#cmp-title").textContent = metricDef[1];
 		this.el.querySelector("#cmp-meta").textContent = this.rows.length
-			? `${this.rows.length} readings across ${this.years.length} year(s)`
+			? `${this.rows.length} readings across ${this.years.length} ${this.years.length === 1 ? "year" : "years"}`
 			: "no history";
 
 		if (!this.rows.length) {
-			this.el.querySelector("#cmp-chart").innerHTML = '<div class="ui-empty">No weather history for this farm.</div>';
+			this.el.querySelector("#cmp-chart").innerHTML = '<div class="empty">No weather history for this farm.</div>';
 			this.el.querySelector("#cmp-years").innerHTML = "";
 			this.el.querySelector("#cmp-legend").innerHTML = "";
 			this.el.querySelector("#cmp-table").innerHTML = "";
@@ -204,7 +204,7 @@ ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
 		this.el.querySelector("#cmp-years").innerHTML = this.years
 			.map(
 				(y) =>
-					`<button class="ui-chip${this.activeYears.has(y) ? " on" : ""}" data-year="${y}" type="button">${y}</button>`
+					`<button class="side__chip${this.activeYears.has(y) ? " on" : ""}" data-year="${y}" type="button">${y}</button>`
 			)
 			.join("");
 		this.el.querySelectorAll("[data-year]").forEach((b) => {

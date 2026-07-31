@@ -53,16 +53,16 @@ ${pagehead(
 	"IoT Sensors",
 	"Live telemetry",
 	'<span id="iot-meta"></span>',
-	`<select class="ui-select" id="iot-type"><option value="">All sensor types</option></select>
-	 <button class="ui-btn ghost" id="iot-refresh" type="button">${icon("refresh")}Refresh</button>`
+	`<select class="select" id="iot-type"><option value="">All sensor types</option></select>
+	 <button class="btn ghost" id="iot-refresh" type="button">${icon("refresh")}Refresh</button>`
 )}
-<div class="ui-status" id="iot-status"></div>
-<div class="ui-kpis ui-stagger" id="iot-kpis"></div>
-<div class="ui-sensor-grid ui-stagger" id="iot-cards"></div>
-<div class="ui-card" style="margin-top:14px">
-	<div class="ui-cardhead"><h3>Recent readings</h3><span class="meta" id="iot-count"></span></div>
-	<div class="ui-tablewrap scroll">
-		<table class="ui-table">
+<div class="status" id="iot-status"></div>
+<div class="kpi-grid stagger" id="iot-kpis"></div>
+<div class="sensor-grid stagger" id="iot-cards"></div>
+<div class="card" style="margin-top:14px">
+	<div class="card__head"><h3>Recent readings</h3><span class="meta" id="iot-count"></span></div>
+	<div class="tablewrap scroll">
+		<table class="table">
 			<thead><tr><th>Timestamp</th><th>Sensor</th><th>Type</th><th class="num">Value</th><th class="num">Battery</th><th class="num">RSSI</th></tr></thead>
 			<tbody id="iot-rows"></tbody>
 		</table>
@@ -100,7 +100,7 @@ ${pagehead(
 		const meta = this.el.querySelector("#iot-meta");
 		if (meta) {
 			meta.textContent = sensors.length
-				? `${sensors.length} device(s) reporting · last ${kpis.window_days || filters.days} days`
+				? `${sensors.length} ${sensors.length === 1 ? "device" : "devices"} reporting · last ${kpis.window_days || filters.days} days`
 				: "no devices reporting in this window";
 		}
 
@@ -140,7 +140,7 @@ ${pagehead(
 		const host = this.el.querySelector("#iot-cards");
 		const sensors = data.sensors || [];
 		if (!sensors.length) {
-			host.innerHTML = `<div class="ui-card" style="grid-column:1/-1"><div class="ui-empty">No readings in the selected window. Check that devices are transmitting and that the period covers a sync.</div></div>`;
+			host.innerHTML = `<div class="card" style="grid-column:1/-1"><div class="empty">No readings in the selected window. Check that devices are transmitting and that the period covers a sync.</div></div>`;
 			return;
 		}
 
@@ -156,26 +156,26 @@ ${pagehead(
 				const mn = values.length ? Math.min(...values).toFixed(1) : "—";
 				const mx = values.length ? Math.max(...values).toFixed(1) : "—";
 
-				return `<div class="ui-sensor" style="--kc:${color};--i:${Math.min(i, 12)}">
-	<div class="ui-sensor-head">
+				return `<div class="sensor" style="--kc:${color}">
+	<div class="sensor-head">
 		<div>
 			<div class="t">${charts.esc(s.sensor_name || duid)}</div>
 			<div class="id">${charts.esc(s.sensor_type || "sensor")} · ${charts.esc(String(duid).slice(-8))}</div>
 		</div>
-		<span class="ui-sev ${stale ? "warn" : "ok"}">${stale ? "Stale" : "Live"}</span>
+		<span class="sev ${stale ? "warn" : "ok"}">${stale ? "Stale" : "Live"}</span>
 	</div>
-	<div class="ui-sensor-value">
+	<div class="sensor-value">
 		<b>${latest.value != null ? Number(latest.value).toFixed(1) : "—"}</b>
 		<span>${charts.esc(s.units || latest.units || "")}</span>
 	</div>
-	<div class="ui-sensor-meta">${charts.timeAgo(latest.timestamp || s.last_seen)} · range ${mn}–${mx}</div>
+	<div class="sensor-meta">${charts.timeAgo(latest.timestamp || s.last_seen)} · range ${mn}–${mx}</div>
 	${charts.sparkline(values, color, 34)}
-	<div class="ui-sensor-foot">
+	<div class="sensor-foot">
 		<div><small>Battery</small><b style="color:${batteryTone(latest.battery)}">${latest.battery != null ? `${Number(latest.battery).toFixed(2)}V` : "—"}</b></div>
 		<div><small>RSSI</small><b style="color:${rssi.color}">${latest.rssi != null ? `${latest.rssi}` : "—"}</b></div>
 		<div><small>SNR</small><b>${latest.snr != null ? Number(latest.snr).toFixed(1) : "—"}</b></div>
 	</div>
-	<div class="ui-sensor-meta" style="margin:10px 0 0;text-align:center">${s.reading_count || 0} readings in window</div>
+	<div class="sensor-meta" style="margin:10px 0 0;text-align:center">${s.reading_count || 0} readings in window</div>
 </div>`;
 			})
 			.join("");
@@ -188,7 +188,7 @@ ${pagehead(
 		const list = readings.slice().reverse().slice(0, 200);
 		this.el.querySelector("#iot-count").textContent = `${readings.length} total · showing ${list.length}`;
 		if (!list.length) {
-			body.innerHTML = '<tr><td colspan="6"><div class="ui-empty small">No readings</div></td></tr>';
+			body.innerHTML = '<tr><td colspan="6"><div class="empty small">No readings</div></td></tr>';
 			return;
 		}
 		body.innerHTML = list
@@ -198,7 +198,7 @@ ${pagehead(
 				const ts = r.timestamp ? String(r.timestamp).replace("T", " ").slice(0, 16) : "—";
 				return `<tr>
 	<td>${charts.esc(ts)}</td>
-	<td><span class="ui-dot" style="background:${color}"></span>${charts.esc(r.sensor_name || r.deveui || "—")}</td>
+	<td><span class="dot" style="background:${color}"></span>${charts.esc(r.sensor_name || r.deveui || "—")}</td>
 	<td>${charts.esc(r.sensor_type || "—")}</td>
 	<td class="num"><b style="color:${color}">${r.value != null ? Number(r.value).toFixed(1) : "—"}</b> ${charts.esc(r.units || "")}</td>
 	<td class="num" style="color:${batteryTone(r.battery)}">${r.battery != null ? `${Number(r.battery).toFixed(2)}V` : "—"}</td>

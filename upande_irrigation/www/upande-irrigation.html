@@ -3,29 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upande Irrigation{% if site_label %} · {{ site_label }}{% endif %}</title>
+  <title>Upande · {{ site_label }} · Irrigation</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- Inter matches desk's --font-stack; this page is standalone HTML and so
-       does not inherit desk CSS. -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="/assets/upande_irrigation/css/tokens.css?v={{ asset_version }}">
   <link rel="stylesheet" href="/assets/upande_irrigation/css/shell.css?v={{ asset_version }}">
+  <link rel="stylesheet" href="/assets/upande_irrigation/css/views.css?v={{ asset_version }}">
 </head>
 <body>
 
+<div class="topbar">
+  <div class="topbar__brand">
+    <img class="topbar__logo" alt="Upande" src="/assets/upande_irrigation/images/upande-logo.png?v={{ asset_version }}">
+    <div class="topbar__divider"></div>
+    <div class="topbar__product">{{ site_label }}<small>Irrigation &amp; Water</small></div>
+  </div>
+  <nav class="topbar__nav">
+    <a href="#overview" class="on">Irrigation</a>
+    <a href="/app/task-work-hub" title="Task Work Hub">Task Work</a>
+    <a href="/app/smart-irrigation" title="Smart Irrigation workspace">Records</a>
+    <a href="/app" title="Frappe Desk">Desk</a>
+  </nav>
+  <div class="topbar__right">
+    <span>{{ current_user }}</span>
+    <div class="avatar">{{ user_initials }}</div>
+  </div>
+</div>
+
 <div id="ui-root">
-  <div class="ui-loading">Loading Upande Irrigation…</div>
+  <div class="loading">Loading Upande Irrigation…</div>
 </div>
 
 <script>
-  /* Handed to the shell as boot context. csrf_token is required for every
-     write; the farm list saves the first view a round trip. */
   window.IRRIGATION_BOOT = {
     csrf_token: {{ csrf_token | tojson }},
     user: {{ current_user | tojson }},
+    user_label: {{ user_label | tojson }},
+    user_initials: {{ user_initials | tojson }},
     site_label: {{ site_label | tojson }},
     farms: {{ farms | tojson }},
     today: {{ today | tojson }},

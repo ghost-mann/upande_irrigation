@@ -58,12 +58,12 @@ ${pagehead(
 	"Irrigation Now",
 	"Live section view",
 	'Auto-refresh every 30 s · countdown ticks each second',
-	`<span class="ui-sev ink" id="now-clock">—</span>
-	 <button class="ui-btn ghost" id="now-refresh" type="button">${icon("refresh")}Refresh</button>`
+	`<span class="sev ink" id="now-clock">—</span>
+	 <button class="btn ghost" id="now-refresh" type="button">${icon("refresh")}Refresh</button>`
 )}
-<div class="ui-status" id="now-status"></div>
-<div class="ui-kpis ui-stagger" id="now-kpis"></div>
-<div id="now-body"><div class="ui-loading">Loading…</div></div>`;
+<div class="status" id="now-status"></div>
+<div class="kpi-grid stagger" id="now-kpis"></div>
+<div id="now-body"><div class="loading">Loading…</div></div>`;
 
 		el.querySelector("#now-refresh").addEventListener("click", () => this.refresh());
 		this.unsubscribe = ctx.onFilterChange(() => {});
@@ -102,19 +102,19 @@ ${pagehead(
 
 		const body = this.el.querySelector("#now-body");
 		if (!farms.length) {
-			body.innerHTML = `<div class="ui-card"><div class="ui-empty">No active or upcoming shifts. Run the scheduler to generate this week's planners.<div style="margin-top:12px"><a class="ui-btn ghost small" href="/app/irrigation-scheduler" style="text-decoration:none">Open scheduler</a></div></div></div>`;
+			body.innerHTML = `<div class="card"><div class="empty">No active or upcoming shifts. Run the scheduler to generate this week's planners.<div style="margin-top:12px"><a class="btn ghost small" href="/app/irrigation-scheduler" style="text-decoration:none">Open scheduler</a></div></div></div>`;
 			return;
 		}
 
 		body.innerHTML = farms
 			.map((f) => {
 				const activeCount = (f.sections || []).filter((s) => s.current).length;
-				return `<div class="ui-card">
-	<div class="ui-cardhead">
+				return `<div class="card">
+	<div class="card__head">
 		<h3>${icon("drop")}${charts.esc(f.farm)}</h3>
-		<span class="meta">${(f.sections || []).length} section(s) · ${activeCount} irrigating</span>
+		<span class="meta">${(f.sections || []).length} ${(f.sections || []).length === 1 ? "section" : "sections"} · ${activeCount} irrigating</span>
 	</div>
-	<div class="ui-live-grid ui-stagger">${(f.sections || []).map((s, i) => this.sectionCard(s, i)).join("")}</div>
+	<div class="live-grid stagger">${(f.sections || []).map((s, i) => this.sectionCard(s, i)).join("")}</div>
 </div>`;
 			})
 			.join("");
@@ -135,7 +135,7 @@ ${pagehead(
 
 			const cycleLine =
 				count >= 1
-					? `<div class="cycleline"><b>${count} cycle${count === 1 ? "" : "s"} × ${each.toFixed(2)} hr</b>${count > 1 ? `<span class="ui-sev ok" data-cycle>cycle ${currentCycle(c.started_at, count, each)} of ${count}</span>` : ""}</div>`
+					? `<div class="cycleline"><b>${count} cycle${count === 1 ? "" : "s"} × ${each.toFixed(2)} hr</b>${count > 1 ? `<span class="sev lo" data-cycle>cycle ${currentCycle(c.started_at, count, each)} of ${count}</span>` : ""}</div>`
 					: "";
 
 			const seps =
@@ -145,10 +145,10 @@ ${pagehead(
 
 			const steps =
 				(c.cycles || []).length > 1
-					? `<div class="ui-csteps">${c.cycles
+					? `<div class="csteps">${c.cycles
 							.map(
 								(cy) =>
-									`<div class="ui-cstep ${cycleState(cy.starts_at, cy.ends_at)}" data-cstart="${charts.esc(cy.starts_at)}" data-cend="${charts.esc(cy.ends_at)}">
+									`<div class="cstep ${cycleState(cy.starts_at, cy.ends_at)}" data-cstart="${charts.esc(cy.starts_at)}" data-cend="${charts.esc(cy.ends_at)}">
 	<span class="cn">cyc ${cy.n}</span>
 	<span class="ct">${charts.esc(charts.fmtClock(cy.starts_at))}</span>
 </div>`
@@ -160,19 +160,19 @@ ${pagehead(
 <div class="countdown" data-countdown data-started="${charts.esc(c.started_at)}" data-ends="${charts.esc(c.ends_at)}" data-count="${count}" data-each="${each}">${charts.fmtCountdown(t.remaining)} left</div>
 ${cycleLine}
 <div class="times"><span>Started ${charts.esc(charts.fmtClock(c.started_at))}</span><span>Ends ${charts.esc(charts.fmtClock(c.ends_at))}</span></div>
-<div class="ui-progress"><i data-progress style="width:${t.pct.toFixed(1)}%"></i>${seps}</div>
+<div class="progress"><i data-progress style="width:${t.pct.toFixed(1)}%"></i>${seps}</div>
 ${steps}`;
 		} else {
 			const next = (s.upcoming || [])[0];
-			body = `<div class="ui-empty small" style="text-align:left;padding:8px 0">${next ? `No shift running. Next at ${charts.esc(charts.fmtDayClock(next.starts_at))}.` : "No shift running and none scheduled."}</div>`;
+			body = `<div class="empty small" style="text-align:left;padding:8px 0">${next ? `No shift running. Next at ${charts.esc(charts.fmtDayClock(next.starts_at))}.` : "No shift running and none scheduled."}</div>`;
 		}
 
 		const upcoming = (s.upcoming || []).length
-			? `<div class="ui-upnext">
-	<div class="ui-label">Up next</div>
+			? `<div class="upnext">
+	<div class="label">Up next</div>
 	${s.upcoming
 		.map(
-			(u) => `<div class="ui-uprow">
+			(u) => `<div class="uprow">
 	<span class="s">${charts.esc(u.shift)}</span>
 	<span class="t">${charts.esc(charts.fmtDayClock(u.starts_at))} · ${(u.shift_hours || 0).toFixed(1)} hr${(u.cycles_count || 0) > 1 ? ` · ${u.cycles_count}×${(u.cycle_hours_each || 0).toFixed(1)}h` : ""}</span>
 </div>`
@@ -181,10 +181,10 @@ ${steps}`;
 </div>`
 			: "";
 
-		return `<div class="ui-live ${on ? "on" : ""}" style="--i:${Math.min(i, 12)}">
-	<div class="ui-live-head">
+		return `<div class="live ${on ? "on" : ""}">
+	<div class="live-head">
 		<div class="n">${charts.esc(s.section)}</div>
-		<span class="ui-sev ${on ? "ok" : "ink"}">${on ? "IRRIGATING" : "IDLE"}</span>
+		<span class="sev ${on ? "ok" : "ink"}">${on ? "IRRIGATING" : "IDLE"}</span>
 	</div>
 	${body}
 	${upcoming}
@@ -203,7 +203,7 @@ ${steps}`;
 			});
 		}
 
-		this.el.querySelectorAll(".ui-live.on").forEach((card) => {
+		this.el.querySelectorAll(".live.on").forEach((card) => {
 			const cd = card.querySelector("[data-countdown]");
 			const bar = card.querySelector("[data-progress]");
 			if (!cd || !bar) return;
@@ -219,7 +219,7 @@ ${steps}`;
 				badge.textContent = `cycle ${currentCycle(cd.getAttribute("data-started"), count, each)} of ${count}`;
 			}
 
-			card.querySelectorAll(".ui-cstep").forEach((step) => {
+			card.querySelectorAll(".cstep").forEach((step) => {
 				const st = cycleState(step.getAttribute("data-cstart"), step.getAttribute("data-cend"));
 				step.classList.remove("done", "running", "upcoming");
 				step.classList.add(st);

@@ -246,16 +246,16 @@ ${pagehead(
 	"Field Map",
 	"Valves and block boundaries",
 	'Live valve state · click a valve or block for detail',
-	`<span class="ui-sev ink" id="map-stat">Loading…</span>
-	 <button class="ui-btn ghost" id="map-refresh" type="button">${icon("refresh")}Refresh state</button>`
+	`<span class="sev ink" id="map-stat">Loading…</span>
+	 <button class="btn ghost" id="map-refresh" type="button">${icon("refresh")}Refresh state</button>`
 )}
-<div class="ui-status" id="map-status"></div>
-<div class="ui-kpis" id="map-kpis"></div>
-<div class="ui-card">
-	<div class="ui-map" id="map-canvas">
-		<div class="ui-map-overlay" id="map-overlay">Loading map…</div>
+<div class="status" id="map-status"></div>
+<div class="kpi-grid" id="map-kpis"></div>
+<div class="card">
+	<div class="fieldmap" id="map-canvas">
+		<div class="fieldmap__overlay" id="map-overlay">Loading map…</div>
 	</div>
-	<div class="ui-legend row">
+	<div class="clegend">
 		<span><i style="background:var(--ui-ok)"></i>Open · pulsing</span>
 		<span><i style="background:var(--ui-warn)"></i>Closed</span>
 		<span><i style="background:${BLOCK_FILL};opacity:.45"></i>Block boundary</span>

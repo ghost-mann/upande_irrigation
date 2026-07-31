@@ -1,0 +1,878 @@
+/* Irrigation-specific components, built only from the tokens in tokens.css.
+ *
+ * The bed-grid heatmap (.pm), section tabs and scrollbox follow the Mona Flowers
+ * scouting page directly; the week schedule grid, irrometer gauges, live shift
+ * cards and valve cards are this app's own, shaped to the same system.
+ */
+
+/* ══════════════════════════════════════════════ week schedule grid
+ *
+ * One column per day of the planning week, one row per section, one block per
+ * shift labelled with its hours. This is the shape assign_daily_blocks()
+ * produces, so the grid is the schedule rather than a picture of it.
+ */
+
+.week {
+	overflow-x: auto;
+	padding-bottom: 4px;
+}
+
+.week__grid {
+	display: grid;
+	grid-template-columns: 120px repeat(7, minmax(78px, 1fr));
+	gap: 5px;
+	min-width: 680px;
+}
+
+.week__head {
+	font: 500 10px var(--sans);
+	text-transform: uppercase;
+	letter-spacing: 1.2px;
+	color: var(--ink-mute);
+	text-align: center;
+	padding: 0 0 8px;
+}
+
+.week__head.today {
+	color: var(--trap-deep);
+	font-weight: 600;
+}
+
+.week__row {
+	font: 600 12.5px var(--sans);
+	color: var(--ink);
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding-right: 8px;
+}
+
+.week__cell {
+	min-height: 40px;
+	border-radius: 10px;
+	background: rgba(10, 10, 10, 0.03);
+	padding: 4px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.week__cell.today {
+	box-shadow: inset 0 0 0 1.5px rgba(10, 10, 10, 0.14);
+}
+
+.week__shift {
+	flex: 1;
+	min-height: 17px;
+	border-radius: 6px;
+	background: var(--trap-500);
+	color: #fff;
+	font: 600 10px var(--sans);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-variant-numeric: tabular-nums;
+	transition: all 0.15s;
+}
+
+.week__shift:hover {
+	transform: scale(1.05);
+	box-shadow: 0 3px 10px rgba(10, 10, 10, 0.2);
+}
+
+.week__shift.running {
+	background: var(--sev-low);
+	box-shadow: inset 0 0 0 1.5px #2e6b3a;
+}
+
+.week__shift.capped {
+	background: var(--sev-mod);
+	color: #3a2a00;
+}
+
+.week__shift.dry {
+	background: transparent;
+	box-shadow: inset 0 0 0 1px var(--hairline);
+	color: var(--ink-mute);
+	font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════ bed / block grid heatmap */
+
+.pm {
+	display: grid;
+	grid-template-columns: repeat(24, 1fr);
+	gap: 5px;
+}
+
+.pm span {
+	aspect-ratio: 1;
+	border-radius: 5px;
+	background: rgba(10, 10, 10, 0.05);
+}
+
+.pm span.l {
+	background: rgba(63, 143, 79, 0.16);
+}
+
+.pm span.m {
+	background: rgba(217, 150, 46, 0.7);
+}
+
+.pm span.h {
+	background: var(--sev-high);
+}
+
+.pm span.t {
+	background: rgba(217, 165, 20, 0.5);
+}
+
+.pm span.th {
+	background: rgba(217, 165, 20, 0.85);
+	box-shadow: inset 0 0 0 2px var(--sev-high);
+}
+
+.pm__axis {
+	display: flex;
+	justify-content: space-between;
+	margin-top: 10px;
+	font: 500 11px var(--sans);
+	color: var(--ink-mute);
+}
+
+/* ══════════════════════════════════════════════ section tabs + scrollbox */
+
+.stabs {
+	display: flex;
+	gap: 4px;
+	overflow-x: auto;
+	padding-bottom: 2px;
+	margin-bottom: 14px;
+	border-bottom: 1px solid var(--hairline);
+}
+
+.stabs::-webkit-scrollbar {
+	height: 3px;
+}
+
+.stabs::-webkit-scrollbar-thumb {
+	background: rgba(10, 10, 10, 0.14);
+	border-radius: 2px;
+}
+
+.stab {
+	border: 0;
+	background: transparent;
+	font: 500 12.5px var(--sans);
+	color: var(--ink-4);
+	padding: 8px 14px;
+	border-radius: 12px 12px 0 0;
+	cursor: pointer;
+	white-space: nowrap;
+	position: relative;
+	transition: color 0.2s;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.stab:hover {
+	color: var(--ink);
+}
+
+.stab::after {
+	content: "";
+	position: absolute;
+	left: 8px;
+	right: 8px;
+	bottom: -1px;
+	height: 2px;
+	border-radius: 2px 2px 0 0;
+	background: transparent;
+	transition: background 0.2s;
+}
+
+.stab.on {
+	color: var(--ink);
+	font-weight: 600;
+}
+
+.stab.on::after {
+	background: var(--trap-500);
+}
+
+.stab .n {
+	font: 600 9.5px var(--sans);
+	background: rgba(10, 10, 10, 0.06);
+	border-radius: 99px;
+	padding: 1px 7px;
+	color: var(--ink-4);
+}
+
+.stab.on .n {
+	background: rgba(217, 165, 20, 0.18);
+	color: var(--trap-deep);
+}
+
+.scrollbox {
+	max-height: 280px;
+	overflow-y: auto;
+	padding-right: 4px;
+}
+
+.scrollbox::-webkit-scrollbar {
+	width: 4px;
+}
+
+.scrollbox::-webkit-scrollbar-thumb {
+	background: rgba(10, 10, 10, 0.14);
+	border-radius: 2px;
+}
+
+/* ══════════════════════════════════════════════ irrometer gauges */
+
+.irro-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+	gap: 10px;
+}
+
+.irro {
+	border-radius: 14px;
+	background: rgba(10, 10, 10, 0.025);
+	padding: 12px 14px;
+	border-left: 3px solid var(--ink-mute);
+}
+
+.irro__name {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	font: 600 11.5px var(--sans);
+	color: var(--ink);
+	margin-bottom: 9px;
+}
+
+.irro__gauges {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+	text-align: center;
+}
+
+.irro__gauges b {
+	display: block;
+	font: 600 13px var(--sans);
+	font-variant-numeric: tabular-nums;
+}
+
+.irro__gauges small {
+	font: 500 8.5px var(--sans);
+	text-transform: uppercase;
+	letter-spacing: 0.9px;
+	color: var(--ink-mute);
+}
+
+.gauge {
+	display: block;
+	margin: 0 auto;
+}
+
+/* ══════════════════════════════════════════════ sensor cards */
+
+.sensor-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+	gap: 14px;
+}
+
+.sensor {
+	background: var(--surface-2);
+	border-radius: 20px;
+	padding: 22px 24px;
+	box-shadow: var(--shadow-card);
+	border-left: 3px solid var(--kc, var(--trap-500));
+	transition: all 0.2s;
+}
+
+.sensor:hover {
+	transform: translateY(-2px);
+	box-shadow: var(--shadow-hover);
+}
+
+.sensor__head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 12px;
+}
+
+.sensor__head .t {
+	font: 600 14px var(--sans);
+	color: var(--ink);
+	line-height: 1.3;
+}
+
+.sensor__head .id {
+	font: 500 10px var(--mono);
+	color: var(--ink-mute);
+	margin-top: 3px;
+}
+
+.sensor__value {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin: 4px 0;
+}
+
+.sensor__value b {
+	font: 600 34px var(--sans);
+	letter-spacing: -1.1px;
+	line-height: 1;
+	color: var(--kc, var(--ink));
+	font-variant-numeric: tabular-nums;
+}
+
+.sensor__value span {
+	font: 400 12.5px var(--sans);
+	color: var(--ink-mute);
+}
+
+.sensor__meta {
+	font: 500 11px var(--sans);
+	color: var(--ink-mute);
+	margin-bottom: 12px;
+}
+
+.sensor__foot {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px;
+	margin-top: 14px;
+	padding-top: 13px;
+	border-top: 1px solid var(--hairline);
+	text-align: center;
+}
+
+.sensor__foot small {
+	display: block;
+	font: 500 8.5px var(--sans);
+	text-transform: uppercase;
+	letter-spacing: 0.9px;
+	color: var(--ink-mute);
+}
+
+.sensor__foot b {
+	font: 600 13px var(--sans);
+	font-variant-numeric: tabular-nums;
+	margin-top: 3px;
+	display: block;
+}
+
+/* ══════════════════════════════════════════════ live shifts */
+
+.live-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+	gap: 14px;
+}
+
+.live {
+	border-radius: 18px;
+	padding: 18px 20px;
+	background: rgba(10, 10, 10, 0.025);
+	border-left: 3px solid var(--ink-mute);
+	transition: all 0.2s;
+}
+
+.live.on {
+	background: rgba(63, 143, 79, 0.07);
+	border-left-color: var(--sev-low);
+}
+
+.live:hover {
+	transform: translateY(-1px);
+}
+
+.live__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 12px;
+}
+
+.live__head .n {
+	font: 600 15px var(--sans);
+	color: var(--ink);
+}
+
+.live .shift {
+	font: 600 13px var(--sans);
+	color: var(--ink);
+	margin-bottom: 6px;
+}
+
+.live .countdown {
+	font: 600 26px var(--sans);
+	color: #2e6b3a;
+	letter-spacing: -0.9px;
+	margin-bottom: 8px;
+	font-variant-numeric: tabular-nums;
+}
+
+.live .cycleline {
+	font: 500 11.5px var(--sans);
+	color: var(--ink-4);
+	margin-bottom: 8px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.live .cycleline b {
+	color: var(--ink);
+}
+
+.live .times {
+	display: flex;
+	justify-content: space-between;
+	font: 500 11px var(--sans);
+	color: var(--ink-mute);
+	margin-bottom: 8px;
+}
+
+.progress {
+	position: relative;
+	height: 8px;
+	background: rgba(10, 10, 10, 0.07);
+	border-radius: 999px;
+	overflow: hidden;
+}
+
+.progress i {
+	display: block;
+	height: 100%;
+	background: linear-gradient(90deg, #2e6b3a, #3f8f4f);
+	transition: width 1s linear;
+}
+
+.progress .sep {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	background: var(--surface-2);
+}
+
+.csteps {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+	margin-top: 10px;
+}
+
+.cstep {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 5px 9px;
+	border-radius: 9px;
+	border: 1px solid var(--hairline);
+	font-size: 10px;
+	min-width: 54px;
+}
+
+.cstep .cn {
+	font: 600 10.5px var(--sans);
+}
+
+.cstep .ct {
+	color: var(--ink-mute);
+	font: 500 9.5px var(--mono);
+}
+
+.cstep.done {
+	background: rgba(63, 143, 79, 0.12);
+	border-color: rgba(63, 143, 79, 0.4);
+	color: #2e6b3a;
+}
+
+.cstep.running {
+	background: var(--sev-low);
+	border-color: var(--sev-low);
+	color: #fff;
+}
+
+.cstep.running .ct {
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.cstep.upcoming {
+	background: var(--surface-2);
+	color: var(--ink-mute);
+}
+
+.upnext {
+	margin-top: 14px;
+	padding-top: 11px;
+	border-top: 1px dashed var(--hairline);
+}
+
+.uprow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 5px 0;
+	font-size: 11.5px;
+	border-bottom: 1px solid var(--hairline);
+}
+
+.uprow:last-child {
+	border-bottom: 0;
+}
+
+.uprow .s {
+	font-weight: 600;
+	color: var(--ink);
+}
+
+.uprow .t {
+	color: var(--ink-mute);
+	font: 500 10.5px var(--mono);
+}
+
+/* ══════════════════════════════════════════════ valve control */
+
+.valve-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+	gap: 12px;
+}
+
+.valve {
+	border-radius: 18px;
+	padding: 16px 18px;
+	background: rgba(10, 10, 10, 0.025);
+	border-left: 3px solid var(--ink-mute);
+	transition: all 0.2s;
+}
+
+.valve.on {
+	background: rgba(63, 143, 79, 0.07);
+	border-left-color: var(--sev-low);
+}
+
+.valve.forced {
+	background: rgba(217, 150, 46, 0.1);
+	border-left-color: var(--sev-mod);
+}
+
+.valve:hover {
+	transform: translateY(-1px);
+}
+
+.valve__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+.valve__head .n {
+	font: 600 13px var(--sans);
+	color: var(--ink);
+}
+
+.valve__row {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	font: 400 11.5px var(--sans);
+	color: var(--ink-mute);
+	line-height: 1.7;
+}
+
+.valve__row b {
+	color: var(--ink-3);
+	font-weight: 500;
+}
+
+.valve__actions {
+	display: flex;
+	gap: 5px;
+	margin-top: 13px;
+}
+
+.vbtn {
+	flex: 1;
+	padding: 7px 8px;
+	border-radius: 9px;
+	border: 1px solid var(--hairline);
+	background: var(--surface-2);
+	cursor: pointer;
+	font: 500 11.5px var(--sans);
+	color: var(--ink-4);
+	transition: all 0.15s;
+}
+
+.vbtn:hover:not(:disabled) {
+	border-color: var(--ink);
+	color: var(--ink);
+}
+
+.vbtn.on.active {
+	background: var(--sev-low);
+	border-color: var(--sev-low);
+	color: #fff;
+}
+
+.vbtn.off.active {
+	background: var(--ink-4);
+	border-color: var(--ink-4);
+	color: #fff;
+}
+
+.vbtn.auto.active {
+	background: var(--grad-ink);
+	border-color: var(--ink);
+	color: #fafaf6;
+}
+
+.vbtn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* ══════════════════════════════════════════════ flow diagram */
+
+.flow {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-wrap: wrap;
+	justify-content: center;
+}
+
+.flow__node {
+	text-align: center;
+	min-width: 104px;
+}
+
+.flow__node .ic {
+	width: 48px;
+	height: 48px;
+	margin: 0 auto 10px;
+	border-radius: 16px;
+	display: grid;
+	place-items: center;
+	background: rgba(10, 10, 10, 0.04);
+}
+
+.flow__node .ic svg {
+	width: 21px;
+	height: 21px;
+	stroke: var(--kc, var(--ink-3));
+	fill: none;
+	stroke-width: 2;
+}
+
+.flow__node .l {
+	font: 500 9.5px var(--sans);
+	text-transform: uppercase;
+	letter-spacing: 1.2px;
+	color: var(--ink-mute);
+}
+
+.flow__node .v {
+	font: 600 16px var(--sans);
+	color: var(--ink);
+	margin-top: 4px;
+	font-variant-numeric: tabular-nums;
+}
+
+.flow__node .s {
+	font: 400 10.5px var(--sans);
+	color: var(--ink-mute);
+	margin-top: 1px;
+}
+
+.flow__arrow {
+	flex: 1 1 64px;
+	min-width: 64px;
+	text-align: center;
+	padding-bottom: 24px;
+}
+
+.flow__arrow .line {
+	height: 2px;
+	border-radius: 1px;
+	background: rgba(10, 10, 10, 0.1);
+	margin-bottom: 7px;
+}
+
+.flow__arrow .lbl {
+	font: 500 10px var(--sans);
+	color: var(--ink-mute);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ══════════════════════════════════════════════ timeline */
+
+.timeline {
+	display: flex;
+	flex-direction: column;
+	max-height: 310px;
+	overflow-y: auto;
+}
+
+.tl {
+	display: grid;
+	grid-template-columns: 64px 1fr auto;
+	gap: 12px;
+	align-items: center;
+	padding: 9px 4px;
+	border-bottom: 1px solid var(--hairline);
+	font-size: 12px;
+}
+
+.tl:last-child {
+	border-bottom: 0;
+}
+
+.tl .d {
+	font: 600 12px var(--sans);
+	color: var(--ink);
+}
+
+.tl .m {
+	font: 400 11px var(--sans);
+	color: var(--ink-mute);
+}
+
+.tl .v {
+	font: 600 13px var(--sans);
+	color: #2e6b3a;
+	font-variant-numeric: tabular-nums;
+}
+
+/* ══════════════════════════════════════════════ entry form */
+
+.entry {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+	gap: 14px;
+	align-items: end;
+}
+
+.entry label {
+	display: block;
+	font: 500 10px var(--sans);
+	text-transform: uppercase;
+	letter-spacing: 1.2px;
+	color: var(--ink-mute);
+	margin-bottom: 6px;
+}
+
+.entry__actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.logged {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+	gap: 12px;
+}
+
+.logged div {
+	padding: 12px 14px;
+	background: rgba(10, 10, 10, 0.025);
+	border-radius: 14px;
+}
+
+.logged small {
+	display: block;
+	font: 500 9px var(--sans);
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	color: var(--ink-mute);
+	margin-bottom: 5px;
+}
+
+.logged b {
+	font: 600 16px var(--sans);
+	color: var(--ink);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ══════════════════════════════════════════════ map */
+
+.fieldmap {
+	width: 100%;
+	height: 560px;
+	border-radius: 18px;
+	overflow: hidden;
+	position: relative;
+	background: #e8e6df;
+	z-index: 0;
+}
+
+.fieldmap__overlay {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	background: rgba(244, 243, 239, 0.92);
+	color: var(--ink-mute);
+	font: 500 13px var(--sans);
+	z-index: 2;
+	transition: opacity 0.25s;
+	text-align: center;
+	padding: 30px;
+}
+
+.fieldmap__overlay.hidden {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.maplibregl-popup-content {
+	font-family: var(--sans);
+	border-radius: 12px;
+	box-shadow: 0 4px 20px rgba(10, 10, 10, 0.18);
+	font-size: 12px;
+	color: var(--ink-2);
+	padding: 9px 13px;
+}
+
+/* Messages inside a card grid must span it. */
+.irro-grid > .empty,
+.sensor-grid > .empty,
+.valve-grid > .empty,
+.live-grid > .empty {
+	grid-column: 1 / -1;
+}
+
+@media (max-width: 1000px) {
+	.pm {
+		gap: 3px;
+	}
+
+	.pm span {
+		border-radius: 3px;
+	}
+
+	.fieldmap {
+		height: 420px;
+	}
+}

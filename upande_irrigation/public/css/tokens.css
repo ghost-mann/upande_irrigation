@@ -1,68 +1,97 @@
 /* Upande house design tokens.
  *
- * Ported verbatim from kaitet_taskwork's Task Work Hub (task_work_hub.js,
- * inject_css) so /upande-irrigation and /app/task-work-hub read as one
- * system. Values are the source of truth — change them here, not inline.
+ * Taken verbatim from the Mona Flowers scouting dashboard, which is the
+ * reference for this design system: shades of black from the Upande logo, a
+ * warm paper canvas, one gold accent, and a three-step severity scale shared
+ * across every Upande product page.
  *
- * Naming: --twh-* became --ui-* so the same tokens can be reused by other
- * Upande www pages without implying they belong to Task Work.
+ * The --ui-* block at the end aliases these onto the names the dashboard's view
+ * modules already use, so the tokens stay canonical while the JS keeps reading
+ * one stable set of names.
  */
 
 :root {
-	/* ── Ink ── */
-	--ui-ink: #0a0a0a;
-	--ui-ink3: #3a3a34;
-	--ui-ink4: #5a5a52;
-	--ui-mute: #8a8780;
+	/* Shades of black — from the Upande logo */
+	--ink: #0a0a0a;
+	--ink-1: #1a1a18;
+	--ink-2: #2a2a26;
+	--ink-3: #3a3a34;
+	--ink-4: #5a5a52;
+	--ink-mute: #8a8780;
+	--ink-faint: #b8b6ae;
 
-	/* ── Surfaces ── */
-	--ui-bg: #f4f3ef;
-	--ui-card: #ffffff;
-	--ui-hair: rgba(10, 10, 10, 0.06);
+	/* Surfaces */
+	--bg: #f4f3ef;
+	--surface: #fafaf6;
+	--surface-2: #ffffff;
+	--hairline: rgba(10, 10, 10, 0.06);
+	--shadow-card: 0 1px 0 rgba(10, 10, 10, 0.04), 0 8px 32px -16px rgba(10, 10, 10, 0.1);
+	--shadow-hover: 0 1px 0 rgba(10, 10, 10, 0.06), 0 24px 48px -24px rgba(10, 10, 10, 0.18);
 
-	/* ── Accents ── */
-	--ui-clay: #c25a2e;
-	--ui-clay-deep: #7c2f16;
-	--ui-ok: #3f8f4f;
-	--ui-ok-deep: #2e6b3a;
-	--ui-warn: #d9962e;
-	--ui-warn-deep: #96650f;
-	--ui-hot: #c4302b;
-	--ui-teal: #228883;
+	/* Gold — this page's accent */
+	--trap-100: #f7edcd;
+	--trap-300: #edc23c;
+	--trap-500: #d9a514;
+	--trap-700: #a87d0d;
+	--trap-deep: #8a6a10;
 
-	/* ── Depth ── */
-	--ui-shadow: 0 1px 0 rgba(10, 10, 10, 0.04), 0 8px 32px -16px rgba(10, 10, 10, 0.1);
-	--ui-grad-ink: linear-gradient(135deg, #0a0a0a, #3a3a34);
-	--ui-grad-clay: linear-gradient(135deg, #9a3c1e, #e07a4f);
+	/* Severity scale */
+	--sev-low: #3f8f4f;
+	--sev-mod: #d9962e;
+	--sev-high: #c4302b;
 
-	/* ── Type ──
-	 * --font-stack mirrors frappe/public/scss/espresso/_typography.scss so the
-	 * page matches desk. This is a standalone www page, so it does not inherit
-	 * desk CSS — Inter is loaded from the shell's <head>.
-	 * Desk never defines --font-stack-mono (Task Work Hub falls back to
-	 * `monospace`); we define it so numerals are consistent here.
+	/* Water & biology */
+	--bio: #228883;
+	--water: #228883;
+	--water-deep: #1d6b66;
+
+	--signal: var(--trap-500);
+
+	/* Gradient layers */
+	--grad-ink: linear-gradient(135deg, #0a0a0a 0%, #3a3a34 100%);
+	--grad-trap: linear-gradient(135deg, #a87d0d 0%, #edc23c 100%);
+	--grad-chart: linear-gradient(180deg, rgba(10, 10, 10, 0.18) 0%, rgba(10, 10, 10, 0) 100%);
+
+	--sans: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	--display: "Fraunces", Georgia, serif;
+	--mono: "JetBrains Mono", ui-monospace, monospace;
+
+	/* ── Aliases for the view modules ───────────────────────────
+	 * The eight view_*.js files reference these names. Keeping them as aliases
+	 * means the canonical tokens above stay the single source of truth.
 	 */
-	--font-stack: "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-		"Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-		sans-serif;
-	--font-stack-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
-
-	/* ── Radii ── */
-	--ui-r-card: 18px;
-	--ui-r-tile: 16px;
-	--ui-r-nav: 10px;
+	--ui-ink: var(--ink);
+	--ui-ink3: var(--ink-3);
+	--ui-ink4: var(--ink-4);
+	--ui-mute: var(--ink-mute);
+	--ui-bg: var(--bg);
+	--ui-card: var(--surface-2);
+	--ui-hair: var(--hairline);
+	--ui-clay: var(--trap-500);
+	--ui-clay-deep: var(--trap-deep);
+	--ui-ok: var(--sev-low);
+	--ui-ok-deep: #2e6b3a;
+	--ui-warn: var(--sev-mod);
+	--ui-warn-deep: #96650f;
+	--ui-hot: var(--sev-high);
+	--ui-teal: var(--bio);
+	--ui-shadow: var(--shadow-card);
+	--ui-grad-ink: var(--grad-ink);
+	--ui-grad-clay: var(--grad-trap);
+	--font-stack: var(--sans);
+	--font-stack-mono: var(--mono);
+	--ui-r-card: 24px;
+	--ui-r-tile: 20px;
+	--ui-r-nav: 12px;
 	--ui-r-pill: 999px;
 
-	/* ── Series colours ──
-	 * Charts inherit the house accents rather than meniscus's blue-grey SaaS
-	 * palette. Ordered for categorical use; each is legible on --ui-card.
-	 */
-	--ui-rain: #228883;
-	--ui-eto: #96650f;
-	--ui-heat: #c4302b;
-	--ui-cool: #3d7ea6;
-	--ui-water: #228883;
-	--ui-elec: #d9962e;
-	--ui-pump: #3f8f4f;
-	--ui-violet: #7c5cbf;
+	/* Chart series */
+	--ui-rain: var(--bio);
+	--ui-eto: var(--trap-700);
+	--ui-heat: var(--sev-high);
+	--ui-cool: #4a70a8;
+	--ui-water: var(--bio);
+	--ui-elec: var(--trap-500);
+	--ui-pump: var(--sev-low);
+	--ui-violet: #7d4a72;
 }
