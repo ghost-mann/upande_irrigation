@@ -1,0 +1,68 @@
+/* Upande house design tokens.
+ *
+ * Ported verbatim from kaitet_taskwork's Task Work Hub (task_work_hub.js,
+ * inject_css) so /upande-irrigation and /app/task-work-hub read as one
+ * system. Values are the source of truth — change them here, not inline.
+ *
+ * Naming: --twh-* became --ui-* so the same tokens can be reused by other
+ * Upande www pages without implying they belong to Task Work.
+ */
+
+:root {
+	/* ── Ink ── */
+	--ui-ink: #0a0a0a;
+	--ui-ink3: #3a3a34;
+	--ui-ink4: #5a5a52;
+	--ui-mute: #8a8780;
+
+	/* ── Surfaces ── */
+	--ui-bg: #f4f3ef;
+	--ui-card: #ffffff;
+	--ui-hair: rgba(10, 10, 10, 0.06);
+
+	/* ── Accents ── */
+	--ui-clay: #c25a2e;
+	--ui-clay-deep: #7c2f16;
+	--ui-ok: #3f8f4f;
+	--ui-ok-deep: #2e6b3a;
+	--ui-warn: #d9962e;
+	--ui-warn-deep: #96650f;
+	--ui-hot: #c4302b;
+	--ui-teal: #228883;
+
+	/* ── Depth ── */
+	--ui-shadow: 0 1px 0 rgba(10, 10, 10, 0.04), 0 8px 32px -16px rgba(10, 10, 10, 0.1);
+	--ui-grad-ink: linear-gradient(135deg, #0a0a0a, #3a3a34);
+	--ui-grad-clay: linear-gradient(135deg, #9a3c1e, #e07a4f);
+
+	/* ── Type ──
+	 * --font-stack mirrors frappe/public/scss/espresso/_typography.scss so the
+	 * page matches desk. This is a standalone www page, so it does not inherit
+	 * desk CSS — Inter is loaded from the shell's <head>.
+	 * Desk never defines --font-stack-mono (Task Work Hub falls back to
+	 * `monospace`); we define it so numerals are consistent here.
+	 */
+	--font-stack: "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+		"Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+		sans-serif;
+	--font-stack-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+
+	/* ── Radii ── */
+	--ui-r-card: 18px;
+	--ui-r-tile: 16px;
+	--ui-r-nav: 10px;
+	--ui-r-pill: 999px;
+
+	/* ── Series colours ──
+	 * Charts inherit the house accents rather than meniscus's blue-grey SaaS
+	 * palette. Ordered for categorical use; each is legible on --ui-card.
+	 */
+	--ui-rain: #228883;
+	--ui-eto: #96650f;
+	--ui-heat: #c4302b;
+	--ui-cool: #3d7ea6;
+	--ui-water: #228883;
+	--ui-elec: #d9962e;
+	--ui-pump: #3f8f4f;
+	--ui-violet: #7c5cbf;
+}

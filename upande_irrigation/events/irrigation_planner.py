@@ -106,7 +106,12 @@ def compute_shift(doc, method=None):
 	doc.clean_et_crop_mm = clean_et_crop
 
 	this_week_deficit = max(0.0, clean_et_crop - weekly_rainfall)
-	doc.irrigation_deficit_mm = round(this_week_deficit, 4)
+	# Write the DocField that exists and is labelled for this ("This Week Deficit
+	# (mm)"). An earlier version assigned `irrigation_deficit_mm`, which is an
+	# orphan column with no field behind it — Frappe drops unknown attributes at
+	# save time, so the form's deficit read 0 and the client script's per-row
+	# hrsweek calculation always short-circuited to 0.
+	doc.this_week_deficit = round(this_week_deficit, 4)
 
 	# ── Per-shift carry-forward from prev week ───────────────────
 	prev_to_date = frappe.utils.add_days(from_date_obj, -1)

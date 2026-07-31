@@ -153,6 +153,18 @@ doctype_js = {
 	"Reservoir Pumping Record":  "public/js/reservoir_pumping_record.js",
 }
 
+# Website
+# -------
+# /meniscus, /irrigation-now and /irrigation-control were consolidated into the
+# single /upande-irrigation dashboard. The old page files are gone; these
+# redirects are the compatibility layer, and they deep-link to the equivalent
+# view so an existing bookmark still lands where the operator expects.
+website_redirects = [
+    {"source": "/meniscus", "target": "/upande-irrigation"},
+    {"source": "/irrigation-now", "target": "/upande-irrigation#now"},
+    {"source": "/irrigation-control", "target": "/upande-irrigation#control"},
+]
+
 # Scheduled Tasks
 # ---------------
 scheduler_events = {

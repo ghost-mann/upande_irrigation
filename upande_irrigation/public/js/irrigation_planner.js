@@ -33,7 +33,9 @@ frappe.ui.form.on('Irrigation Planner Section', {
 
 function recalc_row(frm, cdt, cdn) {
     const row     = locals[cdt][cdn];
-    const deficit = flt(frm.doc.irrigation_deficit_mm);
+    // this_week_deficit is the persisted field; irrigation_deficit_mm was an
+    // orphan column that never held a value (see events/irrigation_planner.py).
+    const deficit = flt(frm.doc.this_week_deficit);
     const mm_hr   = flt(row.mm_hr);
     const cov_pct = flt(row.irrigation_coverage_pct);
 

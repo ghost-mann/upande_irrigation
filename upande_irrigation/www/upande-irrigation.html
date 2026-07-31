@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upande Irrigation{% if site_label %} · {{ site_label }}{% endif %}</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Inter matches desk's --font-stack; this page is standalone HTML and so
+       does not inherit desk CSS. -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/assets/upande_irrigation/css/tokens.css">
+  <link rel="stylesheet" href="/assets/upande_irrigation/css/shell.css">
+</head>
+<body>
+
+<div id="ui-root">
+  <div class="ui-loading">Loading Upande Irrigation…</div>
+</div>
+
+<script>
+  /* Handed to the shell as boot context. csrf_token is required for every
+     write; the farm list saves the first view a round trip. */
+  window.IRRIGATION_BOOT = {
+    csrf_token: {{ csrf_token | tojson }},
+    user: {{ current_user | tojson }},
+    site_label: {{ site_label | tojson }},
+    farms: {{ farms | tojson }},
+    today: {{ today | tojson }},
+  };
+  window.csrf_token = window.IRRIGATION_BOOT.csrf_token;
+</script>
+
+<script type="module">
+  import { Shell } from '/assets/upande_irrigation/js/dashboard/shell.js';
+
+  import overview  from '/assets/upande_irrigation/js/dashboard/view_overview.js';
+  import weather   from '/assets/upande_irrigation/js/dashboard/view_weather.js';
+  import compare   from '/assets/upande_irrigation/js/dashboard/view_compare.js';
+  import iot       from '/assets/upande_irrigation/js/dashboard/view_iot.js';
+  import resources from '/assets/upande_irrigation/js/dashboard/view_resources.js';
+  import map       from '/assets/upande_irrigation/js/dashboard/view_map.js';
+  import now       from '/assets/upande_irrigation/js/dashboard/view_now.js';
+  import control   from '/assets/upande_irrigation/js/dashboard/view_control.js';
+
+  const shell = new Shell({
+    mount: document.getElementById('ui-root'),
+    boot:  window.IRRIGATION_BOOT,
+    views: [overview, weather, compare, iot, resources, map, now, control],
+  });
+
+  window.IRRIGATION_SHELL = shell;
+  shell.start();
+</script>
+
+</body>
+</html>
