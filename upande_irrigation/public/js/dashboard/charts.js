@@ -1,6 +1,6 @@
 /* Charts and formatters.
  *
- * Weight and finish follow Task Work Hub's line_chart/donut: 3px round-cap
+ * Weight and finish follow the Upande house style: 3px round-cap
  * strokes, a gradient wash under the first series, and 4px dots ringed in the
  * card colour so they read against the fill. Thin 1.8px lines with bare 2px
  * dots were the main reason the ported charts looked weaker than the original.
@@ -12,8 +12,9 @@
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/* Task Work Hub's donut palette, unchanged so the two pages agree. */
-export const DONUT_COLORS = ["#c25a2e", "#2a2a26", "#8a8780", "#e07a4f", "#228883"];
+/* Donut palette from the reference page's observation mix — gold first, then
+ * plum, teal, olive, grey and red, which stay distinguishable in order. */
+export const DONUT_COLORS = ["#d9a514", "#7d4a72", "#228883", "#7aa23f", "#8a8780", "#c4302b"];
 
 export const SERIES_COLORS = [
 	"#c25a2e",
@@ -345,7 +346,7 @@ export function mkChart(host, series, W, H, opts = {}) {
 		}
 		const width = s.width || (isLead ? 3 : 2);
 		body += `<path class="${s.dash ? "ui-fade" : "ui-draw"}" d="${pathD}" fill="none" stroke="${s.color}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round"${s.dash ? ` stroke-dasharray="${s.dash}"` : ""}/>`;
-		/* Ringed dots, as in Task Work Hub — they hold up over the gradient.
+		/* Ringed dots — they hold up over the gradient wash.
 		 * Capped low: past ~20 points the dots crowd the line instead of
 		 * marking readings. */
 		if (!s.noPoints && n <= 20) {
@@ -404,7 +405,7 @@ export function mkChart(host, series, W, H, opts = {}) {
 
 /* ══════════════════════════════════════════════ donut */
 
-/* entries: [[label, value], …]. Matches Task Work Hub's geometry exactly:
+/* entries: [[label, value], …]. Geometry matches the reference page:
  * r=80, 46px stroke on a 300 box, swept from 12 o'clock. */
 export function donut(host, entries, { total, unit, colors } = {}) {
 	if (!host) return;

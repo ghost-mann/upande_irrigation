@@ -2,8 +2,7 @@
 
 The single operator dashboard for the app: weather, IoT telemetry, water and
 energy, year-on-year comparison, the 3D field map, live shift status and valve
-control — one sidebar, one theme (the Upande house style shared with Task Work
-Hub).
+control — one sidebar, one theme (the Upande house style).
 
 Replaces the former /meniscus, /irrigation-now and /irrigation-control pages,
 which now 301 here (see website_redirects in hooks.py).
