@@ -267,16 +267,23 @@ ${pagehead(
 	},
 
 	async refresh() {
-		/* First call builds the map; later ones only repaint valve state. */
-		if (!this.initialised) {
-			if (!this.initialising) this.initialising = this.build();
-			try {
-				await this.initialising;
-			} catch (err) {
-				return;
-			}
-		}
+		/* Valve state is painted first and independently. The basemap and the 3D
+		 * libraries come from external CDNs and WebGL may be unavailable; when
+		 * that happens the operator should still get the counts rather than a
+		 * view stuck on "Loading map…". */
 		await this.paintState();
+
+		if (this.initialised || this.mapFailed) return;
+		if (!this.initialising) this.initialising = this.build();
+		try {
+			await this.initialising;
+			/* build() is what counts the block boundaries, so repaint the tiles
+			 * now that blockCount is known and light the valves in the layer. */
+			await this.paintState();
+		} catch (err) {
+			/* build() has already written an explanation into the overlay. */
+			this.mapFailed = true;
+		}
 	},
 
 	async build() {
@@ -377,7 +384,34 @@ ${pagehead(
 		map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
 		this.map = map;
 
-		await new Promise((res) => map.on("load", res));
+		/* Don't wait forever on "load": without WebGL, or behind a blocked tile
+		 * host, that event never fires and the view would hang indefinitely. */
+		const loaded = await new Promise((res) => {
+			let settled = false;
+			const done = (ok) => {
+				if (settled) return;
+				settled = true;
+				res(ok);
+			};
+			map.on("load", () => done(true));
+			map.on("error", (e) => {
+				console.warn("[irrigation] map error", e && e.error);
+			});
+			setTimeout(() => done(false), 15000);
+		});
+
+		if (!loaded) {
+			if (overlay) {
+				overlay.textContent =
+					"The basemap did not load. Valve counts above are live; the map needs access to tiles.openfreemap.org and unpkg.com.";
+			}
+			statusStrip(
+				status,
+				"Map unavailable — the basemap or 3D libraries could not load. Everything else on this page is unaffected.",
+				"warn"
+			);
+			throw new Error("basemap did not load");
+		}
 
 		if (this.blockCount) this.addBlockLayers(maplibregl, map, blocksFC);
 

@@ -223,6 +223,12 @@ svg {
 	color: var(--ui-ink4);
 }
 
+/* A count only exists once a view has something to report; an empty badge
+ * otherwise renders as a stray grey pill on every nav row. */
+.ui-navlink .n:empty {
+	display: none;
+}
+
 .ui-navlink.on .n {
 	background: rgba(255, 255, 255, 0.16);
 	color: #fafaf6;
@@ -494,6 +500,15 @@ svg {
 	font-variant-numeric: tabular-nums;
 }
 
+/* A bare em-dash at 30px/600 with tight tracking renders as a thick black bar.
+ * When a tile has no value, say so quietly instead. */
+.ui-kpi .v.none {
+	font-size: 17px;
+	font-weight: 500;
+	letter-spacing: 0;
+	color: var(--ui-mute);
+}
+
 .ui-kpi .v .unit {
 	font-size: 12px;
 	font-weight: 500;
@@ -602,6 +617,60 @@ svg {
 .ui-empty.small {
 	padding: 10px;
 	font-size: 11.5px;
+}
+
+/* An empty screen is an invitation to act, so the large variant names the
+ * reason and offers the next step rather than shrugging. */
+.ui-empty.lg {
+	padding: 44px 28px;
+	max-width: 460px;
+	margin: 0 auto;
+}
+
+.ui-empty.lg .ic {
+	width: 46px;
+	height: 46px;
+	margin: 0 auto 16px;
+	border-radius: 14px;
+	background: rgba(194, 90, 46, 0.1);
+	display: grid;
+	place-items: center;
+}
+
+.ui-empty.lg .ic svg {
+	width: 20px;
+	height: 20px;
+	stroke: var(--ui-clay-deep);
+	fill: none;
+	stroke-width: 2;
+	margin: 0;
+}
+
+.ui-empty.lg h4 {
+	margin: 0 0 7px;
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--ui-ink);
+	letter-spacing: -0.3px;
+}
+
+.ui-empty.lg p {
+	margin: 0;
+	font-size: 12.5px;
+	color: var(--ui-ink4);
+	line-height: 1.6;
+}
+
+.ui-empty.lg .acts {
+	display: flex;
+	gap: 8px;
+	justify-content: center;
+	margin-top: 18px;
+	flex-wrap: wrap;
+}
+
+.ui-empty.lg .acts .ui-btn {
+	text-decoration: none;
 }
 
 /* ══════════════════════════════════════════════ severity & status */
@@ -733,31 +802,33 @@ svg {
 	color: var(--ui-ink3);
 }
 
+/* Severity has to survive being a 36px chip, so the tints run stronger than
+ * Task Work Hub's and the glyph is heavier. */
 .ui-inboxrow .ic svg {
-	width: 15px;
-	height: 15px;
+	width: 17px;
+	height: 17px;
 	stroke: currentColor;
 	fill: none;
-	stroke-width: 2;
+	stroke-width: 2.3;
 }
 
 .ui-inboxrow .ic.hot {
-	background: rgba(196, 48, 43, 0.1);
-	color: var(--ui-hot);
+	background: rgba(196, 48, 43, 0.16);
+	color: #a5231f;
 }
 
 .ui-inboxrow .ic.warn {
-	background: rgba(217, 150, 46, 0.14);
-	color: var(--ui-warn-deep);
+	background: rgba(217, 150, 46, 0.24);
+	color: #7d5309;
 }
 
 .ui-inboxrow .ic.clay {
-	background: rgba(194, 90, 46, 0.12);
+	background: rgba(194, 90, 46, 0.2);
 	color: var(--ui-clay-deep);
 }
 
 .ui-inboxrow .ic.ok {
-	background: rgba(63, 143, 79, 0.12);
+	background: rgba(63, 143, 79, 0.18);
 	color: var(--ui-ok-deep);
 }
 
@@ -975,6 +1046,15 @@ svg {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 	gap: 8px;
+}
+
+/* A message inside a card grid must span it, or it wraps inside one 150px
+ * column and reads as a broken cell. */
+.ui-irro-grid > .ui-empty,
+.ui-sensor-grid > .ui-empty,
+.ui-valve-grid > .ui-empty,
+.ui-live-grid > .ui-empty {
+	grid-column: 1 / -1;
 }
 
 .ui-irro {
@@ -1634,6 +1714,544 @@ svg {
 	gap: 6px;
 	flex-wrap: wrap;
 	margin-bottom: 14px;
+}
+
+/* ══════════════════════════════════════════════ donut */
+
+.ui-pie {
+	position: relative;
+	display: grid;
+	place-items: center;
+}
+
+.ui-pie svg {
+	width: 100%;
+	max-width: 220px;
+	height: auto;
+	display: block;
+}
+
+.ui-pie .center {
+	position: absolute;
+	text-align: center;
+	pointer-events: none;
+}
+
+.ui-pie .center b {
+	display: block;
+	font-size: 30px;
+	font-weight: 600;
+	color: var(--ui-ink);
+	letter-spacing: -1px;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+
+.ui-pie .center small {
+	font-size: 9px;
+	text-transform: uppercase;
+	letter-spacing: 1.4px;
+	color: var(--ui-mute);
+}
+
+/* ══════════════════════════════════════════════ health bars */
+
+.ui-hb {
+	display: grid;
+	grid-template-columns: 116px 1fr 62px;
+	gap: 14px;
+	align-items: center;
+	padding: 9px 0;
+	border-bottom: 1px solid var(--ui-hair);
+}
+
+.ui-hb:last-child {
+	border-bottom: 0;
+}
+
+.ui-hb .n {
+	font-weight: 600;
+	font-size: 12.5px;
+	color: var(--ui-ink);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ui-hb .lane {
+	position: relative;
+	height: 14px;
+	background: rgba(10, 10, 10, 0.05);
+	border-radius: var(--ui-r-pill);
+	overflow: hidden;
+}
+
+.ui-hb .lane i {
+	position: absolute;
+	left: 0;
+	top: 2px;
+	height: 10px;
+	border-radius: var(--ui-r-pill);
+	display: block;
+	width: var(--w, 0%);
+}
+
+.ui-hb .lane i.ok {
+	background: linear-gradient(90deg, #2e6b3a, #3f8f4f);
+}
+
+.ui-hb .lane i.warn {
+	background: linear-gradient(90deg, #9a5a00, #d9962e);
+}
+
+.ui-hb .lane i.hot {
+	background: linear-gradient(90deg, #7a2218, #c4302b);
+}
+
+.ui-hb .lane i.clay {
+	background: var(--ui-grad-clay);
+}
+
+.ui-hb .p {
+	font-weight: 600;
+	font-size: 12px;
+	text-align: right;
+	color: var(--ui-ink3);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ══════════════════════════════════════════════ week schedule grid
+ *
+ * The signature element: one column per day of the planning week, one row per
+ * section, each cell a shift block. This is the shape assign_daily_blocks()
+ * actually produces, so the grid is the schedule rather than a picture of it.
+ */
+
+.ui-week {
+	overflow-x: auto;
+}
+
+.ui-week-grid {
+	display: grid;
+	grid-template-columns: 116px repeat(7, minmax(74px, 1fr));
+	gap: 4px;
+	min-width: 640px;
+}
+
+.ui-week-head {
+	font-size: 9px;
+	text-transform: uppercase;
+	letter-spacing: 1.1px;
+	color: var(--ui-mute);
+	font-weight: 500;
+	text-align: center;
+	padding: 0 0 6px;
+}
+
+.ui-week-head.today {
+	color: var(--ui-clay-deep);
+	font-weight: 600;
+}
+
+.ui-week-row-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--ui-ink);
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding-right: 6px;
+}
+
+.ui-week-cell {
+	min-height: 38px;
+	border-radius: 9px;
+	background: rgba(10, 10, 10, 0.03);
+	padding: 3px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.ui-week-cell.today {
+	box-shadow: inset 0 0 0 1.5px rgba(10, 10, 10, 0.16);
+}
+
+/* Each block is one shift, labelled with its hours — the number an operator
+ * actually needs off this grid. Flat clay rather than a gradient: with up to 28
+ * blocks on screen, gradients turn the card into a wash. */
+.ui-week-shift {
+	flex: 1;
+	min-height: 16px;
+	border-radius: 5px;
+	background: var(--ui-clay);
+	color: #fff;
+	font-size: 9.5px;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	letter-spacing: 0.1px;
+	font-variant-numeric: tabular-nums;
+	cursor: default;
+	transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.ui-week-shift:hover {
+	transform: scale(1.05);
+	box-shadow: 0 2px 8px rgba(10, 10, 10, 0.18);
+}
+
+.ui-week-shift.running {
+	background: var(--ui-ok);
+	box-shadow: inset 0 0 0 1.5px #2e6b3a;
+}
+
+.ui-week-shift.capped {
+	background: var(--ui-warn);
+	color: #3a2a00;
+}
+
+.ui-week-shift.dry {
+	background: transparent;
+	box-shadow: inset 0 0 0 1px var(--ui-hair);
+	color: var(--ui-mute);
+	font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════ tabs (scrollable panels) */
+
+.ui-tabs {
+	display: flex;
+	gap: 4px;
+	overflow-x: auto;
+	padding-bottom: 2px;
+	margin-bottom: 12px;
+	border-bottom: 1px solid var(--ui-hair);
+	scrollbar-width: thin;
+}
+
+.ui-tabs::-webkit-scrollbar {
+	height: 3px;
+}
+
+.ui-tabs::-webkit-scrollbar-thumb {
+	background: rgba(10, 10, 10, 0.14);
+	border-radius: 2px;
+}
+
+.ui-tab {
+	border: 0;
+	background: transparent;
+	font-family: inherit;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--ui-ink4);
+	padding: 7px 13px;
+	border-radius: var(--ui-r-nav) var(--ui-r-nav) 0 0;
+	cursor: pointer;
+	white-space: nowrap;
+	position: relative;
+	transition: color 0.15s;
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+}
+
+.ui-tab:hover {
+	color: var(--ui-ink);
+}
+
+.ui-tab::after {
+	content: "";
+	position: absolute;
+	left: 8px;
+	right: 8px;
+	bottom: -1px;
+	height: 2px;
+	border-radius: 2px 2px 0 0;
+	background: transparent;
+	transition: background 0.15s;
+}
+
+.ui-tab.on {
+	color: var(--ui-ink);
+	font-weight: 600;
+}
+
+.ui-tab.on::after {
+	background: var(--ui-clay);
+}
+
+.ui-tab .n {
+	font-size: 9.5px;
+	font-weight: 600;
+	background: rgba(10, 10, 10, 0.06);
+	border-radius: var(--ui-r-pill);
+	padding: 1px 7px;
+	color: var(--ui-ink4);
+}
+
+.ui-tab.on .n {
+	background: rgba(194, 90, 46, 0.14);
+	color: var(--ui-clay-deep);
+}
+
+/* A panel that scrolls on its own rather than stretching the page. */
+.ui-scrollbox {
+	max-height: 268px;
+	overflow-y: auto;
+	padding-right: 4px;
+	scrollbar-width: thin;
+}
+
+.ui-scrollbox::-webkit-scrollbar {
+	width: 4px;
+}
+
+.ui-scrollbox::-webkit-scrollbar-thumb {
+	background: rgba(10, 10, 10, 0.14);
+	border-radius: 2px;
+}
+
+/* ══════════════════════════════════════════════ chart detail */
+
+.ui-chart .zero-line {
+	stroke: rgba(10, 10, 10, 0.22);
+	stroke-width: 1;
+}
+
+.ui-chart .ui-crosshair {
+	stroke: rgba(10, 10, 10, 0.22);
+	stroke-width: 1;
+	stroke-dasharray: 3 3;
+	pointer-events: none;
+	transition: opacity 0.1s;
+}
+
+.ui-chart text.ax {
+	font-size: 10px;
+	fill: var(--ui-mute);
+	font-variant-numeric: tabular-nums;
+}
+
+.ui-gauge {
+	display: block;
+	margin: 0 auto;
+}
+
+.ui-tooltip .sw {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+	margin-right: 6px;
+	vertical-align: 0;
+}
+
+/* ══════════════════════════════════════════════ skeletons */
+
+.ui-skel {
+	border-radius: var(--ui-r-tile);
+	background: linear-gradient(
+		90deg,
+		rgba(10, 10, 10, 0.045) 25%,
+		rgba(10, 10, 10, 0.075) 37%,
+		rgba(10, 10, 10, 0.045) 63%
+	);
+	background-size: 400% 100%;
+	animation: ui-shimmer 1.3s ease-in-out infinite;
+}
+
+.ui-skel-kpi {
+	height: 96px;
+}
+
+.ui-skel-card {
+	height: 220px;
+}
+
+.ui-skel-row {
+	height: 15px;
+	border-radius: 6px;
+	margin-bottom: 9px;
+}
+
+/* ══════════════════════════════════════════════ motion
+ *
+ * Every keyframe below is disabled wholesale by the reduced-motion query at the
+ * end of this block. Nothing here is load-bearing: elements animate from their
+ * final state, so if the animation never runs the layout is still correct.
+ */
+
+@keyframes ui-shimmer {
+	0% {
+		background-position: 100% 0;
+	}
+	100% {
+		background-position: 0 0;
+	}
+}
+
+@keyframes ui-draw-in {
+	from {
+		stroke-dashoffset: var(--len);
+	}
+	to {
+		stroke-dashoffset: 0;
+	}
+}
+
+@keyframes ui-fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes ui-rise-in {
+	from {
+		transform: scaleY(0.02);
+	}
+	to {
+		transform: scaleY(1);
+	}
+}
+
+@keyframes ui-pop-in {
+	from {
+		opacity: 0;
+		transform: scale(0.3);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes ui-grow-in {
+	from {
+		width: 0;
+	}
+	to {
+		width: var(--w);
+	}
+}
+
+@keyframes ui-arc-in {
+	from {
+		stroke-dashoffset: 502.65;
+		opacity: 0;
+	}
+}
+
+@keyframes ui-card-in {
+	from {
+		opacity: 0;
+		transform: translateY(7px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.ui-chart path.ui-draw[style*="--len"] {
+	stroke-dasharray: var(--len);
+	animation: ui-draw-in 900ms cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+.ui-gauge path.ui-draw[style*="--len"] {
+	stroke-dasharray: var(--len);
+	animation: ui-draw-in 700ms cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+.ui-chart .ui-fade {
+	animation: ui-fade-in 700ms 200ms ease both;
+}
+
+.ui-chart rect.ui-rise {
+	transform-box: fill-box;
+	transform-origin: bottom;
+	animation: ui-rise-in 520ms var(--d, 0ms) cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+.ui-chart circle.ui-pop {
+	animation: ui-pop-in 320ms var(--d, 0ms) cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+.ui-hb .lane i.ui-grow {
+	animation: ui-grow-in 640ms var(--d, 0ms) cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+.ui-pie circle.ui-arc {
+	animation: ui-arc-in 780ms var(--d, 0ms) cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+/* Staggered entrance for a freshly painted grid of cards. The index is set
+ * inline by the view so the delay follows document order. */
+.ui-stagger > * {
+	animation: ui-card-in 380ms calc(var(--i, 0) * 45ms) cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+/* Hover lift, as in Task Work Hub's kcard/tile/wcard. */
+.ui-kpi,
+.ui-sensor,
+.ui-live,
+.ui-valve {
+	transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.ui-kpi:hover,
+.ui-sensor:hover {
+	transform: translateY(-2px);
+}
+
+.ui-valve:hover,
+.ui-live:hover {
+	transform: translateY(-1px);
+}
+
+.ui-inboxrow {
+	transition: background 0.15s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		animation-delay: 0ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+	}
+
+	.ui-hb .lane i.ui-grow {
+		width: var(--w);
+	}
+
+	.ui-chart path.ui-draw[style*="--len"] {
+		stroke-dasharray: none;
+	}
+
+	.ui-kpi:hover,
+	.ui-sensor:hover,
+	.ui-valve:hover,
+	.ui-live:hover,
+	.ui-week-shift:hover {
+		transform: none;
+	}
+}
+
+/* Keyboard focus must stay visible everywhere. */
+:focus-visible {
+	outline: 2px solid var(--ui-clay);
+	outline-offset: 2px;
+	border-radius: 4px;
 }
 
 /* ══════════════════════════════════════════════ responsive */

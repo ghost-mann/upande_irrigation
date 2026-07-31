@@ -62,7 +62,7 @@ ${pagehead(
 	 <button class="ui-btn ghost" id="now-refresh" type="button">${icon("refresh")}Refresh</button>`
 )}
 <div class="ui-status" id="now-status"></div>
-<div class="ui-kpis" id="now-kpis"></div>
+<div class="ui-kpis ui-stagger" id="now-kpis"></div>
 <div id="now-body"><div class="ui-loading">Loading…</div></div>`;
 
 		el.querySelector("#now-refresh").addEventListener("click", () => this.refresh());
@@ -114,7 +114,7 @@ ${pagehead(
 		<h3>${icon("drop")}${charts.esc(f.farm)}</h3>
 		<span class="meta">${(f.sections || []).length} section(s) · ${activeCount} irrigating</span>
 	</div>
-	<div class="ui-live-grid">${(f.sections || []).map((s) => this.sectionCard(s)).join("")}</div>
+	<div class="ui-live-grid ui-stagger">${(f.sections || []).map((s, i) => this.sectionCard(s, i)).join("")}</div>
 </div>`;
 			})
 			.join("");
@@ -122,7 +122,7 @@ ${pagehead(
 		this.tick();
 	},
 
-	sectionCard(s) {
+	sectionCard(s, i = 0) {
 		const { charts } = this.ctx;
 		const on = !!s.current;
 		let body;
@@ -181,7 +181,7 @@ ${steps}`;
 </div>`
 			: "";
 
-		return `<div class="ui-live ${on ? "on" : ""}">
+		return `<div class="ui-live ${on ? "on" : ""}" style="--i:${Math.min(i, 12)}">
 	<div class="ui-live-head">
 		<div class="n">${charts.esc(s.section)}</div>
 		<span class="ui-sev ${on ? "ok" : "ink"}">${on ? "IRRIGATING" : "IDLE"}</span>

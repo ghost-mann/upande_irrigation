@@ -86,7 +86,7 @@ ${pagehead(
 	 <button class="ui-btn ghost" id="r-refresh" type="button">${icon("refresh")}Refresh</button>`
 )}
 <div class="ui-status" id="r-status"></div>
-<div class="ui-kpis" id="r-kpis"></div>
+<div class="ui-kpis ui-stagger" id="r-kpis"></div>
 
 <div class="ui-card">
 	<div class="ui-cardhead"><h3>${icon("resources")}River → dam → sections</h3><span class="meta">period totals</span></div>
@@ -126,7 +126,7 @@ ${pagehead(
 
 <div class="ui-card">
 	<div class="ui-cardhead"><h3>Section performance vs target</h3><span class="meta">weekly · dashed line = weekly budget</span></div>
-	<div class="ui-sensor-grid" id="r-perf"></div>
+	<div class="ui-sensor-grid ui-stagger" id="r-perf"></div>
 </div>
 
 <div class="ui-row2eq">

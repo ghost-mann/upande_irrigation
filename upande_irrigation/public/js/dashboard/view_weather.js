@@ -19,6 +19,15 @@ const T = {
 	clay: "var(--ui-clay)",
 };
 
+/* "23HA_SECTION - KL" → "23 Ha", so a tab bar stays readable. */
+function shortSection(name) {
+	const base = String(name || "")
+		.replace(/ - [A-Z]{2}$/, "")
+		.replace("_SECTION", "")
+		.trim();
+	return base.endsWith("HA") ? `${base.slice(0, -2)} Ha` : base || "—";
+}
+
 function tension(cb) {
 	if (cb == null) return { cls: "ink", label: "—", color: "var(--ui-mute)" };
 	if (cb < 20) return { cls: "ok", label: "Wet", color: "var(--ui-ok)" };
@@ -53,7 +62,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 	<div id="wx-entry"><div class="ui-empty small">Loading…</div></div>
 </div>
 
-<div class="ui-kpis" id="wx-kpis"></div>
+<div class="ui-kpis ui-stagger" id="wx-kpis"></div>
 
 <div class="ui-card">
 	<div class="ui-cardhead"><h3>Rainfall</h3><span class="meta" id="wx-wetdry">mm · daily, against reference ETo</span></div>
@@ -100,9 +109,13 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 </div>
 
 <div class="ui-card">
-	<div class="ui-cardhead"><h3>Soil tension · irrometers</h3><span class="meta">centibars · latest reading per block</span></div>
-	<div id="wx-irro"></div>
-	<div class="ui-legend row">
+	<div class="ui-cardhead">
+		<h3>Soil tension · irrometers</h3>
+		<span class="meta">centibars · latest reading per block</span>
+	</div>
+	<div class="ui-tabs" id="wx-irro-tabs"></div>
+	<div class="ui-scrollbox"><div class="ui-irro-grid ui-stagger" id="wx-irro"></div></div>
+	<div class="ui-legend row" style="margin-top:12px">
 		<span><i style="background:${T.ok}"></i>0–20 wet</span>
 		<span><i style="background:${T.warn}"></i>20–40 optimal</span>
 		<span><i style="background:${T.clay}"></i>40–60 drying</span>
@@ -157,10 +170,15 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 			return;
 		}
 
+		/* Never pre-select a farm the operator did not choose. A browser selects
+		 * the first <option> by default, which silently aimed the form at
+		 * whichever farm sorted first — a reading filed against the wrong farm
+		 * corrupts that farm's SWD and GDD chain from that day forward. */
 		const farmField = farms.length
 			? `<div>
 	<label for="wx-f-farm">Farm</label>
 	<select class="ui-select" id="wx-f-farm">
+		${farm ? "" : '<option value="">Choose a farm…</option>'}
 		${farms.map((f) => `<option value="${charts.esc(f)}"${f === farm ? " selected" : ""}>${charts.esc(f)}</option>`).join("")}
 	</select>
 </div>`
@@ -212,7 +230,8 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		const farmEl = host.querySelector("#wx-f-farm");
 		const farm = farmEl ? farmEl.value : this.ctx.filters.farm;
 		if (!farm) {
-			statusStrip(status, "Pick a farm in the sidebar first — a reading belongs to one farm.");
+			statusStrip(status, "Choose a farm — a reading belongs to exactly one.");
+			if (farmEl) farmEl.focus();
 			return;
 		}
 		const date = val("#wx-f-date");
@@ -289,7 +308,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 
 		this.renderEntry(data);
 		this.renderKpis(data.kpis, weather);
-		this.renderCharts(weather);
+		this.renderCharts(weather, meta);
 		this.renderIrrometer(blocks);
 		this.renderBlocks(blocks);
 	},
@@ -304,135 +323,196 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		const sp = (vals, color) => charts.sparkline(vals, color);
 		const range =
 			kpis.min_temperature != null ? `${kpis.min_temperature}° – ${kpis.max_temperature}°` : "—";
-		host.innerHTML =
-			kpi(T.rain, "Rainfall", charts.fmtNum(kpis.total_rainfall), "mm", `${kpis.wet_days} wet · ${kpis.dry_days} dry`, sp(weather.map((r) => r.rainfall_mm || 0), T.rain)) +
-			kpi(T.eto, "Pan evap", charts.fmtNum(kpis.total_evaporation), "mm", `${kpis.reading_count} readings`, sp(weather.map((r) => r.daily_evaporation || 0), T.eto)) +
-			kpi(T.clay, "Reference ETo", charts.fmtNum(kpis.total_eto), "mm", `K-pan ${(this.ctx.filters.kpan || 0.75)}`, sp(weather.map((r) => r.eto || 0), T.clay)) +
-			kpi(T.violet, "Mean temp", charts.fmtNum(kpis.avg_mean_temperature), "°C", range, sp(weather.map((r) => r.mean_temperature).filter((v) => v != null), T.violet)) +
-			kpi(kpis.water_deficit > 0 ? T.heat : T.ok, "Deficit", charts.fmtNum(kpis.water_deficit), "mm", kpis.water_deficit > 0 ? "irrigation needed" : "crop demand met", sp(weather.map((r) => Math.max(0, (r.eto || 0) - (r.rainfall_mm || 0))), T.heat));
+		const idx = (html, i) => html.replace('<div class="ui-kpi"', `<div class="ui-kpi" style="--i:${i}"`);
+		host.innerHTML = [
+			kpi(T.rain, "Rainfall", charts.fmtNum(kpis.total_rainfall), "mm", `${kpis.wet_days} wet · ${kpis.dry_days} dry`, sp(weather.map((r) => r.rainfall_mm || 0), T.rain)),
+			kpi(T.eto, "Pan evap", charts.fmtNum(kpis.total_evaporation), "mm", `${kpis.reading_count} readings`, sp(weather.map((r) => r.daily_evaporation || 0), T.eto)),
+			kpi(T.clay, "Reference ETo", charts.fmtNum(kpis.total_eto), "mm", "K-pan 0.75", sp(weather.map((r) => r.eto || 0), T.clay)),
+			kpi(T.violet, "Mean temp", charts.fmtNum(kpis.avg_mean_temperature), "°C", range, sp(weather.map((r) => r.mean_temperature).filter((v) => v != null), T.violet)),
+			kpi(kpis.water_deficit > 0 ? T.heat : T.ok, "Deficit", charts.fmtNum(kpis.water_deficit), "mm", kpis.water_deficit > 0 ? "irrigation needed" : "crop demand met", sp(weather.map((r) => Math.max(0, (r.eto || 0) - (r.rainfall_mm || 0))), T.heat)),
+		].map(idx).join("");
 	},
 
-	renderCharts(weather) {
+	/* Every chart here shares one continuous daily axis spanning the selected
+	 * period, with null for days the station never recorded. Plotting readings
+	 * by array index — as the old page did — compressed a sparse month into a
+	 * handful of adjacent points and invented a trend between them. */
+	renderCharts(weather, meta) {
 		const { charts } = this.ctx;
-		const dates = weather.map((r) => r.date);
+		const axis = charts.dailyAxis(weather, meta.start_date, meta.end_date);
+		const dates = axis.labels;
 
 		charts.mkChart(
 			this.el.querySelector("#wx-rain"),
 			[
-				{ label: "Rainfall", color: T.rain, type: "bar", values: weather.map((r) => r.rainfall_mm || 0), unit: "mm" },
-				{ label: "ETo", color: T.eto, values: weather.map((r) => r.eto || 0), dash: "4 3", width: 1.5, unit: "mm", noPoints: true },
+				{ label: "Rainfall", color: T.rain, type: "bar", values: axis.pick("rainfall_mm"), unit: "mm" },
+				{ label: "ETo", color: T.eto, values: axis.pick("eto"), dash: "4 3", width: 1.8, unit: "mm", noPoints: true },
 			],
 			1200,
-			200,
+			210,
 			{ xLabels: dates, tooltip: true }
 		);
 		const wet = weather.filter((r) => (r.rainfall_mm || 0) > 0.1).length;
 		const wd = this.el.querySelector("#wx-wetdry");
-		if (wd) wd.textContent = `${wet} wet · ${weather.length - wet} dry days`;
+		if (wd) wd.textContent = `${wet} wet · ${weather.length - wet} dry of ${weather.length} logged`;
 
-		const temps = weather.filter((r) => r.minimum_temperature != null && r.maximum_temperature != null);
-		charts.mkChart(
-			this.el.querySelector("#wx-temp"),
-			[
-				{ label: "Max", color: T.heat, values: temps.map((r) => r.maximum_temperature), width: 1.6, unit: "°C", noPoints: true },
-				{ label: "Mean", color: T.clay, values: temps.map((r) => r.mean_temperature != null ? r.mean_temperature : (r.minimum_temperature + r.maximum_temperature) / 2), width: 2, unit: "°C", noPoints: true },
-				{ label: "Min", color: T.cool, values: temps.map((r) => r.minimum_temperature), width: 1.6, unit: "°C", noPoints: true },
-			],
-			1200,
-			200,
-			{
-				xLabels: temps.map((r) => r.date),
-				tooltip: true,
-				noFill: true,
-				yMin: temps.length ? Math.floor(Math.min(...temps.map((r) => r.minimum_temperature)) - 2) : 0,
-				yMax: temps.length ? Math.ceil(Math.max(...temps.map((r) => r.maximum_temperature)) + 2) : 40,
-			}
-		);
+		/* A 0 °C reading on a Kenyan farm means "not recorded", which is exactly
+		 * how events/irrigation_planner.py treats it (temp > 0). Charting the
+		 * zeros drew the series down to the axis. */
+		const realTemp = (v) => (v == null || Number(v) <= 0 ? null : Number(v));
+		const lo = axis.pick(null, (r) => realTemp(r.minimum_temperature));
+		const hi = axis.pick(null, (r) => realTemp(r.maximum_temperature));
+		const mean = axis.pick(null, (r) => {
+			const a = realTemp(r.minimum_temperature);
+			const b = realTemp(r.maximum_temperature);
+			if (r.mean_temperature != null && Number(r.mean_temperature) > 0) return Number(r.mean_temperature);
+			return a != null && b != null ? (a + b) / 2 : null;
+		});
+		const tempHost = this.el.querySelector("#wx-temp");
+		const anyTemp = lo.some((v) => v != null) || hi.some((v) => v != null);
+		if (!anyTemp) {
+			tempHost.innerHTML = '<div class="ui-empty small">No temperature readings in this period.</div>';
+		} else {
+			const loVals = lo.filter((v) => v != null);
+			const hiVals = hi.filter((v) => v != null);
+			charts.mkChart(
+				tempHost,
+				[
+					{ label: "Max", color: T.heat, values: hi, width: 2.2, unit: "°C", noPoints: true },
+					{ label: "Mean", color: T.clay, values: mean, width: 3, unit: "°C", noPoints: true },
+					{ label: "Min", color: T.cool, values: lo, width: 2.2, unit: "°C", noPoints: true },
+				],
+				1200,
+				210,
+				{
+					xLabels: dates,
+					tooltip: true,
+					noFill: true,
+					yMin: Math.floor(Math.min(...loVals) - 2),
+					yMax: Math.ceil(Math.max(...hiVals) + 2),
+				}
+			);
+		}
 
 		charts.mkChart(
 			this.el.querySelector("#wx-evap"),
-			[{ label: "Evaporation", color: T.eto, values: weather.map((r) => r.daily_evaporation || 0), unit: "mm" }],
+			[{ label: "Evaporation", color: T.eto, values: axis.pick("daily_evaporation"), unit: "mm" }],
 			560,
-			180,
+			190,
 			{ xLabels: dates, tooltip: true }
 		);
 
-		const swd = weather.filter((r) => r.swd != null);
-		if (swd.length) {
-			const vals = swd.map((r) => Number(r.swd));
+		const swdVals = axis.pick("swd");
+		const swdHost = this.el.querySelector("#wx-swd");
+		if (swdVals.some((v) => v != null)) {
+			const present = swdVals.filter((v) => v != null);
 			charts.mkChart(
-				this.el.querySelector("#wx-swd"),
-				[{ label: "SWD", color: T.cool, values: vals, unit: "mm", noPoints: swd.length > 60 }],
+				swdHost,
+				[{ label: "SWD", color: T.cool, values: swdVals, unit: "mm" }],
 				560,
-				180,
+				190,
 				{
-					xLabels: swd.map((r) => r.date),
+					xLabels: dates,
 					tooltip: true,
 					noFill: true,
-					yMin: Math.floor(Math.min(...vals, 0)),
-					yMax: Math.ceil(Math.max(...vals, 0)),
+					yMin: Math.floor(Math.min(...present, 0)),
+					yMax: Math.ceil(Math.max(...present, 0)),
 				}
 			);
 		} else {
-			this.el.querySelector("#wx-swd").innerHTML = '<div class="ui-empty small">no SWD data</div>';
+			swdHost.innerHTML = '<div class="ui-empty small">No soil water deficit recorded yet.</div>';
 		}
 
-		const zs = weather.filter((r) => r.z_value != null);
+		const zVals = axis.pick("z_value");
 		const badge = this.el.querySelector("#wx-z-badge");
-		if (!zs.length) {
-			this.el.querySelector("#wx-z").innerHTML = '<div class="ui-empty small">no z-value data yet</div>';
+		const zHost = this.el.querySelector("#wx-z");
+		if (!zVals.some((v) => v != null)) {
+			zHost.innerHTML = '<div class="ui-empty small">The Z-value needs a temperature reading to compute.</div>';
 			if (badge) {
 				badge.textContent = "—";
 				badge.className = "ui-sev ink";
 			}
 			return;
 		}
-		const latest = zs[zs.length - 1];
+		const withZ = weather.filter((r) => r.z_value != null);
+		const latest = withZ[withZ.length - 1];
 		const zv = Number(latest.z_value) || 0;
 		if (badge) {
 			badge.textContent = `${zv.toFixed(1)} · ${latest.z_risk_level || "—"}`;
 			badge.className = `ui-sev ${zTone(zv).cls}`;
 		}
-		const n = zs.length;
+		const n = dates.length;
 		charts.mkChart(
-			this.el.querySelector("#wx-z"),
+			zHost,
 			[
-				{ label: "Spore release (5)", color: T.warn, values: Array(n).fill(5), dash: "3 3", width: 1, noPoints: true },
-				{ label: "Infection risk (15)", color: T.clay, values: Array(n).fill(15), dash: "3 3", width: 1, noPoints: true },
-				{ label: "High risk (20)", color: T.heat, values: Array(n).fill(20), dash: "3 3", width: 1, noPoints: true },
-				{ label: "Z value", color: T.violet, values: zs.map((r) => Number(r.z_value) || 0), width: 2 },
+				{ label: "Z value", color: T.violet, values: zVals, width: 3, unit: "" },
+				{ label: "Spore release (5)", color: T.warn, values: Array(n).fill(5), dash: "3 3", width: 1.2, noPoints: true },
+				{ label: "Infection risk (15)", color: T.clay, values: Array(n).fill(15), dash: "3 3", width: 1.2, noPoints: true },
+				{ label: "Fungicide (20)", color: T.heat, values: Array(n).fill(20), dash: "3 3", width: 1.2, noPoints: true },
 			],
 			1200,
-			200,
-			{ xLabels: zs.map((r) => r.date), tooltip: true, noFill: true }
+			210,
+			{ xLabels: dates, tooltip: true, noFill: true }
 		);
 	},
 
+	/* One tab per irrigation section, gauges for the selected one in a panel
+	 * that scrolls on its own. Stacking every section as open <details> made a
+	 * farm with 78 blocks push the rest of the page off screen. */
 	renderIrrometer(blocks) {
 		const { charts } = this.ctx;
+		const tabsHost = this.el.querySelector("#wx-irro-tabs");
 		const host = this.el.querySelector("#wx-irro");
+
 		if (!blocks.length) {
-			host.innerHTML = '<div class="ui-empty small">No block data.</div>';
+			tabsHost.innerHTML = "";
+			host.innerHTML = '<div class="ui-empty small">No blocks are mapped to a section yet.</div>';
 			return;
 		}
+
 		const grouped = {};
 		blocks.forEach((b) => {
-			const key = b.parent_section || "Other";
+			const key = b.parent_section || "Unassigned";
 			(grouped[key] = grouped[key] || []).push(b);
 		});
+		const sections = Object.keys(grouped).sort();
 
-		host.innerHTML = Object.keys(grouped)
-			.sort()
-			.map((section) => {
-				const list = grouped[section];
-				const hasData = list.some((b) => b.irrometer_1ft != null);
-				const cards = list
-					.map((b) => {
-						const t1 = tension(b.irrometer_1ft);
-						const t2 = tension(b.irrometer_2ft);
-						return `<div class="ui-irro" style="border-left-color:${t1.color}">
+		/* Keep the operator's tab across refreshes; fall back to the first. */
+		if (!this.irroSection || !grouped[this.irroSection]) {
+			this.irroSection = sections[0];
+		}
+
+		tabsHost.innerHTML = sections
+			.map((s) => {
+				const list = grouped[s];
+				const withData = list.filter((b) => b.irrometer_1ft != null).length;
+				return `<button class="ui-tab${s === this.irroSection ? " on" : ""}" type="button" data-section="${charts.esc(s)}" title="${charts.esc(s)}">
+	${charts.esc(shortSection(s))}<span class="n">${withData || list.length}</span>
+</button>`;
+			})
+			.join("");
+
+		tabsHost.querySelectorAll("[data-section]").forEach((btn) => {
+			btn.addEventListener("click", () => {
+				this.irroSection = btn.getAttribute("data-section");
+				this.renderIrrometer(blocks);
+			});
+		});
+
+		const list = grouped[this.irroSection] || [];
+		const withData = list.filter((b) => b.irrometer_1ft != null);
+		if (!withData.length) {
+			host.innerHTML = `<div class="ui-empty">${icon("drop")}No irrometer readings logged for ${charts.esc(shortSection(this.irroSection))} yet. Readings are entered on the Weather Reading form.</div>`;
+			return;
+		}
+
+		host.innerHTML = list
+			.map((b, i) => {
+				const t1 = tension(b.irrometer_1ft);
+				const t2 = tension(b.irrometer_2ft);
+				return `<div class="ui-irro" style="border-left-color:${t1.color};--i:${i}">
 	<div class="ui-irro-name">
-		<span>${charts.esc(b.block_name || b.name)}</span>
+		<span title="${charts.esc(b.name)}">${charts.esc(b.block_name || b.name)}</span>
 		<span class="ui-sev ${t1.cls}">${t1.label}</span>
 	</div>
 	<div class="ui-irro-gauges">
@@ -448,19 +528,9 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		</div>
 	</div>
 </div>`;
-					})
-					.join("");
-				return `<details class="ui-section-group" open>
-	<summary>
-		<span class="ui-dot" style="background:var(--ui-clay)"></span>
-		${charts.esc(section)}
-		<span class="meta">${list.length} block(s)</span>
-		${hasData ? "" : '<span class="meta" style="margin-left:auto">no readings yet</span>'}
-	</summary>
-	<div class="ui-irro-grid">${cards}</div>
-</details>`;
 			})
 			.join("");
+		charts.animateIn(host);
 	},
 
 	renderBlocks(blocks) {
@@ -475,13 +545,18 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		body.innerHTML = blocks
 			.map((b) => {
 				const t = tension(b.irrometer_1ft);
+				/* No reading means no status — a row of "—" pills reads as data. */
+				const status =
+					b.irrometer_1ft != null
+						? `<span class="ui-sev ${t.cls}">${t.label}</span>`
+						: '<span style="color:var(--ui-mute)">not read</span>';
 				return `<tr>
 	<td><b>${charts.esc(b.block_name || b.name)}</b></td>
-	<td>${charts.esc(b.parent_section || "—")}</td>
+	<td>${charts.esc(shortSection(b.parent_section) || "—")}</td>
 	<td class="num">${b.irrometer_1ft != null ? b.irrometer_1ft : "—"}</td>
 	<td class="num">${b.irrometer_2ft != null ? b.irrometer_2ft : "—"}</td>
 	<td>${b.irrometer_date ? charts.fmtDate(b.irrometer_date) : "—"}</td>
-	<td class="num"><span class="ui-sev ${t.cls}">${t.label}</span></td>
+	<td class="num">${status}</td>
 </tr>`;
 			})
 			.join("");

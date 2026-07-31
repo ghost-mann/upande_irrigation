@@ -57,8 +57,8 @@ ${pagehead(
 	 <button class="ui-btn ghost" id="iot-refresh" type="button">${icon("refresh")}Refresh</button>`
 )}
 <div class="ui-status" id="iot-status"></div>
-<div class="ui-kpis" id="iot-kpis"></div>
-<div class="ui-sensor-grid" id="iot-cards"></div>
+<div class="ui-kpis ui-stagger" id="iot-kpis"></div>
+<div class="ui-sensor-grid ui-stagger" id="iot-cards"></div>
 <div class="ui-card" style="margin-top:14px">
 	<div class="ui-cardhead"><h3>Recent readings</h3><span class="meta" id="iot-count"></span></div>
 	<div class="ui-tablewrap scroll">
@@ -145,7 +145,7 @@ ${pagehead(
 		}
 
 		host.innerHTML = sensors
-			.map((s) => {
+			.map((s, i) => {
 				const duid = s.deveui;
 				const latest = (data.latest || {})[duid] || {};
 				const series = (data.series || {})[duid] || [];
@@ -156,7 +156,7 @@ ${pagehead(
 				const mn = values.length ? Math.min(...values).toFixed(1) : "—";
 				const mx = values.length ? Math.max(...values).toFixed(1) : "—";
 
-				return `<div class="ui-sensor" style="--kc:${color}">
+				return `<div class="ui-sensor" style="--kc:${color};--i:${Math.min(i, 12)}">
 	<div class="ui-sensor-head">
 		<div>
 			<div class="t">${charts.esc(s.sensor_name || duid)}</div>

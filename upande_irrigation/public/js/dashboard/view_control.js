@@ -28,13 +28,13 @@ export default {
 		el.innerHTML = `
 ${pagehead(
 	"Valve Control",
-	"Grouped by tank",
+	"Valve state",
 	"Auto-refresh every 30 s · operator override takes precedence over the schedule",
 	`<span class="ui-sev ink" id="vc-clock">—</span>
 	 <button class="ui-btn ghost" id="vc-refresh" type="button">${icon("refresh")}Refresh</button>`
 )}
 <div class="ui-status" id="vc-status"></div>
-<div class="ui-kpis" id="vc-kpis"></div>
+<div class="ui-kpis ui-stagger" id="vc-kpis"></div>
 <div id="vc-body"><div class="ui-loading">Loading…</div></div>`;
 
 		el.querySelector("#vc-refresh").addEventListener("click", () => this.refresh());
@@ -84,35 +84,62 @@ ${pagehead(
 		tanks.forEach((t) => {
 			tankLabel[t.name] = t.asset_label || t.name;
 		});
+
+		/* Group by tank where one is assigned. Where none is — which is every
+		 * valve on Lokitela today — fall back to the block-name prefix
+		 * ("Airstrip 3 · #3,#4" → "Airstrip"). Without that, 58 identical cards
+		 * render as one undifferentiated wall. */
 		const groups = {};
+		const labels = {};
 		valves.forEach((v) => {
-			const key = v.tank || "__none__";
+			let key;
+			let label;
+			if (v.tank) {
+				key = `tank:${v.tank}`;
+				label = tankLabel[v.tank] || v.tank;
+			} else {
+				const prefix = String(v.asset_label || v.name).trim().split(/[\s·]+/)[0] || "Other";
+				key = `prefix:${prefix.toLowerCase()}`;
+				label = prefix;
+			}
+			labels[key] = label;
 			(groups[key] = groups[key] || []).push(v);
 		});
-		/* Unassigned valves sort last — they're a data-quality tail, not a tank. */
-		const keys = Object.keys(groups).sort((a, b) =>
-			a === "__none__" ? 1 : b === "__none__" ? -1 : a.localeCompare(b)
-		);
 
-		body.innerHTML = keys
-			.map((k) => {
-				const list = groups[k];
-				const label = k === "__none__" ? "No tank assigned" : tankLabel[k] || k;
-				const onCount = list.filter((v) => v.effective_state === "ON").length;
-				return `<div class="ui-card">
+		/* Tanks first, then prefixes, each alphabetically. */
+		const keys = Object.keys(groups).sort((a, b) => {
+			const aTank = a.startsWith("tank:");
+			const bTank = b.startsWith("tank:");
+			if (aTank !== bTank) return aTank ? -1 : 1;
+			return labels[a].localeCompare(labels[b]);
+		});
+
+		const noTanks = !tanks.length;
+		const eyebrow = this.el.querySelector("[data-eyebrow]");
+		if (eyebrow) eyebrow.textContent = noTanks ? "Grouped by block" : "Grouped by tank";
+		body.innerHTML =
+			(noTanks
+				? `<div class="ui-alert muted" style="margin-bottom:14px">${icon("drop")}<span>No valve has a tank assigned, so these are grouped by block name. Set the Tank field on Tank And Valve to group by supply instead.</span></div>`
+				: "") +
+			keys
+				.map((k) => {
+					const list = groups[k];
+					const onCount = list.filter((v) => v.effective_state === "ON").length;
+					const overrides = list.filter((v) => v.override_active).length;
+					return `<div class="ui-card">
 	<div class="ui-cardhead">
-		<h3>${icon("drop")}${charts.esc(label)}</h3>
-		<span class="meta">${list.length} valve(s) · ${onCount} open</span>
+		<h3>${icon("drop")}${charts.esc(labels[k])}</h3>
+		<span class="meta">${list.length} valve${list.length === 1 ? "" : "s"} · ${onCount} open${overrides ? ` · ${overrides} override${overrides === 1 ? "" : "s"}` : ""}</span>
 	</div>
-	<div class="ui-valve-grid">${list.map((v) => this.valveCard(v)).join("")}</div>
+	<div class="ui-valve-grid ui-stagger">${list.map((v, i) => this.valveCard(v, i)).join("")}</div>
 </div>`;
-			})
-			.join("");
+				})
+				.join("");
 
 		this.bindOverrides();
 	},
 
-	valveCard(v) {
+	valveCard(v, i = 0) {
 		const { charts } = this.ctx;
 		const cls = v.override_active ? "forced" : v.effective_state === "ON" ? "on" : "";
 		const sev = v.override_active ? "warn" : v.effective_state === "ON" ? "ok" : "ink";
@@ -125,7 +152,7 @@ ${pagehead(
 			timing = `<div class="ui-valve-row"><span>Next on</span><b>${charts.esc(charts.fmtDayClock(v.next_scheduled_at))}</b></div>`;
 		}
 
-		return `<div class="ui-valve ${cls}" data-valve="${charts.esc(v.name)}">
+		return `<div class="ui-valve ${cls}" data-valve="${charts.esc(v.name)}" style="--i:${Math.min(i, 12)}">
 	<div class="ui-valve-head">
 		<div class="n">${charts.esc(v.asset_label || v.name)}</div>
 		<span class="ui-sev ${sev}">${charts.esc(pill)}</span>

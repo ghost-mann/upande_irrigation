@@ -11,8 +11,17 @@
  * /meniscus each ran their own intervals for as long as the tab lived.
  */
 
-import * as api from "./api.js";
-import * as charts from "./charts.js";
+/* A relative specifier resolves against this module's path without its query,
+ * so `import "./charts.js"` would bypass the ?v= cache token the page puts on
+ * every asset URL and could serve a stale copy for up to twelve hours after a
+ * deploy. Carry the token across explicitly. Views never import these two
+ * directly — they receive them on ctx — so this is the only place it matters. */
+const ASSET_VERSION = new URL(import.meta.url).search;
+
+const [api, charts] = await Promise.all([
+	import(`./api.js${ASSET_VERSION}`),
+	import(`./charts.js${ASSET_VERSION}`),
+]);
 
 const RAIL_KEY = "ui-irr-rail";
 const DEFAULT_VIEW = "overview";
@@ -36,6 +45,11 @@ const ICONS = {
 	check: '<polyline points="20 6 9 17 4 12"/>',
 	refresh:
 		'<path d="M1 4v6h6M23 20v-6h-6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+	calendar:
+		'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+	target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+	trend: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+	zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
 };
 
 export function icon(name, extra = "") {
@@ -345,10 +359,14 @@ export class Shell {
 
 /* ══════════════════════════════════════════════ shared view helpers */
 
+/* `title` and `eyebrow` are escaped text. `sub` and `toolbar` are markup the
+ * view supplies, so they are inserted as-is — every caller passes a literal
+ * template, never user data. Views that need to update the eyebrow after a
+ * fetch target [data-eyebrow] rather than embedding an element in the string. */
 export function pagehead(title, eyebrow, sub, toolbar = "") {
 	return `<div class="ui-pagehead">
 	<div>
-		<div class="eyebrow">${charts.esc(eyebrow || "")}</div>
+		<div class="eyebrow" data-eyebrow>${charts.esc(eyebrow || "")}</div>
 		<h1>${charts.esc(title)}</h1>
 		${sub ? `<p>${sub}</p>` : ""}
 	</div>
@@ -357,9 +375,13 @@ export function pagehead(title, eyebrow, sub, toolbar = "") {
 }
 
 export function kpi(kc, label, value, unit, note, spark = "") {
+	/* "—" and "" mean "not measured", which should read as absence rather than
+	 * as a giant dash sitting where a number belongs. */
+	const blank = value == null || value === "" || value === "—";
+	const shown = blank ? "no data" : value;
 	return `<div class="ui-kpi" style="--kc:${kc}">
 	<div class="l">${charts.esc(label)}</div>
-	<div class="v">${value}${unit ? `<span class="unit">${charts.esc(unit)}</span>` : ""}</div>
+	<div class="v${blank ? " none" : ""}">${shown}${unit && !blank ? `<span class="unit">${charts.esc(unit)}</span>` : ""}</div>
 	<div class="u">${charts.esc(note || "")}</div>
 	${spark ? `<div class="spark">${spark}</div>` : ""}
 </div>`;

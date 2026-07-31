@@ -12,9 +12,17 @@ The page shell is static HTML; every view fetches its own data from
 upande_irrigation.api.* through public/js/dashboard/api.js.
 """
 
+import os
+
 import frappe
 
 no_cache = 1  # data is live; don't cache the shell
+
+# The dashboard's CSS and JS are served straight from public/ (symlinked into
+# sites/assets), and Frappe sends those with Cache-Control: max-age=43200.
+# Without a version token in the URL, a deploy would not reach an operator's
+# browser for another twelve hours. These are the files to fingerprint.
+_ASSET_DIRS = (("css",), ("js", "dashboard"))
 
 
 def get_context(context):
@@ -36,8 +44,30 @@ def get_context(context):
     context.today = frappe.utils.nowdate()
     context.site_label = _site_label()
     context.farms = _irrigation_farms()
+    context.asset_version = _asset_version()
 
     return context
+
+
+def _asset_version():
+    """Fingerprint the dashboard's assets so a deploy busts the browser cache.
+
+    Newest mtime across the CSS and view modules, hex-encoded. It changes when
+    and only when one of those files changes, which is the behaviour a cache
+    token needs — a build timestamp would churn on every unrelated build, and a
+    static version string would go stale the moment someone forgot to bump it.
+    """
+    newest = 0
+    base = frappe.get_app_path("upande_irrigation", "public")
+    for parts in _ASSET_DIRS:
+        d = os.path.join(base, *parts)
+        try:
+            for name in os.listdir(d):
+                if name.endswith((".css", ".js")):
+                    newest = max(newest, int(os.path.getmtime(os.path.join(d, name))))
+        except OSError:
+            continue
+    return format(newest, "x") if newest else "0"
 
 
 def _site_label():

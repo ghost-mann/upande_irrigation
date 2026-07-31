@@ -11,8 +11,8 @@
        does not inherit desk CSS. -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="/assets/upande_irrigation/css/tokens.css">
-  <link rel="stylesheet" href="/assets/upande_irrigation/css/shell.css">
+  <link rel="stylesheet" href="/assets/upande_irrigation/css/tokens.css?v={{ asset_version }}">
+  <link rel="stylesheet" href="/assets/upande_irrigation/css/shell.css?v={{ asset_version }}">
 </head>
 <body>
 
@@ -34,16 +34,16 @@
 </script>
 
 <script type="module">
-  import { Shell } from '/assets/upande_irrigation/js/dashboard/shell.js';
+  import { Shell } from '/assets/upande_irrigation/js/dashboard/shell.js?v={{ asset_version }}';
 
-  import overview  from '/assets/upande_irrigation/js/dashboard/view_overview.js';
-  import weather   from '/assets/upande_irrigation/js/dashboard/view_weather.js';
-  import compare   from '/assets/upande_irrigation/js/dashboard/view_compare.js';
-  import iot       from '/assets/upande_irrigation/js/dashboard/view_iot.js';
-  import resources from '/assets/upande_irrigation/js/dashboard/view_resources.js';
-  import map       from '/assets/upande_irrigation/js/dashboard/view_map.js';
-  import now       from '/assets/upande_irrigation/js/dashboard/view_now.js';
-  import control   from '/assets/upande_irrigation/js/dashboard/view_control.js';
+  import overview  from '/assets/upande_irrigation/js/dashboard/view_overview.js?v={{ asset_version }}';
+  import weather   from '/assets/upande_irrigation/js/dashboard/view_weather.js?v={{ asset_version }}';
+  import compare   from '/assets/upande_irrigation/js/dashboard/view_compare.js?v={{ asset_version }}';
+  import iot       from '/assets/upande_irrigation/js/dashboard/view_iot.js?v={{ asset_version }}';
+  import resources from '/assets/upande_irrigation/js/dashboard/view_resources.js?v={{ asset_version }}';
+  import map       from '/assets/upande_irrigation/js/dashboard/view_map.js?v={{ asset_version }}';
+  import now       from '/assets/upande_irrigation/js/dashboard/view_now.js?v={{ asset_version }}';
+  import control   from '/assets/upande_irrigation/js/dashboard/view_control.js?v={{ asset_version }}';
 
   const shell = new Shell({
     mount: document.getElementById('ui-root'),
