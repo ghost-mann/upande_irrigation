@@ -416,17 +416,33 @@ code([
 ])
 
 table(
-    ["Term", "Meaning", "Current value"],
+    ["Term", "Meaning", "Default", "Per shift?"],
     [
         ["`et_crop_coefficient`", "Crop utilisation — the fraction of atmospheric demand the "
-         "canopy actually transpires.", "0.65"],
-        ["`application_rate_mm_hr`", "Depth the emitters apply per hour.", "2.8 mm/hr"],
+         "canopy actually transpires.", "0.65", "farm-wide"],
+        ["`application_rate_mm_hr`", "Depth the emitters apply per hour.", "2.8 mm/hr",
+         "yes — Block Type"],
         ["`coverage`", "Fraction of the block the emitters wet. Dividing by it lengthens the "
-         "run, because only part of the ground receives water.", "70 %"],
+         "run, because only part of the ground receives water.", "70 %", "yes — Block Type"],
         ["`carried_deficit`", "Unmet millimetres from the most recent prior planner for this "
-         "shift.", "per shift"],
+         "shift.", "—", "always"],
     ],
-    widths=[1.6, 3.4, 1.0],
+    widths=[1.55, 2.8, 0.85, 0.9],
+)
+
+rich([
+    ("Rate and coverage are the two levers that change a shift's hours, and both can be set "
+     "per shift on Block Type; blank or zero inherits the farm default. Note what is ", {}),
+    ("not", {"italic": True}),
+    (" a lever: irrigated area. Depth in millimetres is measured per unit area, so a larger "
+     "shift does not need a longer run — it needs more flow. A shift that genuinely differs "
+     "differs in its emitters, and that is what the override captures.", {}),
+])
+para(
+    "By default every shift on a farm therefore computes identically, which is intended: the "
+    "model holds nothing else that distinguishes them yet. applied_rate_mm_hr and "
+    "applied_coverage_pct are written onto each planner, so the hours stay auditable after a "
+    "default is changed.",
 )
 
 doc.add_heading("6.2 Carry-forward", level=2)
@@ -469,15 +485,25 @@ doc.add_heading("7.1 Capacity", level=2)
 code([
     "capacity_hours  =  water_target_m3_per_week / pump_flow_rate_m3_per_hr",
     "",
-    "no profile, or either figure missing:  168 hr/wk, flagged UNVERIFIED",
+    "1. the section's Irrigation Pump Profile        source = profile   A MEASURED LIMIT",
+    "2. the Irrigation Settings farm-wide defaults   source = default   a stated assumption",
+    "3. a full week                                  source = fallback  last resort",
 ])
 rich([
-    ("With no Irrigation Pump Profile there is no capacity to allocate against. The engine "
-     "assumes a full week and says so on every affected planner. It never presents an assumed "
-     "number as a limit. ", {}),
-    ("The live site currently has zero pump profiles, so this is the active path.",
+    ("Only the first is a fact. Where a section has no profile the engine falls to the "
+     "farm-wide defaults — ", {}),
+    ("3500 m\u00b3/wk at 25 m\u00b3/hr = 140 hr/wk", {"mono": True}),
+    (", i.e. 20 h/day leaving four hours for maintenance — and names that figure and its "
+     "provenance on every planner it touches. ", {}),
+    ("The live site has no pump profiles, so the defaults are the active path.",
      {"bold": True}),
 ])
+para(
+    "Capping is reported whatever the provenance: an operator needs to know a shift was cut "
+    "short, and the provenance line says how firm the limit is. The same two figures are the "
+    "DocField defaults on Irrigation Pump Profile, so creating one is a matter of correcting "
+    "two numbers rather than sourcing them."
+)
 
 doc.add_heading("7.2 Grouping", level=2)
 para(
@@ -521,7 +547,7 @@ doc.add_heading("8. Worked example — 23HA · SHIFT 1", level=1)
 
 rich([
     ("Live record ", {}),
-    ("IRPL-2026-01019", {"mono": True}),
+    ("IRPL-2026-02504", {"mono": True}),
     (", plan week 2026-01-08 → 2026-01-14, farm Lokitela. Every figure below is read from "
      "the database, not constructed.", {}),
 ])
@@ -539,14 +565,17 @@ table(
         ["Carried debt", "most recent prior planner for this shift", "0.00 mm — first week"],
         ["Total needed", "21.3038 + 0.00", "21.3038 mm"],
         ["Required hours", "21.3038 ÷ 2.8 ÷ 0.70", "10.87 hr"],
-        ["Pump capacity", "no profile for this section", "168 hr/wk, unverified"],
-        ["Capping factor", "168 ÷ (55 shifts × 10.87 hr) = 168 ÷ 597.8", "0.281"],
-        ["Granted hours", "10.87 × 0.281", "3.05 hr"],
-        ["Cycles", "3.05 ≤ 5.0 hr threshold → cycles_when_below", "1 × 3.05 hr"],
+        ["Applied rate", "no Block Type override → farm defaults",
+         "2.8 mm/hr at 70 % coverage"],
+        ["Pump capacity", "no profile → Irrigation Settings defaults",
+         "140 hr/wk, source = default"],
+        ["Capping factor", "140 ÷ (55 shifts × 10.87 hr) = 140 ÷ 597.8", "0.234"],
+        ["Granted hours", "10.87 × 0.234", "2.55 hr"],
+        ["Cycles", "2.55 ≤ 5.0 hr threshold → cycles_when_below", "1 × 2.55 hr"],
         ["Window", "first in the unknown-pump queue",
-         "2026-01-08 00:00 → 03:03"],
-        ["Delivered depth", "3.05 × 2.8 × 0.70", "5.99 mm"],
-        ["Unmet", "21.3038 − 5.99", "15.32 mm — carries to 2026-01-15"],
+         "2026-01-08 00:00 → 02:33"],
+        ["Delivered depth", "2.55 × 2.8 × 0.70", "4.99 mm"],
+        ["Unmet", "21.3038 − 4.99", "16.31 mm — carries to 2026-01-15"],
         ["Disease index", "Z from mean temp and 0.00 mm rain",
          "5.18 — Spore Release, Low Alert"],
     ],
@@ -555,10 +584,11 @@ table(
 
 callout(
     "What this record is telling the farm",
-    "23HA · SHIFT 1 lost 21.3 mm and received 6.0 mm. It is not a scheduling error — it is a "
-    "capacity statement. With 55 shifts sharing one assumed 168 hr week, the farm can return "
-    "about 28 % of what it loses in a dry week. Creating the Irrigation Pump Profiles is what "
-    "turns that assumption into a measured fact, and may well raise the ceiling.",
+    "23HA · SHIFT 1 lost 21.3 mm and received 5.0 mm. It is not a scheduling error — it is a "
+    "capacity statement. With 55 shifts sharing one assumed 140 hr week, the farm can return "
+    "about 23 % of what it loses in a dry week. Creating the Irrigation Pump Profiles is what "
+    "turns that assumption into a measured fact, and may well raise the ceiling — the default "
+    "is deliberately conservative.",
 )
 
 # ══════════════════════════════════════════════════════════════
@@ -582,6 +612,8 @@ table(
         ["`carried_deficit_mm`", "Debt opened from the prior planner.", "Planner hook"],
         ["`total_water_needed_mm`", "This week plus carried.", "Planner hook"],
         ["`required_hours`", "Hours to meet demand, before any cap.", "Planner hook"],
+        ["`applied_rate_mm_hr`, `applied_coverage_pct`",
+         "The two figures that turned millimetres into hours.", "Planner hook"],
         ["`z_value`, `z_risk_level`", "Anthracnose index and band.", "Planner hook"],
         ["`shift_hours`", "Hours actually granted by the allocator.", "Scheduler"],
         ["`cycles_count`, `cycle_hours_each`, `cycle_plan`", "How the run is split.", "Scheduler"],
@@ -631,6 +663,10 @@ table(
         ["`default_irrigation_coverage`", "Wetted fraction — lengthens the run.", "70 %"],
         ["`auto_cycle_threshold_hrs`", "Longest single cycle before a run is split.", "5.0"],
         ["`cycle_rest_hours`", "Gap between a shift's cycles.", "2.0"],
+        ["`default_pump_flow_rate_m3_per_hr`", "Stand-in pump flow where a section has no "
+         "profile.", "25 m³/hr"],
+        ["`default_water_target_m3_per_week`", "Stand-in weekly volume. Divided by the flow "
+         "this is the hour budget.", "3500 m³"],
         ["`organisation_name`", "Estate name shown in the dashboard header.", "Kaitet Group"],
     ],
     widths=[2.2, 2.8, 1.0],
@@ -677,7 +713,15 @@ table(
         ["Per-block overrides never affected the result.",
          "Row mm_hr never reached the calculation; the client script multiplied by coverage "
          "where the server divides.",
-         "Child table and its doctype removed."],
+         "Child table removed; rate and coverage moved onto Block Type, where they are read."],
+        ["Millimetres were summed across shifts.",
+         "55 shifts each owing 89 mm reported 4,900 mm — depth is per unit area and does not "
+         "add, so the figure had no physical meaning.",
+         "Depths are averaged per shift and labelled as such; only hours are summed."],
+        ["A missing pump profile fell straight to a full 168 hr week.",
+         "Technically honest but useless as a limit, and every planner carried the same "
+         "unverified warning.",
+         "A farm-wide default sits between the two, with its provenance reported."],
     ],
     widths=[2.0, 2.2, 1.8],
 )
@@ -691,7 +735,7 @@ table(
         ["Computed against no weather", "709", "0 — those weeks are refused"],
         ["Weeks refused for incomplete data", "0", "2 (2026-07-09, 2026-07-16)"],
         ["Peak carried debt", "not tracked meaningfully", "97.3 mm mid-February, then drains"],
-        ["Automated tests", "none", "52, passing"],
+        ["Automated tests", "none", "74, passing"],
     ],
     widths=[2.2, 1.9, 1.9],
 )
@@ -699,19 +743,22 @@ table(
 # ══════════════════════════════════════════════════════════════
 doc.add_heading("12. Known limits and next steps", level=1)
 
-bullet("No Irrigation Pump Profile exists on the live site. Until one is created per section, "
-       "capacity is an assumed 168 hr/wk, every planner carries an \"unverified\" warning, and "
-       "all sections are sequenced as though they share one pump. This is the single highest-"
-       "value data entry task outstanding.")
-bullet("Every shift on a farm currently produces identical demand, because nothing in the "
-       "model is shift-specific — no per-shift area, crop age or coefficient. Proportional "
-       "capping therefore degenerates to equal shares. Adding per-shift area would make the "
-       "allocation genuinely differentiated.")
+bullet("No Irrigation Pump Profile exists on the live site. Capacity therefore comes from the "
+       "Irrigation Settings default of 140 hr/wk, every planner says so, and all sections are "
+       "sequenced as though they share one pump. Creating one profile per section is the "
+       "single highest-value data entry task outstanding — the default is deliberately "
+       "conservative, so the real ceiling is probably higher.")
+bullet("Every shift on a farm produces identical demand by default, which is intended for "
+       "now. Rate and coverage can be overridden per shift on Block Type when a section's "
+       "emitters genuinely differ; until they are set, proportional capping reduces to equal "
+       "shares. Per-shift irrigated area would let the model reason about volume rather than "
+       "depth, which is the next real step.")
 bullet("Weather data ends 2026-07-12, so the current week cannot be planned. The dashboard "
        "reports this as an alert rather than showing zeros.")
-bullet("Phase 2 of the rebuild covers visualisation: the week Gantt, pump load, water balance "
-       "and a calculation explainer that shows an operator exactly how a shift's hours were "
-       "derived.")
+bullet("The Planning view (/upande-irrigation#planner) now carries the week Gantt on a real "
+       "clock axis, pump load per day against the 24 h a day offers, the water balance in mean "
+       "mm per shift, and a step-by-step trace of how one shift's hours were decided. Every "
+       "chart has a Table toggle, so none of it depends on colour alone.")
 bullet("Carry-forward is uncapped by design. It drains correctly on the current data, but a "
        "physical ceiling tied to root-zone holding capacity would be more defensible if a farm "
        "ever ran a long structural shortfall.")
@@ -730,9 +777,13 @@ table(
          "readings, writes the demand block, carry-forward and persistence streak."],
         ["`upande_irrigation/api/scheduler.py`", "Run and backfill. Refusal, pump grouping, "
          "allocation, warnings, audit record, live_sections."],
+        ["`upande_irrigation/api/planner.py`", "Planning read model: Gantt windows, pump load, "
+         "water balance, and the calculation trace."],
         ["`upande_irrigation/api/overview.py`", "Dashboard read model: tiles, alerts, schedule "
          "grid, deficit trend."],
-        ["`upande_irrigation/tests/`", "52 tests. Each module's docstring names the defect it "
+        ["`upande_irrigation/public/js/dashboard/palette.js`",
+         "The validated series ramp, with its validator output recorded."],
+        ["`upande_irrigation/tests/`", "74 tests. Each module's docstring names the defect it "
          "locks out."],
         ["`upande_irrigation/patches/v1_0/add_engine_fields.py`", "Adds required_hours and the "
          "measured window; drops the per-block table."],
