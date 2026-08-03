@@ -536,48 +536,13 @@ export function mkMultiLine(host, labels, datasets, W, H, opts = {}) {
 	});
 }
 
-/* ══════════════════════════════════════════════ fleet time series
+/* ══════════════════════════════════════════════ range time series
  *
- * A tab of identical sensors is 28 lines, which reads as spaghetti and hides
- * the thing an operator wants: is the fleet normal, and is this device an
- * outlier? So the fleet is drawn as a p10–p90 envelope with the median through
- * it, and only the devices explicitly picked are overlaid as accent lines.
+ * One measurement over time: the average per bucket as the line, and that
+ * bucket's min–max as a soft band behind it. The band is what makes a sampled
+ * average honest — it shows how much the sensor moved inside each bucket
+ * instead of hiding it in the mean.
  */
-
-function quantile(sorted, q) {
-	if (!sorted.length) return null;
-	const pos = (sorted.length - 1) * q;
-	const lo = Math.floor(pos);
-	const hi = Math.ceil(pos);
-	if (lo === hi) return sorted[lo];
-	return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
-}
-
-/* Per time-slot spread across every device in the tab. */
-export function fleetStats(devices) {
-	const n = Math.max(0, ...devices.map((d) => (d.series || []).length));
-	const lo = [];
-	const mid = [];
-	const hi = [];
-	const count = [];
-	for (let i = 0; i < n; i++) {
-		const col = devices
-			.map((d) => (d.series || [])[i])
-			.filter((v) => v != null && !isNaN(v))
-			.sort((a, b) => a - b);
-		count.push(col.length);
-		if (!col.length) {
-			lo.push(null);
-			mid.push(null);
-			hi.push(null);
-			continue;
-		}
-		lo.push(+quantile(col, 0.1).toFixed(3));
-		mid.push(+quantile(col, 0.5).toFixed(3));
-		hi.push(+quantile(col, 0.9).toFixed(3));
-	}
-	return { lo, mid, hi, count, points: n };
-}
 
 /* Adaptive time labels: a multi-week window wants dates, a single day wants
  * clock times, and a couple of days wants both. */
@@ -606,8 +571,9 @@ function timeTicks(labels, maxTicks = 7) {
 }
 
 /* opts: {labels[], stats:{lo,mid,hi}, picks:[{label,color,values}], unit,
- *        bandColor, medianColor, W, H} */
-export function mkFleetChart(host, opts) {
+ *        bandColor, medianColor, W, H}
+ * stats.mid is the line; stats.lo/hi are the band. picks overlays extra lines. */
+export function mkRangeChart(host, opts) {
 	if (!host) return;
 	const labels = opts.labels || [];
 	const stats = opts.stats || { lo: [], mid: [], hi: [] };
@@ -756,12 +722,13 @@ export function mkFleetChart(host, opts) {
 			const rows = [];
 			if (stats.mid[i] != null) {
 				rows.push(
-					`<span class="sw" style="background:${medianColor}"></span><span class="k">Fleet median</span> ${fmtNum(stats.mid[i])}${u}`
+					`<span class="sw" style="background:${medianColor}"></span><span class="k">${esc(opts.seriesLabel || "Average")}</span> ${fmtNum(stats.mid[i])}${u}`
 				);
-				rows.push(
-					`<span class="sw" style="background:${bandColor};opacity:.5"></span><span class="k">p10–p90</span> ${fmtNum(stats.lo[i])} – ${fmtNum(stats.hi[i])}${u}`
-				);
-				if (stats.count) rows.push(`<span class="k">Reporting</span> ${stats.count[i]}`);
+				if (stats.lo[i] != null && stats.hi[i] != null && stats.lo[i] !== stats.hi[i]) {
+					rows.push(
+						`<span class="sw" style="background:${bandColor};opacity:.5"></span><span class="k">Range</span> ${fmtNum(stats.lo[i])} – ${fmtNum(stats.hi[i])}${u}`
+					);
+				}
 			}
 			picks.forEach((p) => {
 				const v = (p.values || [])[i];
