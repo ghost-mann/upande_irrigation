@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upande · {{ site_label }} · Irrigation</title>
+  <title>{{ product_name }}{% if organisation %} · {{ organisation }}{% endif %}</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,7 +19,7 @@
   <div class="topbar__brand">
     <img class="topbar__logo" alt="Upande" src="/assets/upande_irrigation/images/upande-logo.png?v={{ asset_version }}">
     <div class="topbar__divider"></div>
-    <div class="topbar__product">{{ site_label }}<small>Irrigation &amp; Water</small></div>
+    <div class="topbar__product">{{ product_name }}{% if organisation %}<small>{{ organisation }}</small>{% endif %}</div>
   </div>
   <nav class="topbar__nav">
     <a href="#overview" class="on">Irrigation</a>
@@ -42,7 +42,8 @@
     user: {{ current_user | tojson }},
     user_label: {{ user_label | tojson }},
     user_initials: {{ user_initials | tojson }},
-    site_label: {{ site_label | tojson }},
+    product_name: {{ product_name | tojson }},
+    organisation: {{ organisation | tojson }},
     farms: {{ farms | tojson }},
     today: {{ today | tojson }},
   };

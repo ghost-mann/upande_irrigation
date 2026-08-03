@@ -193,7 +193,7 @@ export class Shell {
 			<div class="avatar">${charts.esc(b.user_initials || "??")}</div>
 			<div class="side__user-info">
 				<b>${charts.esc(b.user_label || b.user || "")}</b>
-				<small>Irrigation · ${charts.esc(b.site_label || "")}</small>
+				<small>${charts.esc(b.organisation ? `Irrigation · ${b.organisation}` : "Irrigation")}</small>
 			</div>
 			<a class="side__gear" href="/app/irrigation-settings" title="Irrigation Settings">${icon("gear")}</a>
 		</div>

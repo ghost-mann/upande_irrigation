@@ -17,6 +17,10 @@ import frappe
 
 no_cache = 1  # data is live; don't cache the shell
 
+# The product is the same everywhere; only the organisation under it changes per
+# deployment, and that comes from Irrigation Settings.
+PRODUCT_NAME = "Upande Irrigation"
+
 # The dashboard's CSS and JS are served straight from public/ (symlinked into
 # sites/assets), and Frappe sends those with Cache-Control: max-age=43200.
 # Without a version token in the URL, a deploy would not reach an operator's
@@ -41,7 +45,8 @@ def get_context(context):
     context.csrf_token = frappe.sessions.get_csrf_token()
     context.current_user = frappe.session.user
     context.today = frappe.utils.nowdate()
-    context.site_label = _site_label()
+    context.product_name = PRODUCT_NAME
+    context.organisation = _organisation()
     context.farms = _irrigation_farms()
     context.asset_version = _asset_version()
     context.user_label = _user_label()
@@ -87,10 +92,17 @@ def _asset_version():
     return format(newest, "x") if newest else "0"
 
 
-def _site_label():
-    """Company name for the sidebar sub-label, falling back to the site host."""
-    label = frappe.db.get_single_value("Global Defaults", "default_company")
-    return label or frappe.local.site
+def _organisation():
+    """The estate or group this deployment serves, from Irrigation Settings.
+
+    Deliberately not Global Defaults' default_company: this app ships to several
+    farms, and the header must not carry one customer's accounting company. A
+    blank value is valid — the header then shows the product name alone.
+    """
+    try:
+        return (frappe.db.get_single_value("Irrigation Settings", "organisation_name") or "").strip()
+    except Exception:
+        return ""
 
 
 def _irrigation_farms():
