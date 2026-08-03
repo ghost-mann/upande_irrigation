@@ -7,3 +7,4 @@
 upande_irrigation.patches.v1_0.fix_module_def_ownership
 upande_irrigation.patches.v1_0.add_planner_cycle_fields
 upande_irrigation.patches.v1_0.add_dashboard_branding_fields
+upande_irrigation.patches.v1_0.add_engine_fields
