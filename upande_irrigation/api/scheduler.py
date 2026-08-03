@@ -17,43 +17,164 @@ from datetime import timedelta
 
 import frappe
 
+from upande_irrigation.engine import allocate as AL
+from upande_irrigation.engine import demand as D
+from upande_irrigation.events.irrigation_planner import (
+	CHRONIC_DEFICIT_THRESHOLD_MM,
+	CHRONIC_WEEKS_THRESHOLD,
+	persistent_weeks,
+	readings_for,
+	settings_dict,
+)
+
 _DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 _DAY_INDEX = {n: i for i, n in enumerate(_DAY_NAMES)}
 
 _UPCOMING_PER_SECTION = 3
 
-# Each day's irrigation begins at this clock hour (same time every day).
-_DAILY_ANCHOR_HOUR = 0
+# Sections with no Irrigation Pump Profile share this bucket. They are sequenced
+# together because an unknown pump might be one pump; assuming otherwise would
+# schedule them concurrently on a main that may not carry it.
+_UNKNOWN_PUMP = None
 
 
-def assign_daily_blocks(from_date, shift_hours_list, day_anchor_hour=_DAILY_ANCHOR_HOUR):
-	"""Distribute a section's shifts across 7 daily blocks.
+def plan_window(cfg):
+	"""The week being planned, from the scheduler's own configuration."""
+	today = frappe.utils.getdate(frappe.utils.nowdate())
+	start_idx = _DAY_INDEX.get(cfg.week_starts_on or "Thursday", 3)
+	week_start = frappe.utils.add_days(today, -((today.weekday() - start_idx) % 7))
+	if (cfg.plan_for or "Current Week") == "Next Week":
+		week_start = frappe.utils.add_days(week_start, 7)
+	return week_start, frappe.utils.add_days(week_start, 6)
 
-	Shift i is assigned to day floor(i * 7 / N); each day's shifts run
-	back-to-back from that day's anchor time. This spreads a section's run
-	over the whole week — light weeks put one short shift per day, heavy
-	weeks pack 2-3 shifts/day (approaching 24 h = continuous). Returns a
-	list of (start_dt, end_dt) aligned with shift_hours_list.
+
+def pump_groups(farm):
+	"""Section prefixes grouped by the pump that serves them.
+
+	Sections sharing a pump_name must be sequenced against one capacity. The old
+	engine capped each section against its own profile and then anchored every
+	section at hour 0, so two sections on one pump each believed they had the whole
+	week to themselves.
 	"""
-	n = len(shift_hours_list)
-	result = [None] * n
-	if n == 0:
-		return result
+	rows = frappe.db.sql(
+		"""
+		SELECT pp.pump_name AS pump_name, w.warehouse_name AS section
+		FROM `tabIrrigation Pump Profile` pp
+		INNER JOIN `tabWarehouse` w ON w.name = pp.irrigation_section
+		WHERE pp.farm = %s
+		""",
+		(farm,),
+		as_dict=True,
+	)
+	groups = {}
+	for r in rows:
+		prefix = (r["section"] or "").replace("_SECTION", "").strip()
+		if prefix:
+			groups.setdefault(r["pump_name"] or "unnamed", []).append(prefix)
+	return groups
 
-	base = frappe.utils.get_datetime(f"{from_date} 00:00:00")
-	by_day = {}
-	for i in range(n):
-		by_day.setdefault((i * 7) // n, []).append(i)
 
-	for day, idxs in by_day.items():
-		cursor = frappe.utils.add_to_date(base, days=day, hours=day_anchor_hour)
-		for i in idxs:
-			hours = float(shift_hours_list[i] or 0)
-			start = cursor
-			end = frappe.utils.add_to_date(cursor, hours=hours)
-			result[i] = (start, end)
-			cursor = end
-	return result
+def profile_for(farm, pump_name):
+	if not pump_name:
+		return None
+	rows = frappe.get_all(
+		"Irrigation Pump Profile",
+		filters={"farm": farm, "pump_name": pump_name},
+		fields=["water_target_m3_per_week", "pump_flow_rate_m3_per_hr"],
+		limit=1,
+	)
+	return rows[0] if rows else None
+
+
+def _by_pump(farm, created):
+	"""Split a farm's shifts into (pump_name, members) pairs.
+
+	Shifts whose section has no profile land under _UNKNOWN_PUMP together, so they
+	are still sequenced rather than all anchored at hour 0.
+	"""
+	groups = pump_groups(farm)
+	owner = {}
+	for pump_name, prefixes in groups.items():
+		for p in prefixes:
+			owner[p] = pump_name
+
+	buckets = {}
+	for c in created:
+		buckets.setdefault(owner.get(c["prefix"], _UNKNOWN_PUMP), []).append(c)
+
+	# Named pumps first, unknown last, so the log reads predictably.
+	return sorted(buckets.items(), key=lambda kv: (kv[0] is _UNKNOWN_PUMP, kv[0] or ""))
+
+
+def _write_allocation(item, farm, capacity, verified, pump_label, settings, result_of, log):
+	"""Persist one shift's granted hours, windows and warnings."""
+	windows = item["windows"]
+	granted = item["placed_hours"] if windows else 0.0
+	mm_hr = settings["default_application_rate_mm_hr"]
+	coverage = settings["default_irrigation_coverage"]
+	delivered = granted * mm_hr * (coverage / 100.0)
+	total = float(item.get("total_needed_mm") or 0)
+	unmet = max(0.0, total - delivered)
+
+	warnings = []
+	if not verified:
+		warnings.append(
+			f"Pump capacity unverified: no Irrigation Pump Profile for {pump_label}; "
+			f"assumed {capacity:.0f} hr/wk. Hours below are demand, not a capped figure."
+		)
+	elif item["capped"]:
+		warnings.append(
+			f"Pump capacity capped ({pump_label}, {capacity:.1f} hr/wk): needed "
+			f"{item['required_hours']:.2f} hr, granted {granted:.2f} hr."
+		)
+	if item["required_hours"] > 0 and not windows:
+		warnings.append(
+			f"Not scheduled: the {pump_label} queue filled the week before this shift's "
+			f"turn. {item['required_hours']:.2f} hr carries forward."
+		)
+	if unmet > CHRONIC_DEFICIT_THRESHOLD_MM:
+		warnings.append(
+			f"CHRONIC DEFICIT: {unmet:.1f} mm unmet — exceeds "
+			f"{CHRONIC_DEFICIT_THRESHOLD_MM} mm threshold. Trees may be stressed."
+		)
+
+	block, plan_from = frappe.db.get_value(
+		"Irrigation Planner", item["key"], ["block", "from_date"]
+	)
+	streak = persistent_weeks(farm, block, plan_from)
+	if streak >= CHRONIC_WEEKS_THRESHOLD:
+		warnings.append(
+			f"PERSISTENT DEFICIT: this shift has carried deficit forward for {streak} "
+			"consecutive weeks. Review pump capacity, coverage, or schedule."
+		)
+
+	frappe.db.set_value(
+		"Irrigation Planner",
+		item["key"],
+		{
+			"shift_hours":        round(granted, 2),
+			"cycles_count":       item["cycles_count"],
+			"cycle_hours_each":   round(item["cycle_hours_each"], 2),
+			"cycle_plan":         (
+				f"{item['cycles_count']} × {item['cycle_hours_each']:.2f} hr"
+				if item["cycles_count"] else ""
+			),
+			"scheduled_start":    frappe.utils.get_datetime_str(windows[0][0]) if windows else None,
+			"scheduled_end":      frappe.utils.get_datetime_str(windows[-1][1]) if windows else None,
+			"delivered_depth_mm": round(delivered, 2),
+			"unmet_deficit_mm":   round(unmet, 2),
+			"capacity_warning":   " | ".join(warnings),
+		},
+		update_modified=False,
+	)
+
+	row = result_of.get(item["key"])
+	if row is not None:
+		row["shift_hours"] = round(granted, 2)
+		row["message"] = warnings[0] if warnings else ""
+
+	log(f"    {block}: {round(granted, 2)} hr in {item['cycles_count']} cycle(s), "
+	    f"{round(unmet, 1)} mm unmet")
 
 
 @frappe.whitelist()
@@ -95,29 +216,21 @@ def run(triggered_by="Manual"):
 		raise frappe.ValidationError("Auto-run disabled.")
 
 	# ── Determine planning window ───────────────────────────────
-	today      = frappe.utils.getdate(frappe.utils.nowdate())
-	weekday    = today.weekday()
-	week_start = cfg.week_starts_on or "Thursday"
-	start_idx  = _DAY_INDEX.get(week_start, 3)
-
-	days_since_start = (weekday - start_idx) % 7
-	this_week_start  = frappe.utils.add_days(today, -days_since_start)
-
-	if (cfg.plan_for or "Current Week") == "Next Week":
-		schedule_from = frappe.utils.add_days(this_week_start, 7)
-	else:
-		schedule_from = this_week_start
-
-	schedule_to = frappe.utils.add_days(schedule_from, 6)
+	today = frappe.utils.getdate(frappe.utils.nowdate())
+	schedule_from, schedule_to = plan_window(cfg)
+	measured_from, measured_to = D.measured_window(schedule_from)
+	settings = settings_dict()
 
 	log("=" * 60)
 	log("Irrigation Scheduler Run")
 	log("=" * 60)
 	log(f"Triggered by:  {triggered_by}")
-	log(f"Today:         {today} ({_DAY_NAMES[weekday]})")
-	log(f"Week starts:   {week_start}")
+	log(f"Today:         {today} ({_DAY_NAMES[today.weekday()]})")
+	log(f"Week starts:   {cfg.week_starts_on or 'Thursday'}")
 	log(f"Plan for:      {cfg.plan_for or 'Current Week'}")
-	log(f"Window:        {schedule_from} → {schedule_to}")
+	log(f"Planning:      {schedule_from} → {schedule_to}")
+	log(f"Measured over: {measured_from} → {measured_to}  (elapsed)")
+	log(f"Min readings:  {settings['min_weather_days']} of 7 days")
 	log("")
 
 	# ── Create run log record (status = Running) ────────────────
@@ -173,6 +286,25 @@ def run(triggered_by="Manual"):
 		log(f"FARM: {farm}")
 		log("─" * 60)
 
+		# ── Refuse before creating anything ─────────────────────
+		# The measured week is shared by every shift on the farm, so this is one
+		# check, not one per shift. A farm-week we cannot measure produces no
+		# planners at all — the old engine created them anyway and every one said
+		# "No irrigation required".
+		farm_agg = D.aggregate(readings_for(farm, measured_from, measured_to))
+		plannable, why = D.is_plannable(farm_agg, settings)
+		if not plannable:
+			log_err(f"  {why} ({measured_from} → {measured_to}). No planners created.")
+			shift_results.append({
+				"farm": farm, "section": "—", "block": "—",
+				"status": "Skipped", "planner": None, "shift_hours": 0,
+				"message": why,
+			})
+			continue
+
+		log(f"  Measured week: {farm_agg['days']} days, "
+		    f"{farm_agg['rainfall_mm']} mm rain, {farm_agg['et_crop_mm']} mm ET crop")
+
 		section_warehouses = frappe.db.sql("""
 			SELECT name, warehouse_name
 			FROM `tabWarehouse`
@@ -188,6 +320,12 @@ def run(triggered_by="Manual"):
 
 		log("  Sections: " + ", ".join(sw["warehouse_name"] for sw in section_warehouses))
 		log("")
+
+		# ── Pass 1: insert every shift on the farm, capture demand ──
+		# Farm-level, not section-level: allocation groups by pump, and one pump can
+		# serve several sections.
+		created = []
+		result_of = {}
 
 		for sw in section_warehouses:
 			if aborted:
@@ -214,10 +352,6 @@ def run(triggered_by="Manual"):
 			log(f"  [{prefix}] {len(shifts)} active shifts")
 			sections_touched.add(prefix)
 
-			base_dt = frappe.utils.get_datetime(f"{schedule_from} 00:00:00")
-
-			# ── Pass 1: insert all shifts (temp schedule), capture shift_hours ──
-			created = []  # ordered list of {name, block, shift_hours}
 			for s in shifts:
 				if aborted:
 					break
@@ -225,7 +359,6 @@ def run(triggered_by="Manual"):
 				total_attempted += 1
 				block_name = s["name"]
 
-				# Skip if planner exists
 				if cfg.skip_existing:
 					existing = frappe.db.exists("Irrigation Planner", {
 						"farm":      farm,
@@ -245,28 +378,34 @@ def run(triggered_by="Manual"):
 						})
 						continue
 
-				# Try insert (scheduled_start gets finalised in pass 2)
 				try:
 					planner = frappe.new_doc("Irrigation Planner")
-					planner.farm            = farm
-					planner.block           = block_name
-					planner.from_date       = str(schedule_from)
-					planner.to_date         = str(schedule_to)
-					planner.scheduled_start = frappe.utils.get_datetime_str(base_dt)
+					planner.farm      = farm
+					planner.block     = block_name
+					planner.from_date = str(schedule_from)
+					planner.to_date   = str(schedule_to)
 
 					planner.insert(ignore_permissions=True)
 					frappe.db.commit()
 
-					sh = float(planner.shift_hours or 0)
+					required = float(planner.required_hours or 0)
 					total_created += 1
-					log(f"    OK    {block_name}  ({round(sh, 2)} hr)")
+					log(f"    OK    {block_name}  needs {round(required, 2)} hr")
 
-					created.append({"name": planner.name, "block": block_name, "shift_hours": sh})
-					shift_results.append({
+					created.append({
+						"key":             planner.name,
+						"block":           block_name,
+						"prefix":          prefix,
+						"required_hours":  required,
+						"total_needed_mm": float(planner.total_water_needed_mm or 0),
+					})
+					row = {
 						"farm": farm, "section": prefix, "block": block_name,
 						"status": "Created", "planner": planner.name,
-						"shift_hours": sh, "message": "",
-					})
+						"shift_hours": 0, "message": "",
+					}
+					result_of[planner.name] = row
+					shift_results.append(row)
 
 				except Exception as e:
 					frappe.db.rollback()
@@ -287,20 +426,25 @@ def run(triggered_by="Manual"):
 						aborted = True
 						break
 
-			# ── Pass 2: distribute this section's shifts across 7 daily blocks ──
-			if created:
-				slots = assign_daily_blocks(schedule_from, [c["shift_hours"] for c in created])
-				for c, slot in zip(created, slots):
-					if not slot:
-						continue
-					start_dt, end_dt = slot
-					frappe.db.set_value("Irrigation Planner", c["name"], {
-						"scheduled_start": frappe.utils.get_datetime_str(start_dt),
-						"scheduled_end":   frappe.utils.get_datetime_str(end_dt),
-					}, update_modified=False)
+		# ── Pass 2: allocate each pump's capacity across its shifts ──
+		if created:
+			log("")
+			for pump_name, members in _by_pump(farm, created):
+				capacity, verified = AL.pump_capacity_hours(profile_for(farm, pump_name))
+				pump_label = pump_name or "unknown pump"
+				needed = sum(m["required_hours"] for m in members)
+				log(f"  PUMP {pump_label}: {len(members)} shifts need "
+				    f"{round(needed, 2)} hr against {capacity} hr/wk"
+				    f"{'' if verified else ' (unverified)'}")
+
+				laid = AL.lay_out(AL.grant(members, capacity), schedule_from, settings)
+				for item in laid:
+					_write_allocation(
+						item, farm, capacity, verified, pump_label, settings, result_of, log
+					)
 				frappe.db.commit()
 
-			log("")
+		log("")
 
 	# ── Final status ────────────────────────────────────────────
 	if aborted:
