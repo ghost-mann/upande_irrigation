@@ -23,6 +23,7 @@ from upande_irrigation.events.irrigation_planner import (
 	CHRONIC_DEFICIT_THRESHOLD_MM,
 	CHRONIC_WEEKS_THRESHOLD,
 	persistent_weeks,
+	pump_defaults,
 	readings_for,
 	settings_dict,
 )
@@ -115,23 +116,34 @@ def _by_pump(farm, created):
 	return sorted(buckets.items(), key=lambda kv: (kv[0] is _UNKNOWN_PUMP, kv[0] or ""))
 
 
-def _write_allocation(item, farm, capacity, verified, pump_label, settings, result_of, log):
+def _write_allocation(item, farm, capacity, source, pump_label, settings, result_of, log):
 	"""Persist one shift's granted hours, windows and warnings."""
 	windows = item["windows"]
 	granted = item["placed_hours"] if windows else 0.0
-	mm_hr = settings["default_application_rate_mm_hr"]
-	coverage = settings["default_irrigation_coverage"]
+	# The shift's own rate and coverage, resolved when its demand was computed — not
+	# the farm defaults, which may not be what this shift used.
+	mm_hr = float(item.get("mm_hr") or settings["default_application_rate_mm_hr"])
+	coverage = float(item.get("coverage") or settings["default_irrigation_coverage"])
 	delivered = granted * mm_hr * (coverage / 100.0)
 	total = float(item.get("total_needed_mm") or 0)
 	unmet = max(0.0, total - delivered)
 
 	warnings = []
-	if not verified:
+	if source == AL.SOURCE_FALLBACK:
 		warnings.append(
-			f"Pump capacity unverified: no Irrigation Pump Profile for {pump_label}; "
-			f"assumed {capacity:.0f} hr/wk. Hours below are demand, not a capped figure."
+			f"Pump capacity unknown: no Irrigation Pump Profile for {pump_label} and no "
+			f"farm default set in Irrigation Settings; assumed a full {capacity:.0f} hr week. "
+			"Hours below are demand, not a capped figure."
 		)
-	elif item["capped"]:
+	elif source == AL.SOURCE_DEFAULT:
+		warnings.append(
+			f"Pump capacity assumed: no Irrigation Pump Profile for {pump_label}; using the "
+			f"Irrigation Settings default of {capacity:.1f} hr/wk. Create a profile to make "
+			"this a measured limit."
+		)
+	# Capping is reported whatever the capacity's provenance — the operator needs to
+	# know the shift was cut short, and the message above says how firm the limit is.
+	if item["capped"]:
 		warnings.append(
 			f"Pump capacity capped ({pump_label}, {capacity:.1f} hr/wk): needed "
 			f"{item['required_hours']:.2f} hr, granted {granted:.2f} hr."
@@ -407,6 +419,10 @@ def run(triggered_by="Manual", for_week=None):
 						"prefix":          prefix,
 						"required_hours":  required,
 						"total_needed_mm": float(planner.total_water_needed_mm or 0),
+						# Carried forward so the allocator's delivered-depth maths uses
+						# the same rate the demand was computed with.
+						"mm_hr":           float(planner.applied_rate_mm_hr or 0),
+						"coverage":        float(planner.applied_coverage_pct or 0),
 					})
 					row = {
 						"farm": farm, "section": prefix, "block": block_name,
@@ -438,18 +454,20 @@ def run(triggered_by="Manual", for_week=None):
 		# ── Pass 2: allocate each pump's capacity across its shifts ──
 		if created:
 			log("")
+			defaults = pump_defaults(settings)
 			for pump_name, members in _by_pump(farm, created):
-				capacity, verified = AL.pump_capacity_hours(profile_for(farm, pump_name))
+				capacity, source = AL.pump_capacity_hours(
+					profile_for(farm, pump_name), defaults
+				)
 				pump_label = pump_name or "unknown pump"
 				needed = sum(m["required_hours"] for m in members)
 				log(f"  PUMP {pump_label}: {len(members)} shifts need "
-				    f"{round(needed, 2)} hr against {capacity} hr/wk"
-				    f"{'' if verified else ' (unverified)'}")
+				    f"{round(needed, 2)} hr against {capacity} hr/wk ({source})")
 
 				laid = AL.lay_out(AL.grant(members, capacity), schedule_from, settings)
 				for item in laid:
 					_write_allocation(
-						item, farm, capacity, verified, pump_label, settings, result_of, log
+						item, farm, capacity, source, pump_label, settings, result_of, log
 					)
 				frappe.db.commit()
 

@@ -32,6 +32,71 @@ class TestSettingsDict(FrappeTestCase):
 	def test_min_weather_days_is_a_usable_positive_int(self):
 		self.assertGreaterEqual(H.settings_dict()["min_weather_days"], 1)
 
+	def test_pump_defaults_give_a_real_capacity_not_a_full_week(self):
+		from upande_irrigation.engine import allocate as A
+
+		hours, source = A.pump_capacity_hours(None, H.pump_defaults(H.settings_dict()))
+		self.assertEqual(source, A.SOURCE_DEFAULT)
+		self.assertLess(hours, A.FULL_WEEK_HOURS)
+		self.assertGreater(hours, 0)
+
+
+class TestShiftSettings(FrappeTestCase):
+	"""Per-shift rate and coverage: identical by default, overridable per shift.
+
+	Bug locked out: the removed per-block table offered these two fields but never
+	fed them into the calculation, so editing them changed nothing.
+	"""
+
+	BASE = {"default_application_rate_mm_hr": 2.8, "default_irrigation_coverage": 70.0}
+
+	def test_no_block_returns_the_farm_defaults_unchanged(self):
+		self.assertEqual(H.shift_settings(self.BASE, None), self.BASE)
+
+	def test_a_shift_with_no_overrides_inherits(self):
+		block = frappe.db.get_value("Block Type", {"is_active": 1}, "name")
+		if not block:
+			self.skipTest("no active Block Type on this site")
+		frappe.db.set_value(
+			"Block Type", block,
+			{"application_rate_mm_hr": 0, "irrigation_coverage": 0},
+			update_modified=False,
+		)
+		out = H.shift_settings(self.BASE, block)
+		self.assertAlmostEqual(out["default_application_rate_mm_hr"], 2.8)
+		self.assertAlmostEqual(out["default_irrigation_coverage"], 70.0)
+
+	def test_a_shift_override_reaches_the_calculation(self):
+		block = frappe.db.get_value("Block Type", {"is_active": 1}, "name")
+		if not block:
+			self.skipTest("no active Block Type on this site")
+		frappe.db.set_value(
+			"Block Type", block,
+			{"application_rate_mm_hr": 4.0, "irrigation_coverage": 90.0},
+			update_modified=False,
+		)
+		out = H.shift_settings(self.BASE, block)
+		self.assertAlmostEqual(out["default_application_rate_mm_hr"], 4.0)
+		self.assertAlmostEqual(out["default_irrigation_coverage"], 90.0)
+
+		# And the override must actually change the hours, which is what the old
+		# per-block fields failed to do.
+		from upande_irrigation.engine import demand as D
+
+		agg = {"et_crop_mm": 40.0, "rainfall_mm": 0.0, "days": 7, "temp_days": 7, "mean_temp": 20.0}
+		base = D.demand(agg, 0.0, {**self.BASE, "et_crop_coefficient": 0.65})
+		over = D.demand(agg, 0.0, {**out, "et_crop_coefficient": 0.65})
+		self.assertNotAlmostEqual(base["required_hours"], over["required_hours"], places=3)
+		self.assertLess(over["required_hours"], base["required_hours"])
+
+	def test_the_source_of_a_shifts_figures_is_recorded_on_the_planner(self):
+		import inspect
+
+		src = inspect.getsource(H.compute_shift)
+		self.assertIn("doc.applied_rate_mm_hr", src)
+		self.assertIn("doc.applied_coverage_pct", src)
+		self.assertIn("shift_settings(", src)
+
 
 class TestHookOwnsDemandOnly(FrappeTestCase):
 	def test_the_hook_never_assigns_allocation_fields(self):

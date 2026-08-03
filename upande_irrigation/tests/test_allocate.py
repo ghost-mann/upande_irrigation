@@ -20,25 +20,44 @@ SETTINGS = {
 }
 
 
+PROFILE = {"water_target_m3_per_week": 1000.0, "pump_flow_rate_m3_per_hr": 20.0}
+DEFAULTS = {"water_target_m3_per_week": 3500.0, "pump_flow_rate_m3_per_hr": 25.0}
+
+
 class TestPumpCapacity(FrappeTestCase):
 	def test_capacity_is_target_over_flow_rate(self):
-		hours, verified = A.pump_capacity_hours(
-			{"water_target_m3_per_week": 1000.0, "pump_flow_rate_m3_per_hr": 20.0}
-		)
+		hours, source = A.pump_capacity_hours(PROFILE)
 		self.assertAlmostEqual(hours, 50.0)
-		self.assertTrue(verified)
+		self.assertEqual(source, A.SOURCE_PROFILE)
 
-	def test_no_profile_falls_back_to_a_full_week_unverified(self):
-		hours, verified = A.pump_capacity_hours(None)
+	def test_a_profile_wins_over_the_defaults(self):
+		hours, source = A.pump_capacity_hours(PROFILE, DEFAULTS)
+		self.assertAlmostEqual(hours, 50.0)
+		self.assertEqual(source, A.SOURCE_PROFILE)
+
+	def test_no_profile_uses_the_settings_defaults(self):
+		hours, source = A.pump_capacity_hours(None, DEFAULTS)
+		self.assertAlmostEqual(hours, 140.0)  # 3500 / 25 = 20 h/day
+		self.assertEqual(source, A.SOURCE_DEFAULT)
+
+	def test_an_incomplete_profile_falls_through_to_the_defaults(self):
+		hours, source = A.pump_capacity_hours(
+			{"water_target_m3_per_week": 0, "pump_flow_rate_m3_per_hr": 20.0}, DEFAULTS
+		)
+		self.assertAlmostEqual(hours, 140.0)
+		self.assertEqual(source, A.SOURCE_DEFAULT)
+
+	def test_neither_profile_nor_defaults_falls_back_to_a_full_week(self):
+		hours, source = A.pump_capacity_hours(None, None)
 		self.assertAlmostEqual(hours, 168.0)
-		self.assertFalse(verified)
+		self.assertEqual(source, A.SOURCE_FALLBACK)
 
-	def test_a_profile_missing_numbers_is_also_unverified(self):
-		hours, verified = A.pump_capacity_hours(
-			{"water_target_m3_per_week": 0, "pump_flow_rate_m3_per_hr": 20.0}
+	def test_zeroed_defaults_are_not_treated_as_a_limit(self):
+		hours, source = A.pump_capacity_hours(
+			None, {"water_target_m3_per_week": 0, "pump_flow_rate_m3_per_hr": 0}
 		)
 		self.assertAlmostEqual(hours, 168.0)
-		self.assertFalse(verified)
+		self.assertEqual(source, A.SOURCE_FALLBACK)
 
 
 class TestGrant(FrappeTestCase):

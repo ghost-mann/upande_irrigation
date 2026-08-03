@@ -32,7 +32,46 @@ def settings_dict():
 		"cycles_when_above_threshold": int(s.get("cycles_when_above_threshold") or 2),
 		"cycles_when_below_threshold": int(s.get("cycles_when_below_threshold") or 1),
 		"cycle_rest_hours": float(s.get("cycle_rest_hours") or 2.0),
+		# Stand-in capacity for a section with no Irrigation Pump Profile. Stated as
+		# how this estate runs its pumps rather than a bare full week.
+		"default_water_target_m3_per_week": float(s.get("default_water_target_m3_per_week") or 0),
+		"default_pump_flow_rate_m3_per_hr": float(s.get("default_pump_flow_rate_m3_per_hr") or 0),
 	}
+
+
+def pump_defaults(settings):
+	"""The farm-wide stand-in for a missing Irrigation Pump Profile."""
+	return {
+		"water_target_m3_per_week": settings.get("default_water_target_m3_per_week") or 0,
+		"pump_flow_rate_m3_per_hr": settings.get("default_pump_flow_rate_m3_per_hr") or 0,
+	}
+
+
+def shift_settings(settings, block):
+	"""Settings with this shift's own rate and coverage overlaid.
+
+	Depth in millimetres is per unit area, so a bigger shift does not need a longer
+	run — what actually changes a shift's hours is its emitter output and how much
+	of the ground those emitters wet. Those are the two overrides Block Type carries,
+	and a blank or zero means inherit the farm default. So by default every shift on
+	a farm computes identically, and a shift that genuinely differs can say so
+	without a code change.
+	"""
+	out = dict(settings)
+	if not block:
+		return out
+
+	row = frappe.db.get_value(
+		"Block Type", block, ["application_rate_mm_hr", "irrigation_coverage"], as_dict=True
+	) or {}
+
+	rate = float(row.get("application_rate_mm_hr") or 0)
+	coverage = float(row.get("irrigation_coverage") or 0)
+	if rate > 0:
+		out["default_application_rate_mm_hr"] = rate
+	if coverage > 0:
+		out["default_irrigation_coverage"] = coverage
+	return out
 
 
 def readings_for(farm, start, end):
@@ -121,7 +160,7 @@ def compute_shift(doc, method=None):
 		frappe.throw(f"Block must follow the pattern '{{SECTION}} - SHIFT {{N}}'. Got: {shift_name}")
 	section_prefix = shift_name.split(" - SHIFT ")[0]
 
-	settings = settings_dict()
+	settings = shift_settings(settings_dict(), doc.block)
 
 	# ── Demand comes from the week that has already happened ─────
 	m_start, m_end = D.measured_window(from_date)
@@ -140,6 +179,10 @@ def compute_shift(doc, method=None):
 
 	out = D.demand(agg, carried, settings)
 	doc.et_crop_coefficient = settings["et_crop_coefficient"]
+	# Record the two figures that turned millimetres into hours, so the number can
+	# be audited later without re-deriving which defaults were in force at the time.
+	doc.applied_rate_mm_hr = settings["default_application_rate_mm_hr"]
+	doc.applied_coverage_pct = settings["default_irrigation_coverage"]
 	doc.clean_et_crop_mm = out["clean_et_crop_mm"]
 	doc.this_week_deficit = out["week_deficit_mm"]
 	doc.total_water_needed_mm = out["total_needed_mm"]

@@ -12,20 +12,34 @@ FULL_WEEK_HOURS = 168.0
 WEEK_DAYS = 7
 
 
-def pump_capacity_hours(profile):
-	"""Weekly hours the pump can run, and whether that figure is real.
+#: Where a capacity figure came from, strongest first. The caller words its warning
+#: from this, so an assumed number is never presented as a measured limit.
+SOURCE_PROFILE = "profile"
+SOURCE_DEFAULT = "default"
+SOURCE_FALLBACK = "fallback"
 
-	With no Irrigation Pump Profile there is no capacity to allocate against, so
-	the caller gets a full week and an explicit "unverified" — never a guess
-	dressed up as a limit. The site currently has zero profiles, so this is the
-	live path, and the distinction is the whole point.
+
+def pump_capacity_hours(profile, defaults=None):
+	"""Weekly hours the pump can run, and where that figure came from.
+
+	Three tiers, strongest first:
+
+	  · the section's Irrigation Pump Profile — a measured limit;
+	  · the farm-wide defaults in Irrigation Settings — a stated assumption that at
+	    least reflects how this estate runs its pumps;
+	  · a full week — the last resort when even the defaults are unset.
+
+	Only the first is a fact. The other two are assumptions, and the caller says so
+	on every planner they touch.
 	"""
-	if profile:
-		target = float(profile.get("water_target_m3_per_week") or 0)
-		flow = float(profile.get("pump_flow_rate_m3_per_hr") or 0)
+	for candidate, source in ((profile, SOURCE_PROFILE), (defaults, SOURCE_DEFAULT)):
+		if not candidate:
+			continue
+		target = float(candidate.get("water_target_m3_per_week") or 0)
+		flow = float(candidate.get("pump_flow_rate_m3_per_hr") or 0)
 		if target > 0 and flow > 0:
-			return round(target / flow, 4), True
-	return FULL_WEEK_HOURS, False
+			return round(target / flow, 4), source
+	return FULL_WEEK_HOURS, SOURCE_FALLBACK
 
 
 def grant(requests, capacity_hours):
