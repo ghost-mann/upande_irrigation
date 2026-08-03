@@ -5,8 +5,8 @@
  * to the planning engine that produces the underlying numbers.
  *
  * The week grid is the centrepiece: one column per day of the planning week,
- * one row per section, one block per shift labelled with its hours. That is the
- * shape assign_daily_blocks() produces, so the grid *is* the schedule.
+ * one row per section, one block per shift labelled with its hours. The blocks
+ * are the windows the allocator laid out, so the grid *is* the schedule.
  */
 
 import { pagehead, kpi, statusStrip, icon } from "./shell.js";

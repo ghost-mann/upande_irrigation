@@ -401,9 +401,9 @@ def fetch(farm=None):
     def schedule_grid():
         """Every scheduled shift this week, bucketed by section and weekday.
 
-        This is the shape api.scheduler.assign_daily_blocks actually produces —
-        shift i lands on day floor(i*7/N) — so the grid is the schedule rather
-        than a picture of it.
+        This reads the windows api.scheduler laid out, so the grid is the
+        schedule rather than a picture of it. A shift with no window (the pump
+        queue filled the week first) simply has no block to draw.
         """
         rows = frappe.db.sql(
             f"""

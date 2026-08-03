@@ -8,8 +8,8 @@
 /* ══════════════════════════════════════════════ week schedule grid
  *
  * One column per day of the planning week, one row per section, one block per
- * shift labelled with its hours. This is the shape assign_daily_blocks()
- * produces, so the grid is the schedule rather than a picture of it.
+ * shift labelled with its hours. The blocks are the windows the allocator laid
+ * out, so the grid is the schedule rather than a picture of it.
  */
 
 .week {

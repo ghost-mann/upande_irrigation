@@ -38,8 +38,17 @@ _UPCOMING_PER_SECTION = 3
 _UNKNOWN_PUMP = None
 
 
-def plan_window(cfg):
-	"""The week being planned, from the scheduler's own configuration."""
+def plan_window(cfg, for_week=None):
+	"""The week being planned.
+
+	Normally derived from the configuration and today's date. `for_week` overrides
+	it with an explicit start date — that is how historical weeks are regenerated,
+	and it is the only way to plan a week that is not the current or next one.
+	"""
+	if for_week:
+		week_start = frappe.utils.getdate(for_week)
+		return week_start, frappe.utils.add_days(week_start, 6)
+
 	today = frappe.utils.getdate(frappe.utils.nowdate())
 	start_idx = _DAY_INDEX.get(cfg.week_starts_on or "Thursday", 3)
 	week_start = frappe.utils.add_days(today, -((today.weekday() - start_idx) % 7))
@@ -178,7 +187,7 @@ def _write_allocation(item, farm, capacity, verified, pump_label, settings, resu
 
 
 @frappe.whitelist()
-def run(triggered_by="Manual"):
+def run(triggered_by="Manual", for_week=None):
 	if triggered_by not in ("Cron", "Manual", "API"):
 		triggered_by = "Manual"
 
@@ -217,7 +226,7 @@ def run(triggered_by="Manual"):
 
 	# ── Determine planning window ───────────────────────────────
 	today = frappe.utils.getdate(frappe.utils.nowdate())
-	schedule_from, schedule_to = plan_window(cfg)
+	schedule_from, schedule_to = plan_window(cfg, for_week)
 	measured_from, measured_to = D.measured_window(schedule_from)
 	settings = settings_dict()
 
@@ -508,6 +517,36 @@ def run(triggered_by="Manual"):
 		"skipped": total_skipped,
 		"failed":  total_failed,
 	}
+
+
+def backfill(from_week, to_week, triggered_by="API"):
+	"""Regenerate planners week by week across a historical range.
+
+	Deliberately not whitelisted: it can create thousands of records. Run it from
+	bench. Each week gets its own Irrigation Scheduler Run, so a farm-week that
+	refuses for want of weather is recorded rather than silently absent.
+
+	    bench --site <site> execute upande_irrigation.api.scheduler.backfill \\
+	        --kwargs "{'from_week':'2024-12-05','to_week':'2026-07-16'}"
+	"""
+	week = frappe.utils.getdate(from_week)
+	last = frappe.utils.getdate(to_week)
+	summary = []
+
+	while week <= last:
+		try:
+			out = run(triggered_by=triggered_by, for_week=str(week))
+			summary.append({"week": str(week), **{k: out[k] for k in ("status", "created", "skipped", "failed")}})
+		except Exception as e:
+			frappe.db.rollback()
+			summary.append({"week": str(week), "status": "Error", "message": str(e)[:200]})
+		week = frappe.utils.add_days(week, 7)
+
+	created = sum(s.get("created") or 0 for s in summary)
+	print(f"\nBackfill {from_week} → {to_week}: {len(summary)} weeks, {created} planners created")
+	for s in summary:
+		print(f"  {s['week']}  {s.get('status')}  created={s.get('created', 0)} skipped={s.get('skipped', 0)}")
+	return {"weeks": summary, "created": created}
 
 
 def _section_of(shift_name):

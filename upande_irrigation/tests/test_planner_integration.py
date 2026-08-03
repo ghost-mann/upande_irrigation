@@ -53,11 +53,20 @@ class TestPlannerOverAMeasuredWeek(FrappeTestCase):
 
 	def test_it_finds_real_demand_where_the_old_engine_found_none(self):
 		doc = self._planner()
+		# This week's figures depend only on the measured window, so they are fixed.
 		self.assertAlmostEqual(doc.clean_et_crop_mm, 13.091, places=2)
 		self.assertAlmostEqual(doc.this_week_deficit, 5.431, places=2)
 		self.assertGreater(doc.required_hours, 0.0)
-		self.assertAlmostEqual(doc.required_hours, 2.771, places=2)
 		self.assertEqual(doc.no_irrigation_reason, "")
+
+	def test_required_hours_follow_from_the_deficit_and_the_carried_debt(self):
+		# Recomputed from the document's own inputs rather than hard-coded, because
+		# whatever this shift carries in depends on how much history the site holds.
+		doc = self._planner()
+		total = doc.this_week_deficit + doc.carried_deficit_mm
+		self.assertAlmostEqual(doc.total_water_needed_mm, total, places=3)
+		expected = total / 2.8 / 0.70  # default_application_rate_mm_hr, coverage 70 %
+		self.assertAlmostEqual(doc.required_hours, expected, places=2)
 
 	def test_the_hook_leaves_allocation_untouched(self):
 		doc = self._planner()
