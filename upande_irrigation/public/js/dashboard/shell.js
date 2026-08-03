@@ -44,6 +44,8 @@ const ICONS = {
 	check: '<polyline points="20 6 9 17 4 12"/>',
 	refresh:
 		'<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+	planner:
+		'<rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><rect x="6" y="12" width="5" height="3" rx="1"/><rect x="13" y="16" width="5" height="3" rx="1"/>',
 	calendar:
 		'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
 	target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
@@ -59,6 +61,7 @@ export function icon(name, extra = "") {
 /* Sidebar order. The separator splits "look at the data" from "act on it". */
 const NAV = [
 	["overview", "Overview"],
+	["planner", "Planning"],
 	["weather", "Weather"],
 	["compare", "Compare"],
 	["iot", "IoT Sensors"],

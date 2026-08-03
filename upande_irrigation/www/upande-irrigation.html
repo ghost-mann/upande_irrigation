@@ -54,6 +54,7 @@
   import { Shell } from '/assets/upande_irrigation/js/dashboard/shell.js?v={{ asset_version }}';
 
   import overview  from '/assets/upande_irrigation/js/dashboard/view_overview.js?v={{ asset_version }}';
+  import planner   from '/assets/upande_irrigation/js/dashboard/view_planner.js?v={{ asset_version }}';
   import weather   from '/assets/upande_irrigation/js/dashboard/view_weather.js?v={{ asset_version }}';
   import compare   from '/assets/upande_irrigation/js/dashboard/view_compare.js?v={{ asset_version }}';
   import iot       from '/assets/upande_irrigation/js/dashboard/view_iot.js?v={{ asset_version }}';
@@ -65,7 +66,7 @@
   const shell = new Shell({
     mount: document.getElementById('ui-root'),
     boot:  window.IRRIGATION_BOOT,
-    views: [overview, weather, compare, iot, resources, map, now, control],
+    views: [overview, planner, weather, compare, iot, resources, map, now, control],
   });
 
   window.IRRIGATION_SHELL = shell;

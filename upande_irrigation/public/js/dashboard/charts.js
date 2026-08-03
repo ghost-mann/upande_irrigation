@@ -744,3 +744,87 @@ export function mkRangeChart(host, opts) {
 		});
 	});
 }
+
+/* ══════════════════════════════════════════════ grouped bars
+ *
+ * groupedBars(host, {labels, groups, W, H, unit, dec, yMax, refLine})
+ *
+ *   labels  one per x position, e.g. the seven days of the week
+ *   groups  [{label, color, values}] — one bar per group per position
+ *   refLine {value, label} — a dashed reference, e.g. the 24 h a day offers
+ *
+ * Bars are thin, sit on the baseline with 4px rounded tops, and carry a 2px
+ * surface gap between neighbours so adjacent fills never touch. Each bar hovers
+ * for its own value; identity comes from the legend the caller renders plus the
+ * bar's own title, never from colour alone.
+ */
+export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "", dec = 1, yMax, refLine } = {}) {
+	if (!host) return;
+	const gs = (groups || []).filter((g) => (g.values || []).length);
+	if (!gs.length || !(labels || []).length) {
+		host.innerHTML = '<div class="empty small">Nothing to plot for this week.</div>';
+		return;
+	}
+
+	const M = { t: 16, r: 16, b: 30, l: 46 };
+	const iw = W - M.l - M.r;
+	const ih = H - M.t - M.b;
+
+	const all = gs.flatMap((g) => g.values || []).filter((v) => v != null);
+	const top = yMax != null ? yMax : niceMax(Math.max(...all, refLine ? refLine.value : 0, 0.001));
+	const y = (v) => M.t + ih - (Math.max(0, v) / top) * ih;
+
+	const slot = iw / labels.length;
+	/* 2px between bars in a group, 20% of the slot kept as a gutter between
+	 * groups so the eye can tell one day from the next. */
+	const inner = slot * 0.8;
+	/* Thin marks: a bar never grows past 26px however few groups there are, so one
+	 * pump does not read as a block of colour. */
+	const bw = Math.max(3, Math.min(26, inner / gs.length - 2));
+
+	let grid = "";
+	const TICKS = 4;
+	for (let t = 0; t <= TICKS; t++) {
+		const v = (top / TICKS) * t;
+		const yy = y(v);
+		grid += `<line class="gl" x1="${M.l}" y1="${yy.toFixed(1)}" x2="${W - M.r}" y2="${yy.toFixed(1)}"/>
+<text class="ax" x="${M.l - 8}" y="${(yy + 3.5).toFixed(1)}" text-anchor="end">${fmtNum(v, top / TICKS >= 1 ? 0 : dec)}</text>`;
+	}
+
+	let bars = "";
+	labels.forEach((lab, i) => {
+		const used = gs.length * bw + (gs.length - 1) * 2;
+		const x0 = M.l + slot * i + (slot - used) / 2;
+		gs.forEach((g, gi) => {
+			const v = (g.values || [])[i];
+			if (v == null) return;
+			const x = x0 + gi * (bw + 2);
+			const yy = y(v);
+			const h = Math.max(0, M.t + ih - yy);
+			bars += `<rect class="gb" x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${g.color}" data-v="${v}" data-g="${esc(g.label)}" data-x="${esc(String(lab))}"><title>${esc(g.label)} · ${esc(String(lab))}: ${fmtNum(v, dec)}${unit}</title></rect>`;
+		});
+		bars += `<text class="ax" x="${(M.l + slot * i + slot / 2).toFixed(1)}" y="${(M.t + ih + 18).toFixed(1)}" text-anchor="middle">${esc(String(lab))}</text>`;
+	});
+
+	let ref = "";
+	if (refLine && refLine.value > 0 && refLine.value <= top) {
+		const yy = y(refLine.value);
+		ref = `<line class="refline" x1="${M.l}" y1="${yy.toFixed(1)}" x2="${W - M.r}" y2="${yy.toFixed(1)}"/>
+<text class="reftext" x="${W - M.r}" y="${(yy - 6).toFixed(1)}" text-anchor="end">${esc(refLine.label || "")}</text>`;
+	}
+
+	host.innerHTML = `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img">
+	${grid}${ref}${bars}
+</svg></div>`;
+
+	host.querySelectorAll("rect.gb").forEach((r) => {
+		r.addEventListener("mousemove", (e) => {
+			showTip(
+				`<span class="d">${esc(r.dataset.x)}</span><span class="sw" style="background:${r.getAttribute("fill")}"></span><span class="k">${esc(r.dataset.g)}</span> ${fmtNum(Number(r.dataset.v), dec)}${unit}`,
+				e.clientX,
+				e.clientY
+			);
+		});
+		r.addEventListener("mouseleave", hideTip);
+	});
+}

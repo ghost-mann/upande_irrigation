@@ -876,3 +876,365 @@
 		height: 420px;
 	}
 }
+
+/* ══════════════════════════════════════════════ week Gantt
+ *
+ * A real time axis: bar position is (hours into the week) / 168, so a 2.5 h cycle
+ * reads as the sliver it is. Day cells are the grid behind it, not the unit of
+ * placement — which is the difference between this and the Overview week grid.
+ */
+.gantt {
+	--gantt-name: 108px;
+	--gantt-num: 54px;
+	font-variant-numeric: tabular-nums;
+}
+
+.gantt__head,
+.gantt__row {
+	display: grid;
+	grid-template-columns: var(--gantt-name) 1fr var(--gantt-num);
+	align-items: center;
+	gap: 8px;
+}
+
+.gantt__head {
+	padding-bottom: 8px;
+	border-bottom: 1px solid var(--ui-hair);
+	margin-bottom: 8px;
+}
+
+.gantt__lane {
+	position: relative;
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	min-height: 22px;
+}
+
+.gantt__day {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	color: var(--ui-mute);
+	text-align: center;
+	padding-bottom: 2px;
+}
+
+.gantt__day.today {
+	color: var(--ui-clay-deep);
+}
+
+.gantt__name {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--ui-ink3);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.gantt__num {
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--ui-ink3);
+	text-align: right;
+}
+
+.gantt__head .gantt__num {
+	font-weight: 600;
+	font-size: 11px;
+	color: var(--ui-mute);
+}
+
+.gantt__group + .gantt__group {
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid var(--ui-hair);
+}
+
+.gantt__sec {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--ui-mute);
+	margin-bottom: 6px;
+}
+
+.gantt__row {
+	min-height: 24px;
+}
+
+.gantt__cell {
+	border-left: 1px solid var(--ui-hair);
+	height: 18px;
+}
+
+.gantt__cell:first-child {
+	border-left: 0;
+}
+
+.gantt__cell.today {
+	background: rgba(217, 165, 20, 0.05);
+}
+
+/* A cycle. 4px radius, and a 2px surface ring so two cycles an hour apart still
+ * read as two marks rather than one long smear. */
+.gantt__bar {
+	position: absolute;
+	top: 2px;
+	height: 14px;
+	min-width: 3px;
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px var(--ui-card);
+	background: #3268c4;
+}
+
+.gantt__bar.done {
+	background: var(--ui-ok);
+}
+
+.gantt__bar.running {
+	background: var(--ui-clay);
+}
+
+.gantt__none {
+	position: absolute;
+	inset: 2px auto 2px 0;
+	display: flex;
+	align-items: center;
+	font-size: 10.5px;
+	font-weight: 600;
+	color: var(--ui-hot);
+	padding-left: 2px;
+}
+
+.gantt__cap {
+	font-style: normal;
+	font-size: 9px;
+	color: var(--ui-warn);
+}
+
+.gantt__body {
+	position: relative;
+}
+
+.gantt__now {
+	position: absolute;
+	top: -4px;
+	bottom: -4px;
+	width: 2px;
+	background: var(--ui-hot);
+	pointer-events: none;
+}
+
+.gantt__now span {
+	position: absolute;
+	top: -14px;
+	left: 50%;
+	transform: translateX(-50%);
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--ui-hot);
+	background: var(--ui-card);
+	padding: 0 3px;
+}
+
+@media (max-width: 720px) {
+	.gantt {
+		--gantt-name: 76px;
+		--gantt-num: 42px;
+	}
+}
+
+/* ══════════════════════════════════════════════ calculation steps
+ *
+ * The chain from measured week to granted hours, one row per step. Tone marks the
+ * three rows where the number is usually questioned.
+ */
+.steps {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	counter-reset: none;
+}
+
+.steps__row {
+	display: grid;
+	grid-template-columns: 26px 1fr auto;
+	gap: 12px;
+	align-items: start;
+	padding: 10px 12px;
+	border-radius: 12px;
+	border-left: 3px solid transparent;
+}
+
+.steps__row + .steps__row {
+	margin-top: 4px;
+}
+
+.steps__row.clay {
+	background: rgba(217, 165, 20, 0.06);
+	border-left-color: var(--ui-clay);
+}
+
+.steps__row.cap {
+	background: rgba(217, 150, 46, 0.07);
+	border-left-color: var(--ui-warn);
+}
+
+.steps__row.hot {
+	background: rgba(196, 48, 43, 0.06);
+	border-left-color: var(--ui-hot);
+}
+
+.steps__n {
+	width: 22px;
+	height: 22px;
+	border-radius: 999px;
+	display: grid;
+	place-items: center;
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--ui-mute);
+	background: rgba(10, 10, 10, 0.05);
+}
+
+.steps__label {
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--ui-ink);
+}
+
+.steps__detail {
+	font-size: 11.5px;
+	color: var(--ui-ink4);
+	font-variant-numeric: tabular-nums;
+	margin-top: 1px;
+}
+
+.steps__note {
+	font-size: 11px;
+	color: var(--ui-mute);
+	margin-top: 3px;
+	max-width: 62ch;
+}
+
+.steps__value {
+	font-size: 17px;
+	font-weight: 700;
+	color: var(--ui-ink);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	padding-top: 1px;
+}
+
+.steps__value small {
+	font-size: 10.5px;
+	font-weight: 600;
+	color: var(--ui-mute);
+	margin-left: 3px;
+}
+
+/* ══════════════════════════════════════════════ table view
+ *
+ * Every chart's Table toggle lands here. Wide tables scroll inside their own
+ * container so the page body never scrolls sideways.
+ */
+.tbl-wrap {
+	overflow-x: auto;
+	margin: 0 -4px;
+}
+
+.tbl {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+
+.tbl th {
+	text-align: left;
+	font-size: 10.5px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--ui-mute);
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--ui-hair);
+	white-space: nowrap;
+}
+
+.tbl td {
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--ui-hair);
+	color: var(--ui-ink3);
+	white-space: nowrap;
+}
+
+.tbl td.num {
+	text-align: right;
+}
+
+.tbl tbody tr:hover td {
+	background: rgba(10, 10, 10, 0.02);
+}
+
+/* ══════════════════════════════════════════════ grouped bars */
+.gb {
+	transition: opacity 0.12s ease;
+}
+
+.chart svg:hover .gb {
+	opacity: 0.55;
+}
+
+.chart svg .gb:hover {
+	opacity: 1;
+}
+
+.refline {
+	stroke: var(--ui-hot);
+	stroke-width: 1.5;
+	stroke-dasharray: 5 4;
+	opacity: 0.6;
+}
+
+.reftext {
+	font-size: 9.5px;
+	font-weight: 700;
+	fill: var(--ui-hot);
+	opacity: 0.85;
+}
+
+
+/* ══════════════════════════════════════════════ five-tile row
+ *
+ * .kpi-grid auto-fits at 212px, which lands four per row on a 1440px screen and
+ * orphans a fifth onto its own line. The Planning view has exactly five numbers
+ * that belong together, so it asks for five columns and only falls back to the
+ * auto-fit behaviour once five would be narrower than legible.
+ */
+.kpi-grid.five {
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+@media (max-width: 1240px) {
+	.kpi-grid.five {
+		grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
+	}
+}
+
+.kpi-grid.five .kpi {
+	padding: 24px 22px;
+}
+
+/* A farm with fifty shifts makes the Gantt taller than the screen. Cap it and let
+ * it scroll in place, so the charts below stay reachable. The header stays put. */
+.gantt__scroll {
+	max-height: 560px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding-right: 4px;
+}

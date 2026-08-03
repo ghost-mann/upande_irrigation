@@ -46,7 +46,7 @@ ${pagehead(
 	`<button class="btn ghost" id="ov-refresh" type="button">${icon("refresh")}Refresh</button>`
 )}
 <div class="status" id="ov-status"></div>
-<div class="kpi-grid stagger" id="ov-tiles">
+<div class="kpi-grid five stagger" id="ov-tiles">
 	${'<div class="skel skel-kpi"></div>'.repeat(5)}
 </div>
 
@@ -78,7 +78,7 @@ ${pagehead(
 		<div id="ov-coverage"></div>
 	</div>
 	<div class="card">
-		<div class="card__head"><h3>${icon("trend")}Deficit carried</h3><span class="meta">mm unmet, recent weeks</span></div>
+		<div class="card__head"><h3>${icon("trend")}Deficit carried</h3><span class="meta">mean mm unmet per shift, recent weeks</span></div>
 		<div id="ov-trend"></div>
 	</div>
 </div>`;
@@ -302,7 +302,7 @@ ${pagehead(
 		}
 		charts.mkChart(
 			host,
-			[{ label: "Unmet", color: "var(--ui-hot)", values: trend.values, unit: "mm" }],
+			[{ label: "Unmet per shift", color: "var(--ui-hot)", values: trend.values, unit: "mm" }],
 			560,
 			195,
 			{ xLabels: trend.labels, tooltip: true }

@@ -88,9 +88,11 @@ def fetch(farm=None):
             f"""
             SELECT
                 COUNT(*)                                  AS planners,
-                COALESCE(SUM(p.total_water_needed_mm), 0) AS needed,
-                COALESCE(SUM(p.delivered_depth_mm), 0)    AS delivered,
-                COALESCE(SUM(p.unmet_deficit_mm), 0)      AS unmet,
+                -- Depths are averaged per shift; only hours add, because hours are a
+                -- claim on one pump's week while millimetres are a depth per area.
+                COALESCE(AVG(p.total_water_needed_mm), 0) AS needed,
+                COALESCE(AVG(p.delivered_depth_mm), 0)    AS delivered,
+                COALESCE(AVG(p.unmet_deficit_mm), 0)      AS unmet,
                 COALESCE(SUM(p.shift_hours), 0)           AS hours,
                 COALESCE(AVG(p.weekly_rainfall_mm), 0)    AS rainfall,
                 COALESCE(AVG(p.clean_et_crop_mm), 0)      AS et_crop,
@@ -162,7 +164,7 @@ def fetch(farm=None):
         },
         {
             "key": "demand",
-            "label": "Week demand",
+            "label": "Demand per shift",
             "value": round(needed, 1),
             "unit": "mm",
             "note": _plural(int(totals.get("planners") or 0), "planner", "planners") + " this week"
@@ -172,7 +174,7 @@ def fetch(farm=None):
         },
         {
             "key": "delivered",
-            "label": "Delivered",
+            "label": "Delivered per shift",
             "value": round(delivered, 1),
             "unit": "mm",
             "note": f"{coverage:g}% of demand" if coverage is not None else "no demand yet",
@@ -183,7 +185,7 @@ def fetch(farm=None):
             "label": "Carrying over",
             "value": round(float(totals.get("unmet") or 0), 1),
             "unit": "mm",
-            "note": "unmet, rolls to next week",
+            "note": "mean per shift, rolls to next week",
             "tone": "hot" if float(totals.get("unmet") or 0) > 0 else "ok",
         },
         {
@@ -440,10 +442,11 @@ def fetch(farm=None):
             bucket = sections.setdefault(
                 section,
                 {"section": section, "farm": r["farm"], "days": [[] for _ in range(7)],
-                 "needed": 0.0, "delivered": 0.0},
+                 "needed": 0.0, "delivered": 0.0, "shifts": 0},
             )
             bucket["needed"] += float(r["needed"] or 0)
             bucket["delivered"] += float(r["delivered"] or 0)
+            bucket["shifts"] += 1
 
             day_index = None
             if r["start_dt"]:
@@ -486,11 +489,15 @@ def fetch(farm=None):
 
         ordered = sorted(sections.values(), key=lambda s: s["section"])
         for s in ordered:
+            # coverage_pct is a ratio of two sums over the same rows, so averaging
+            # cannot change it. The depths themselves are published as means, because
+            # a summed depth is not a quantity anyone should read off this payload.
             s["coverage_pct"] = (
                 round(100.0 * s["delivered"] / s["needed"], 1) if s["needed"] > 0 else None
             )
-            s["needed"] = round(s["needed"], 1)
-            s["delivered"] = round(s["delivered"], 1)
+            n = s.pop("shifts") or 1
+            s["needed_mm_per_shift"] = round(s.pop("needed") / n, 1)
+            s["delivered_mm_per_shift"] = round(s.pop("delivered") / n, 1)
 
         return {"days": day_labels, "sections": ordered}
 
@@ -498,10 +505,16 @@ def fetch(farm=None):
 
     # ── Deficit carried, recent weeks ───────────────────────────
     def deficit_trend(weeks=12):
+        """Mean unmet depth per shift, week by week.
+
+        Averaged, not summed: millimetres are a depth measured per unit area, so
+        adding them across shifts produces a number with no physical meaning —
+        55 shifts each owing 89 mm is not 4,900 mm of anything.
+        """
         rows = frappe.db.sql(
             f"""
             SELECT p.to_date AS to_date,
-                   COALESCE(SUM(p.unmet_deficit_mm), 0) AS unmet
+                   COALESCE(AVG(p.unmet_deficit_mm), 0) AS unmet
             FROM `tabIrrigation Planner` p
             WHERE p.docstatus < 2
               AND p.to_date <= %(to_date)s
