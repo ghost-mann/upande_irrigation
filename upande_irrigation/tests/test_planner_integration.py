@@ -5,10 +5,22 @@ Weather Readings ending 2026-07-12, so a plan week opening 2026-07-13 has a
 complete elapsed week behind it. Every assertion here failed under the old engine,
 which aggregated 2026-07-13 → 2026-07-19 — a week with no readings at all.
 
-Hand-checked arithmetic for that window (Σ et_crop 20.14 mm, Σ rain 7.66 mm):
-    clean ET crop  = 20.14 × 0.65        = 13.091 mm
-    week deficit   = 13.091 − 7.66       =  5.431 mm
-    required hours = 5.431 ÷ 2.8 ÷ 0.70  =  2.771 hr
+Hand-checked arithmetic for that window, re-derived against the real production
+Weather Readings loaded for Task 9 (the bench's old seed data gave different
+figures — see git history for the superseded 13.091 / 5.431 constants). The
+seven stored `et_crop` values for Lokitela 2026-07-06..2026-07-12 are:
+    2.66, 4.275, 2.375, 2.85, 0.665, 3.61, 3.8   → Σ et_crop  = 20.235 mm
+and the seven `rainfall_mm` values are:
+    0.8, 0.0, 0.0, 0.0, 4.2, 2.8, 0.0            → Σ rainfall =  7.8   mm
+`Irrigation Settings.default_avocado_utilisation` (the engine's
+et_crop_coefficient) is 0.65 on this site:
+    clean ET crop  = 20.235 × 0.65        = 13.1527 mm  (rounded to 4 dp)
+    week deficit   = 13.1527 − 7.8        =  5.3527 mm
+    required hours = 5.3527 ÷ 2.8 ÷ 0.70  =  2.732  hr
+This matches upande_irrigation.engine.demand.demand() exactly (verified by
+calling it directly in a v16 console against these same rows), so the change
+from 13.091/5.431 is real production data replacing stale bench data, not an
+engine regression.
 """
 
 import frappe
@@ -54,8 +66,9 @@ class TestPlannerOverAMeasuredWeek(FrappeTestCase):
 	def test_it_finds_real_demand_where_the_old_engine_found_none(self):
 		doc = self._planner()
 		# This week's figures depend only on the measured window, so they are fixed.
-		self.assertAlmostEqual(doc.clean_et_crop_mm, 13.091, places=2)
-		self.assertAlmostEqual(doc.this_week_deficit, 5.431, places=2)
+		# See the module docstring for the hand-derivation against the real readings.
+		self.assertAlmostEqual(doc.clean_et_crop_mm, 13.1527, places=2)
+		self.assertAlmostEqual(doc.this_week_deficit, 5.3527, places=2)
 		self.assertGreater(doc.required_hours, 0.0)
 		self.assertEqual(doc.no_irrigation_reason, "")
 
