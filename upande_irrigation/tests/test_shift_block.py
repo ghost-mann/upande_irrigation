@@ -10,6 +10,8 @@ computing identical hours.
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from upande_irrigation.tests import ROW_META_KEYS
+
 DOCTYPE = "Irrigation Shift Block"
 
 
@@ -31,12 +33,6 @@ class TestShiftBlockSchema(FrappeTestCase):
 		self.assertEqual(field.options, DOCTYPE)
 
 
-_ROW_META_KEYS = (
-	"name", "creation", "modified", "modified_by", "owner",
-	"parent", "parentfield", "parenttype", "doctype", "idx",
-)
-
-
 class TestShiftBlockValidateHook(FrappeTestCase):
 	"""Exercises the real path: Irrigation Scheduler.validate(), not the child in isolation.
 
@@ -48,7 +44,7 @@ class TestShiftBlockValidateHook(FrappeTestCase):
 
 	def setUp(self):
 		self.original_shift_blocks = [
-			{k: v for k, v in row.as_dict().items() if k not in _ROW_META_KEYS}
+			{k: v for k, v in row.as_dict().items() if k not in ROW_META_KEYS}
 			for row in frappe.get_single("Irrigation Scheduler").shift_blocks
 		]
 
