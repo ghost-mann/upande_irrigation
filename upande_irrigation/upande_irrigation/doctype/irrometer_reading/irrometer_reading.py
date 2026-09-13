@@ -1,7 +1,5 @@
-# Copyright (c) 2026, Upande and contributors
-# For license information, please see license.txt
+"""Controller for Irrometer Reading."""
 
-# import frappe
 from frappe.model.document import Document
 
 
