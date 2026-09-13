@@ -63,24 +63,30 @@ def list_states(farm=None):
 
 	# ── Build the lookup: valve.block → active planner row ───────
 	# A valve's `block` is a sub-block warehouse (e.g. "AIRSTRIP BLK 1 - KL").
-	# Sub-blocks roll up to a shift via `tabBlocks List`. A planner row
-	# (Irrigation Planner) holds the scheduled_start/end for each shift.
-	# The active planner for a sub-block right now satisfies:
-	#   bl.block = <valve.block>
-	#   p.block  = bl.parent    (the shift name)
+	# Sub-blocks roll up to a shift via `Irrigation Shift Block`, the child
+	# table of the Irrigation Scheduler single (parenttype/parentfield below
+	# pin it to that table specifically, since child rows are shared storage).
+	# A planner row (Irrigation Planner) holds the scheduled_start/end for
+	# each shift. The active planner for a sub-block right now satisfies:
+	#   sb.block = <valve.block>
+	#   p.block  = sb.shift     (the shift name)
 	#   p.scheduled_start <= NOW <= p.scheduled_end
+	# No is_active filter: Blocks List never had one, and adding one here
+	# would silently change which valves report a schedule.
 	active = frappe.db.sql(
 		"""
 		SELECT
-			bl.block          AS sub_block,
+			sb.block          AS sub_block,
 			p.name            AS planner,
 			p.block           AS shift,
 			p.scheduled_start AS start_dt,
 			p.scheduled_end   AS end_dt,
 			p.shift_hours     AS shift_hours
-		FROM `tabBlocks List` bl
-		INNER JOIN `tabIrrigation Planner` p ON p.block = bl.parent
-		WHERE p.docstatus < 2
+		FROM `tabIrrigation Shift Block` sb
+		INNER JOIN `tabIrrigation Planner` p ON p.block = sb.shift
+		WHERE sb.parenttype = 'Irrigation Scheduler'
+		  AND sb.parentfield = 'shift_blocks'
+		  AND p.docstatus < 2
 		  AND p.scheduled_start IS NOT NULL
 		  AND p.scheduled_end IS NOT NULL
 		  AND %(now)s BETWEEN p.scheduled_start AND p.scheduled_end
@@ -98,14 +104,16 @@ def list_states(farm=None):
 	if off_subblocks:
 		upcoming = frappe.db.sql(
 			"""
-			SELECT bl.block          AS sub_block,
+			SELECT sb.block          AS sub_block,
 			       MIN(p.scheduled_start) AS next_start
-			FROM `tabBlocks List` bl
-			INNER JOIN `tabIrrigation Planner` p ON p.block = bl.parent
-			WHERE p.docstatus < 2
+			FROM `tabIrrigation Shift Block` sb
+			INNER JOIN `tabIrrigation Planner` p ON p.block = sb.shift
+			WHERE sb.parenttype = 'Irrigation Scheduler'
+			  AND sb.parentfield = 'shift_blocks'
+			  AND p.docstatus < 2
 			  AND p.scheduled_start > %(now)s
-			  AND bl.block IN %(blocks)s
-			GROUP BY bl.block
+			  AND sb.block IN %(blocks)s
+			GROUP BY sb.block
 			""",
 			{"now": now_str, "blocks": tuple(off_subblocks)},
 			as_dict=True,
