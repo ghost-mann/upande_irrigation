@@ -260,9 +260,6 @@ scheduler_events = {
 # ignore_translatable_strings_from = []
 
 fixtures = [
-    # Custom DocTypes (and their fields, captured inline) in the Upande Irrigation module
-    {"doctype": "DocType",         "filters": [["module", "=", "Upande Irrigation"]]},
-    {"doctype": "Custom Field",    "filters": [["module", "=", "Upande Irrigation"]]},
     {"doctype": "Property Setter", "filters": [["module", "=", "Upande Irrigation"]]},
     # Custom HTML Blocks owned by this module
     {
