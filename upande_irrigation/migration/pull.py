@@ -185,12 +185,32 @@ def series_targets(doctype, records):
 	return targets
 
 
-def reseed_series(targets):
-	"""Raise each counter in `targets` to at least the given value. Never lowers it.
+# Counter keys this app must never write, however its own data maps onto them.
+#
+# `''` is the counter every `format:` autoname on the site shares — 137 DocTypes
+# on this bench alone, currently at 1,999,007. It is not app-private state:
+# raising it to this app's Reservoir Pumping Record maximum (357,190) would be a
+# no-op here but would renumber 137 unrelated doctypes on any destination whose
+# counter sits lower, irreversibly, on a live ERP with 459 users.
+#
+# And it buys nothing. Reservoir Pumping Record names embed the month
+# (`format:RPR-{YYYY}-{MM}-{#####}` → `RPR-2026-04-345389`), so a counter that
+# restarts at 1 can only collide inside the same calendar month as a migrated
+# record. The migrated rows are all `RPR-2026-04-`; a cutover in any later month
+# cannot collide no matter where the counter sits. There is no safe *and* useful
+# write to make here, so this app makes none.
+#
+# The other two accumulated keys, `IRPL-2026-` and `IRSR-2026-`, are the literal
+# prefixes of this app's own series templates and are private to it — no other
+# doctype can produce them. Those are reseeded.
+SHARED_COUNTER_KEYS = {""}
 
-	Only-raise matters: the `''` key is shared with every other format-named
-	doctype on the site, and lowering it would hand out names other apps have
-	already used.
+
+def reseed_series(targets):
+	"""Raise each app-private counter in `targets` to at least the given value.
+
+	Two things this never does: lower a counter (a counter ahead of the data is
+	left alone), and touch a key in SHARED_COUNTER_KEYS at all.
 	"""
 	from frappe.model.naming import NamingSeries
 
@@ -198,15 +218,20 @@ def reseed_series(targets):
 	for key, wanted in sorted(targets.items()):
 		series = NamingSeries(key)
 		current = series.get_current_value()
+
+		if key in SHARED_COUNTER_KEYS:
+			report[key] = {
+				"was": current, "now": current, "wanted": wanted,
+				"action": "skipped: shared site-wide counter, not this app's to move",
+			}
+			continue
+
 		if current < wanted:
 			series.update_counter(wanted)
-			report[key or "(shared format counter)"] = {
-				"was": current, "now": wanted, "action": "reseeded",
-			}
+			report[key] = {"was": current, "now": wanted, "action": "reseeded"}
 		else:
-			report[key or "(shared format counter)"] = {
-				"was": current, "now": current, "action": "already ahead",
-			}
+			report[key] = {"was": current, "now": current, "action": "already ahead"}
+
 	frappe.db.commit()
 	return report
 
@@ -256,6 +281,23 @@ def load_singles(data_dir=None):
 	return report
 
 
+def count_present(doctype, records):
+	"""How many of these records' names are already on this site.
+
+	Counted so the load's `ok` can require `inserted + already_present` to
+	account for every row in the file. `frappe.db.count(doctype)` cannot: it is
+	site-wide, so on a destination that already holds rows of these doctypes a
+	load that inserted nothing at all would still clear a `>= len(records)`
+	check. Batched rather than one exists() per row.
+	"""
+	names = [record["name"] for record in records]
+	present = 0
+	for start in range(0, len(names), 500):
+		chunk = names[start:start + 500]
+		present += len(frappe.get_all(doctype, filters={"name": ("in", chunk)}, pluck="name"))
+	return present
+
+
 def load_all(data_dir=None):
 	"""Load every exported file in dependency order. Returns per-doctype counts."""
 	data_dir = data_dir or os.path.join(os.path.dirname(__file__), "data")
@@ -268,15 +310,22 @@ def load_all(data_dir=None):
 			continue
 		with open(path) as fh:
 			records = json.load(fh)
+		already_present = count_present(doctype, records)
 		inserted = insert_preserving(doctype, records)
-		total = frappe.db.count(doctype)
 		for key, suffix in series_targets(doctype, records).items():
 			if suffix > targets.get(key, 0):
 				targets[key] = suffix
+		# The gate is per-file, not site-wide: every row in the file must be
+		# accounted for by this load or by a previous one. `now_on_site` is
+		# reported alongside but is information, never the check -- it counts
+		# rows this file never contained.
 		report[doctype] = {
-			"in_file": len(records), "inserted": inserted,
-			"now_on_site": total, "expected": len(records),
-			"ok": total >= len(records),
+			"in_file": len(records),
+			"already_present": already_present,
+			"inserted": inserted,
+			"accounted_for": already_present + inserted,
+			"now_on_site": frappe.db.count(doctype),
+			"ok": already_present + inserted == len(records),
 			"at_first_export": COUNTS_AT_FIRST_EXPORT.get(doctype),
 		}
 

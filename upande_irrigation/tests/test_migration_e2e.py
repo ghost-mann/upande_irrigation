@@ -167,11 +167,6 @@ class TestTheSinglesCameAcross(FrappeTestCase):
 			frappe.db.get_single_value("Irrigation Scheduler", "plan_for"), "Next Week"
 		)
 
-	def test_loading_the_singles_never_touches_the_shift_mapping(self):
-		"""shift_blocks holds the 86 mapping rows built by the shift loader; the
-		source's own copy is the pre-migration one and must not overwrite it."""
-		preserve = dict((dt, p) for dt, _f, p in pull.SINGLES)
-		self.assertIn("shift_blocks", preserve["Irrigation Scheduler"])
 
 
 class TestEveryDocTypeIsReachable(FrappeTestCase):
@@ -208,3 +203,167 @@ class TestEveryDocTypeIsReachable(FrappeTestCase):
 		no System Manager automatically holds."""
 		roles = frappe.get_all("DocPerm", filters={"parent": "Weather Reading"}, pluck="role")
 		self.assertIn("System Manager", roles)
+
+
+class TestTheShiftMappingSurvivesASingleLoad(FrappeTestCase):
+	"""The bug being locked out: load_single() writing Irrigation Scheduler's
+	shift_blocks would destroy the 86 shift→warehouse mapping rows built by the
+	shift loader in Task 7 — the worst single outcome in this migration, and one
+	nothing downstream would report, because a scheduler with an empty mapping
+	simply plans nothing.
+
+	This drives the real function with a payload that deliberately CARRIES a
+	shift_blocks key, rather than restating pull.SINGLES back at itself.
+	"""
+
+	DOCTYPE = "Irrigation Scheduler"
+	CHILD = "Irrigation Shift Block"
+
+	def setUp(self):
+		self.rows_before = frappe.db.sql(
+			f"SELECT * FROM `tab{self.CHILD}` WHERE parent = %s ORDER BY idx",
+			self.DOCTYPE,
+			as_dict=True,
+		)
+		self.plan_for_before = frappe.db.get_single_value(self.DOCTYPE, "plan_for")
+
+	def tearDown(self):
+		"""Put the mapping back if the thing this test guards against happened."""
+		current = frappe.db.count(self.CHILD, {"parent": self.DOCTYPE})
+		if current != len(self.rows_before):
+			frappe.db.delete(self.CHILD, {"parent": self.DOCTYPE})
+			for row in self.rows_before:
+				frappe.get_doc({**row, "doctype": self.CHILD}).db_insert()
+		frappe.db.set_single_value(
+			self.DOCTYPE, "plan_for", self.plan_for_before, update_modified=False
+		)
+		frappe.db.commit()
+		frappe.clear_document_cache(self.DOCTYPE, self.DOCTYPE)
+
+	def _mapping(self):
+		return [
+			(row.shift, row.block)
+			for row in frappe.db.sql(
+				f"SELECT shift, block FROM `tab{self.CHILD}` WHERE parent = %s ORDER BY idx",
+				self.DOCTYPE,
+				as_dict=True,
+			)
+		]
+
+	def test_a_payload_carrying_shift_blocks_leaves_the_mapping_untouched(self):
+		before = self._mapping()
+		self.assertEqual(len(before), 86, "precondition: the 86 mapping rows are loaded")
+
+		payload = {
+			"name": self.DOCTYPE,
+			"doctype": self.DOCTYPE,
+			"plan_for": "Next Week",
+			# The source's own pre-migration copy, standing in for what a future
+			# export that DOES return child tables would hand load_single.
+			"shift_blocks": [
+				{"shift": "PRE-MIGRATION - SHIFT 1", "block": "NOT A REAL WAREHOUSE"}
+			],
+		}
+		result = pull.load_single(self.DOCTYPE, payload, ("shift_blocks",))
+
+		self.assertEqual(self._mapping(), before, "the shift mapping was overwritten")
+		self.assertEqual(len(self._mapping()), 86)
+		self.assertNotIn("shift_blocks", result["applied"])
+		self.assertTrue(
+			any(entry.startswith("shift_blocks") for entry in result["skipped"]),
+			f"load_single did not report skipping shift_blocks: {result['skipped']}",
+		)
+
+	def test_the_scalar_fields_in_the_same_payload_still_land(self):
+		"""Proves the test above is not passing because load_single did nothing."""
+		payload = {"name": self.DOCTYPE, "doctype": self.DOCTYPE, "plan_for": "Current Week"}
+		pull.load_single(self.DOCTYPE, payload, ("shift_blocks",))
+		self.assertEqual(
+			frappe.db.get_single_value(self.DOCTYPE, "plan_for"), "Current Week"
+		)
+
+
+class TestReseedSeriesMovesTheCounter(FrappeTestCase):
+	"""The bug being locked out: reseed_series()'s update branch has never
+	executed on this bench — every counter here is already ahead because of the
+	site's own pre-migration history, so the e2e assertion above passes without
+	the function ever writing anything. First execution would otherwise be on
+	production.
+
+	Driven against a throwaway key so nothing real is moved.
+	"""
+
+	KEY = "UPIRR-TEST-SERIES-"
+	SHARED = ""
+
+	def tearDown(self):
+		frappe.db.delete("Series", {"name": self.KEY})
+		frappe.db.commit()
+
+	def _current(self, key):
+		return frappe.db.get_value("Series", key, "current", order_by="name")
+
+	def _set(self, key, value):
+		from frappe.model.naming import NamingSeries
+
+		NamingSeries(key).update_counter(value)
+		frappe.db.commit()
+
+	def test_a_counter_behind_the_migrated_data_is_advanced(self):
+		self._set(self.KEY, 5)
+		report = pull.reseed_series({self.KEY: 1473})
+		self.assertEqual(int(self._current(self.KEY)), 1473)
+		self.assertEqual(report[self.KEY]["action"], "reseeded")
+		self.assertEqual(report[self.KEY]["was"], 5)
+
+	def test_a_missing_counter_is_created_at_the_migrated_maximum(self):
+		frappe.db.delete("Series", {"name": self.KEY})
+		frappe.db.commit()
+		pull.reseed_series({self.KEY: 1473})
+		self.assertEqual(int(self._current(self.KEY)), 1473)
+
+	def test_a_counter_already_ahead_is_never_moved_backwards(self):
+		self._set(self.KEY, 9000)
+		report = pull.reseed_series({self.KEY: 1473})
+		self.assertEqual(int(self._current(self.KEY)), 9000)
+		self.assertEqual(report[self.KEY]["action"], "already ahead")
+
+
+class TestTheSharedCounterIsNeverWritten(FrappeTestCase):
+	"""The bug being locked out: load_all accumulated the `''` counter key from
+	Reservoir Pumping Record's `format:` autoname and reseeded it like any other.
+	That key is shared by every format-named DocType on the site (137 of them on
+	this bench, at 1,999,007) — writing it would renumber 137 unrelated doctypes
+	on a live ERP. It is also unnecessary: RPR names embed the month, so a
+	counter restarting at 1 cannot collide with a migrated `RPR-2026-04-` name.
+	"""
+
+	def setUp(self):
+		self.before = frappe.db.get_value("Series", "", "current", order_by="name")
+
+	def tearDown(self):
+		"""Restore it if the guard failed and the counter actually moved."""
+		from frappe.model.naming import NamingSeries
+
+		if frappe.db.get_value("Series", "", "current", order_by="name") != self.before:
+			NamingSeries("").update_counter(self.before)
+		frappe.db.commit()
+
+	def test_the_empty_key_is_declared_shared(self):
+		self.assertIn("", pull.SHARED_COUNTER_KEYS)
+
+	def test_a_value_far_above_the_current_counter_still_does_not_move_it(self):
+		"""Deliberately asks for a raise, not a lower: only-raise would not save us."""
+		wanted = int(self.before) + 10_000_000
+		report = pull.reseed_series({"": wanted})
+		self.assertEqual(
+			frappe.db.get_value("Series", "", "current", order_by="name"), self.before
+		)
+		self.assertTrue(report[""]["action"].startswith("skipped"), report[""])
+
+	def test_load_all_would_never_reseed_it_even_though_it_is_derived(self):
+		"""series_targets still DERIVES the key -- the exclusion is the guard."""
+		records = [{"name": "RPR-2026-04-357190"}]
+		self.assertEqual(
+			pull.series_targets("Reservoir Pumping Record", records), {"": 357190}
+		)
