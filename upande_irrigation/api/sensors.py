@@ -18,6 +18,11 @@ import datetime
 
 import frappe
 
+# The dashboard's own guard, reused rather than reinvented: it logs the failure
+# to the Error Log and returns a default so one unavailable doctype costs its own
+# view instead of the whole page.
+from upande_irrigation.api.overview import _guard
+
 # A device silent longer than this is stale. Same threshold api/overview.py
 # alerts on and the view badges.
 STALE_HOURS = 6
@@ -40,20 +45,61 @@ def _bucket_seconds(days):
     return 604800
 
 
+def _empty(days, start_dt, end_dt):
+    """The payload shape fetch() returns when `Sensor Readings` cannot be read.
+
+    Every key the view reads is present and empty, so the Sensors view renders
+    "no data" instead of throwing. `meta.unavailable` lets the view say which of
+    the two it is.
+    """
+    return {
+        "meta": {
+            "days": days,
+            "start": str(start_dt),
+            "end": str(end_dt),
+            "last_reading_at": None,
+            "unavailable": True,
+        },
+        "selection": {"site_name": "", "sensor_type": "", "deveui": ""},
+        "sites": [],
+        "types": [],
+        "devices": [],
+        "series": {"labels": [], "avg": [], "min": [], "max": []},
+        "stats": None,
+    }
+
+
 @frappe.whitelist()
 def fetch(days=30, site_name="", sensor_type="", deveui="", sensor_name="", limit=None):
+    """Guarded entry point.
+
+    `Sensor Readings` is owned by upande_sensors, which is not in every site's
+    app inventory. Every query below reads `tabSensor Readings` directly, so on
+    a site without that app the first one raises and takes the dashboard with
+    it. api/overview.py already anticipated exactly this in _guard's docstring;
+    this reuses it rather than inventing a second mechanism.
+    """
     try:
         days = int(days)
     except (TypeError, ValueError):
         days = 30
     days = max(1, min(days, 3650))
 
+    end_dt = frappe.utils.now_datetime()
+    start_dt = frappe.utils.add_to_date(end_dt, days=-days)
+
+    return _guard(
+        "sensors",
+        lambda: _fetch(days, site_name, sensor_type, deveui, start_dt, end_dt),
+        default=_empty(days, start_dt, end_dt),
+    )
+
+
+def _fetch(days, site_name, sensor_type, deveui, start_dt, end_dt):
     site_name = (site_name or "").strip()
     sensor_type = (sensor_type or "").strip()
     deveui = (deveui or "").strip()
 
-    end_dt = frappe.utils.now_datetime()
-    start_dt = frappe.utils.add_to_date(end_dt, days=-days)
     args = {"start": start_dt, "end": end_dt, "min_valid": _MIN_VALID}
     window = "r.timestamp >= %(start)s AND r.timestamp <= %(end)s"
 

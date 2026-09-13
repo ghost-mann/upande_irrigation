@@ -15,11 +15,16 @@ of guard around its irrometer-block lookup, except it surfaces the swallowed
 exception directly as `blocks_error` in the response rather than only logging
 it, so that field is asserted directly instead.
 
-`sensors.py`, `planner.py`, `resources.py`, `valves.py`, and
-`scheduler.live_sections` were checked for the same pattern and do not swallow
-sub-query exceptions (their only try/except blocks are TypeError/ValueError
-guards around parsing the `days` input) — see task-10-report.md for the
-module-by-module check.
+`sensors.fetch` now has the same shape of guard as `overview.fetch`: every one
+of its queries reads `tabSensor Readings`, which is owned by upande_sensors and
+is not in every site's app inventory, so the whole call is wrapped in the same
+`_guard` and degrades to an empty payload. That makes assertIsNotNone equally
+worthless for it, so it asserts the Error Log delta too.
+
+`planner.py`, `resources.py`, `valves.py`, and `scheduler.live_sections` were
+checked for the same pattern and do not swallow sub-query exceptions (their only
+try/except blocks are TypeError/ValueError guards around parsing the `days`
+input) — see task-10-report.md for the module-by-module check.
 """
 
 import frappe
@@ -95,8 +100,24 @@ class TestEndpointsDoNotRaise(FrappeTestCase):
 		self.assertIsInstance(result.get("kpis"), dict)
 
 	def test_sensors_fetch(self):
+		"""Assert the Error Log delta, not just a non-None return.
+
+		sensors.fetch is wrapped in overview's _guard so a site without
+		upande_sensors gets an empty Sensors view instead of a dead dashboard.
+		On THIS site `Sensor Readings` exists, so the guard must not fire: a
+		swallowed v16 SQL break would otherwise be indistinguishable from a
+		working query, both returning a non-None dict.
+		"""
+		before = frappe.db.count("Error Log")
 		result = sensors.fetch(days=30)
+		after = frappe.db.count("Error Log")
+		self.assertEqual(
+			after - before, 0,
+			"sensors.fetch swallowed an exception into Error Log instead of "
+			"the query actually succeeding",
+		)
 		self.assertIsNotNone(result)
+		self.assertNotIn("unavailable", result.get("meta", {}))
 		self.assertIsInstance(result.get("sites"), list)
 		self.assertIsInstance(result.get("types"), list)
 		self.assertIsInstance(result.get("devices"), list)
@@ -140,3 +161,26 @@ class TestEndpointsDoNotRaise(FrappeTestCase):
 		result = scheduler.live_sections(farm=FARM)
 		self.assertIsNotNone(result)
 		self.assertIsInstance(result.get("farms"), list)
+
+
+class TestSensorsDegradesInsteadOfRaising(FrappeTestCase):
+	"""The bug being locked out: every query in api/sensors.py reads
+	`tabSensor Readings`, owned by upande_sensors -- an app that is not in the
+	destination site's inventory. Unguarded, the first query raises `Table
+	doesn't exist` and takes the whole dashboard page down. api/overview.py's
+	_guard docstring already anticipated exactly this case; sensors had no
+	equivalent.
+	"""
+
+	def test_a_failing_query_returns_the_empty_payload(self):
+		from unittest import mock
+
+		with mock.patch.object(sensors, "_fetch", side_effect=Exception("Table doesn't exist")):
+			result = sensors.fetch(days=30)
+
+		self.assertTrue(result["meta"]["unavailable"])
+		self.assertEqual(result["sites"], [])
+		self.assertEqual(result["types"], [])
+		self.assertEqual(result["devices"], [])
+		self.assertIsNone(result["stats"])
+		self.assertEqual(result["series"], {"labels": [], "avg": [], "min": [], "max": []})

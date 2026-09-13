@@ -39,6 +39,52 @@ _UPCOMING_PER_SECTION = 3
 _UNKNOWN_PUMP = None
 
 
+_FARM_FLAG = "is_irrigation_farm"
+
+
+def farm_flag_exists(fieldname=_FARM_FLAG):
+	"""True when the Farm doctype on THIS site actually carries `fieldname`.
+
+	is_irrigation_farm is shipped by no app in the inventory — on the bench it
+	survives only as an orphan Custom Field with a NULL module. Filtering on it
+	unguarded raises `Unknown column` and kills the whole weekly run before its
+	main loop, which is why www/upande_irrigation.py already wraps the identical
+	query in try/except. The scheduler asks meta instead of catching the error,
+	so the fallback is a decision the run log can state rather than a rescue.
+	"""
+	try:
+		return bool(frappe.get_meta("Farm").get_field(fieldname))
+	except Exception:
+		# Farm itself lives in upande_kaitet and may be absent too.
+		return False
+
+
+def irrigation_farms():
+	"""(farms, explanation) — the farms to plan for, degrading to all farms.
+
+	The explanation is returned rather than logged here so the caller writes it
+	into the run log: a silent fallback would hide a destination quietly
+	planning for every farm on the site.
+	"""
+	if not frappe.db.exists("DocType", "Farm"):
+		return [], "No Farm doctype on this site — nothing to plan."
+
+	if farm_flag_exists():
+		rows = frappe.get_all(
+			"Farm", filters={_FARM_FLAG: 1}, fields=["name"], order_by="name asc"
+		)
+		farms = [f["name"] for f in rows]
+		if farms:
+			return farms, f"Farms ({_FARM_FLAG}=1): {', '.join(farms)}"
+		return [], f"No farms found with {_FARM_FLAG}=1"
+
+	farms = [f["name"] for f in frappe.get_all("Farm", fields=["name"], order_by="name asc")]
+	return farms, (
+		f"Farm.{_FARM_FLAG} is absent on this site — planning for all "
+		f"{len(farms)} farm(s): {', '.join(farms) or 'none'}"
+	)
+
+
 def plan_window(cfg, for_week=None):
 	"""The week being planned.
 
@@ -270,25 +316,10 @@ def run(triggered_by="Manual", for_week=None):
 	log("")
 
 	# ── Resolve farms ───────────────────────────────────────────
-	farms_in_table = []
-	if cfg.get("farms_to_process"):
-		farms_in_table = [r.farm for r in cfg.farms_to_process if r.farm and r.enabled]
-
-	if farms_in_table:
-		farms = farms_in_table
-		log(f"Farms (from config table): {', '.join(farms)}")
-	else:
-		farm_rows = frappe.get_all(
-			"Farm",
-			filters={"is_irrigation_farm": 1},
-			fields=["name"],
-			order_by="name asc",
-		)
-		farms = [f["name"] for f in farm_rows]
-		if farms:
-			log(f"Farms (is_irrigation_farm=1): {', '.join(farms)}")
-		else:
-			log("No farms found with is_irrigation_farm=1")
+	# The `farms_to_process` child table this used to prefer was never a field on
+	# Irrigation Scheduler, so cfg.get() was always None and the branch was dead.
+	farms, how = irrigation_farms()
+	log(how)
 
 	log("")
 

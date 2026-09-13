@@ -13,4 +13,4 @@ upande_irrigation.patches.v1_0.retire_superseded_server_scripts
 upande_irrigation.patches.v1_0.add_engine_fields
 upande_irrigation.patches.v1_0.add_shift_overrides_and_pump_defaults
 upande_irrigation.patches.v1_0.retire_block_type
-
+upande_irrigation.patches.v1_0.ensure_app_roles

@@ -24,12 +24,20 @@ from frappe.tests.utils import FrappeTestCase
 
 from upande_irrigation.migration.pull import insert_preserving
 
+# Carries every field Weather Reading marks reqd. insert_preserving now asserts
+# mandatory presence per record before inserting anything (a blanket
+# ignore_mandatory=True used to let a short export row load silently), so a
+# fixture standing in for an export row has to look like one.
 RECORD = {
 	"name": "TEST-WX-0001",
 	"creation": "2030-01-01 03:04:05.000000",
 	"owner": "Administrator",
 	"farm": "Lokitela",
 	"date": "2030-01-01",
+	"rainfall_mm": 0.0,
+	"pan_cups": 1.0,
+	"minimum_temperature": 10.0,
+	"maximum_temperature": 20.0,
 }
 
 # Deliberately internally-inconsistent derived values: if compute_derived ran,
@@ -175,3 +183,35 @@ class TestInsertPreservingAssumptions(FrappeTestCase):
 			[],
 			"\n".join(failures) if failures else None,
 		)
+
+
+class TestShortExportRowsAreRefused(FrappeTestCase):
+	"""The bug being locked out: ignore_mandatory=True was applied blanket to every
+	record of every doctype, so an export row missing a field the DocType marks
+	reqd would have loaded silently -- against production data. The check now runs
+	over the whole batch before anything is inserted, so a short row stops the load
+	at record zero rather than 5000 rows in.
+	"""
+
+	SHORT = {"name": "TEST-WX-0003", "farm": "Lokitela", "date": "2030-01-03"}
+
+	def tearDown(self):
+		frappe.db.delete("Weather Reading", {"name": self.SHORT["name"]})
+		frappe.db.commit()
+
+	def test_a_missing_required_field_raises_and_names_it(self):
+		with self.assertRaises(frappe.ValidationError) as caught:
+			insert_preserving("Weather Reading", [self.SHORT])
+		self.assertIn("rainfall_mm", str(caught.exception))
+
+	def test_nothing_is_inserted_when_any_record_is_short(self):
+		with self.assertRaises(frappe.ValidationError):
+			insert_preserving("Weather Reading", [RECORD, self.SHORT])
+		self.assertFalse(frappe.db.exists("Weather Reading", RECORD["name"]))
+
+	def test_a_zero_is_a_value_not_a_missing_field(self):
+		"""rainfall_mm is reqd and legitimately 0.0 on a dry day."""
+		insert_preserving("Weather Reading", [RECORD])
+		self.assertTrue(frappe.db.exists("Weather Reading", RECORD["name"]))
+		frappe.db.delete("Weather Reading", {"name": RECORD["name"]})
+		frappe.db.commit()

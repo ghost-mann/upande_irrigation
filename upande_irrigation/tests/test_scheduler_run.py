@@ -28,10 +28,10 @@ class TestPlanWindow(FrappeTestCase):
 
 class TestPumpGroups(FrappeTestCase):
 	def test_groups_are_lists_of_section_prefixes(self):
-		farm = frappe.get_all("Farm", filters={"is_irrigation_farm": 1}, fields=["name"], limit=1)
-		if not farm:
+		farms, _ = S.irrigation_farms()
+		if not farms:
 			self.skipTest("no irrigation farm on this site")
-		groups = S.pump_groups(farm[0]["name"])
+		groups = S.pump_groups(farms[0])
 		self.assertIsInstance(groups, dict)
 		for prefixes in groups.values():
 			self.assertIsInstance(prefixes, list)
@@ -41,10 +41,10 @@ class TestPumpGroups(FrappeTestCase):
 		# The site has zero Irrigation Pump Profile rows, so this is the live path.
 		if frappe.db.count("Irrigation Pump Profile"):
 			self.skipTest("pump profiles exist — grouping is no longer degenerate")
-		farm = frappe.get_all("Farm", filters={"is_irrigation_farm": 1}, fields=["name"], limit=1)
-		if not farm:
+		farms, _ = S.irrigation_farms()
+		if not farms:
 			self.skipTest("no irrigation farm on this site")
-		self.assertEqual(S.pump_groups(farm[0]["name"]), {})
+		self.assertEqual(S.pump_groups(farms[0]), {})
 
 
 class TestByPump(FrappeTestCase):
@@ -64,3 +64,34 @@ class TestByPump(FrappeTestCase):
 		groups = S._by_pump("__nofarm__", created)
 		keys = [m["key"] for _, members in groups for m in members]
 		self.assertEqual(sorted(keys), sorted(c["key"] for c in created))
+
+
+class TestFarmSelectionSurvivesAMissingFlag(FrappeTestCase):
+	"""The bug being locked out: run() filtered Farm on `is_irrigation_farm`, a
+	field shipped by no app in the inventory — on this bench it exists only as
+	an orphan Custom Field with a NULL module, and the fixture that once carried
+	it has been deleted. On the destination the query raises `Unknown column`
+	and the whole weekly run dies before its main loop, while the dashboard
+	(www/upande_irrigation.py) degrades because it wraps the identical query.
+
+	Absence is simulated by driving the meta-guard directly rather than dropping
+	a column from a live table.
+	"""
+
+	def test_the_flag_is_read_from_meta_not_assumed(self):
+		self.assertIsInstance(S.farm_flag_exists(), bool)
+		self.assertFalse(S.farm_flag_exists("a_field_no_farm_ever_had"))
+
+	def test_all_farms_are_planned_when_the_flag_is_absent(self):
+		from unittest import mock
+
+		with mock.patch.object(S, "farm_flag_exists", return_value=False):
+			farms, how = S.irrigation_farms()
+
+		everything = [f["name"] for f in frappe.get_all("Farm", fields=["name"], order_by="name asc")]
+		self.assertEqual(farms, everything)
+		self.assertIn("absent", how)
+
+	def test_the_path_taken_is_stated_not_silent(self):
+		_, how = S.irrigation_farms()
+		self.assertTrue(how.strip(), "farm selection must explain itself in the run log")

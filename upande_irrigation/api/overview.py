@@ -36,7 +36,14 @@ def _week_window():
     try:
         week_start = frappe.db.get_single_value("Irrigation Scheduler", "week_starts_on") or week_start
     except Exception:
-        pass
+        # Never swallow this silently. If the Single is missing or unreadable the
+        # dashboard quietly plans a different week from the scheduler, and an
+        # unlogged fallback is invisible to the Error Log delta assertion in the
+        # migration gate -- the exact blind spot that would hide a wrong week.
+        frappe.log_error(
+            title="Upande Irrigation overview -- week_starts_on unreadable, "
+            f"falling back to {week_start}"
+        )
     start_idx = _DAY_INDEX.get(week_start, 3)
     days_since_start = (today.weekday() - start_idx) % 7
     from_date = frappe.utils.add_days(today, -days_since_start)

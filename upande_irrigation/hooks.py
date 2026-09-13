@@ -83,7 +83,10 @@ app_license = "mit"
 # ------------
 
 # before_install = "upande_irrigation.install.before_install"
-# after_install = "upande_irrigation.install.after_install"
+# The app's DocPerms name Roles that no app in a clean site's inventory
+# creates (ERPNext v16 dropped the Agriculture roles). Without this the
+# DocTypes are unreachable for every non-Administrator -- see install.py.
+after_install = "upande_irrigation.install.after_install"
 
 # Uninstallation
 # ------------

@@ -36,3 +36,19 @@ class TestWorkspaceSidebar(FrappeTestCase):
 		doc = frappe.get_doc("Workspace Sidebar", "Upande Irrigation")
 		targets = {i.link_to for i in doc.items if i.link_type == "Workspace"}
 		self.assertIn("Smart Irrigation", targets)
+
+	def test_every_doctype_link_resolves(self):
+		"""The bug being locked out: a sidebar item pointing at a DocType that is
+		not installed renders as a live link that 404s for every user. This branch
+		already had to clean one such link up, and only the single Workspace-type
+		link was ever asserted.
+		"""
+		doc = frappe.get_doc("Workspace Sidebar", "Upande Irrigation")
+		dangling = [
+			item.link_to
+			for item in doc.items
+			if item.type == "Link"
+			and item.link_type == "DocType"
+			and not frappe.db.exists("DocType", item.link_to)
+		]
+		self.assertEqual(dangling, [], f"sidebar links to missing DocType(s): {dangling}")

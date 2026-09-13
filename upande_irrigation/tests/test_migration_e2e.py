@@ -24,6 +24,8 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from upande_irrigation import shifts
+from upande_irrigation.install import APP_ROLES
+from upande_irrigation.migration import pull
 
 FARM = "Lokitela"
 
@@ -100,3 +102,109 @@ class TestMigratedSiteIsWhole(FrappeTestCase):
 	def test_the_four_sections_each_report_active_shifts(self):
 		for prefix in ("23HA", "56HA", "65HA", "70HA"):
 			self.assertGreater(len(shifts.active_shifts(FARM, prefix)), 0, prefix)
+
+
+class TestNamingCountersCameAcross(FrappeTestCase):
+	"""The bug being locked out: pull.insert_preserving sets flags.name_set and
+	passes set_name, so getseries() is never called and tabSeries is never
+	advanced. frappe.model.naming.getseries() has no existence check — with no
+	counter row it returns 1.
+
+	This bench only survives because it carries tabSeries rows (IRPL-2026- =
+	4098, IRSR-2026- = 85) from its own pre-migration history. On a clean
+	destination the first scheduler run would be named IRSR-2026-00001 and die
+	on a duplicate key, and planner creation would survive 72 records before
+	failing from IRPL-2026-00073 — a week-two failure, which is worse than a
+	week-one failure. pull.reseed_series() closes that, and this is the guard
+	that would have caught it.
+	"""
+
+	SERIES_DOCTYPES = (
+		"Irrigation Planner",
+		"Irrigation Scheduler Run",
+		"Reservoir Pumping Record",
+	)
+
+	def test_every_counter_clears_the_highest_migrated_name(self):
+		for doctype in self.SERIES_DOCTYPES:
+			records = [{"name": n} for n in frappe.get_all(doctype, pluck="name")]
+			targets = pull.series_targets(doctype, records)
+			self.assertTrue(targets, f"{doctype} yielded no series counter to check")
+			for key, highest in targets.items():
+				# order_by="name": tabSeries has no `creation` column, and
+				# get_value's default ORDER BY would raise Unknown column.
+				current = frappe.db.get_value("Series", key, "current", order_by="name")
+				self.assertIsNotNone(
+					current,
+					f"{doctype}: tabSeries has no row for {key!r} — the next "
+					f"record will be numbered 1 and collide with a migrated name",
+				)
+				self.assertGreaterEqual(
+					int(current), highest,
+					f"{doctype}: counter {key!r} is at {current} but names go up "
+					f"to {highest} — the next record collides",
+				)
+
+
+class TestTheSinglesCameAcross(FrappeTestCase):
+	"""The bug being locked out: pull.LOAD_ORDER covered six doctypes and neither
+	Single, so on a clean site Irrigation Settings and Irrigation Scheduler would
+	fall back to the code DocType defaults. This bench passed only because it
+	already held the source's values.
+
+	default_irrigation_coverage is the sharpest of the three: the code default is
+	62.5 and the source is 70, so every planner's required_hours would shift by
+	roughly 12% with nothing raising.
+	"""
+
+	def test_coverage_is_the_source_value_not_the_code_default(self):
+		coverage = frappe.db.get_single_value("Irrigation Settings", "default_irrigation_coverage")
+		self.assertEqual(float(coverage), 70.0)
+		self.assertNotEqual(float(coverage), 62.5, "fell back to the code DocType default")
+
+	def test_the_scheduler_plans_the_week_the_source_planned(self):
+		self.assertEqual(
+			frappe.db.get_single_value("Irrigation Scheduler", "plan_for"), "Next Week"
+		)
+
+	def test_loading_the_singles_never_touches_the_shift_mapping(self):
+		"""shift_blocks holds the 86 mapping rows built by the shift loader; the
+		source's own copy is the pre-migration one and must not overwrite it."""
+		preserve = dict((dt, p) for dt, _f, p in pull.SINGLES)
+		self.assertIn("shift_blocks", preserve["Irrigation Scheduler"])
+
+
+class TestEveryDocTypeIsReachable(FrappeTestCase):
+	"""The bug being locked out: every DocPerm this app ships names a Role that no
+	app in the inventory creates — ERPNext v16 dropped Agriculture Manager and
+	Agriculture User, and Irrigation User was only ever a bare tabRole row on the
+	source. DocPerms import with ignore_links=True, so on a clean site they bind
+	to nothing and Weather Reading becomes a dead sidebar link for all 459 users,
+	System Managers included.
+	"""
+
+	APP_DOCTYPES = (
+		"Tank And Valve", "Weather Reading", "Irrigation Planner",
+		"Reservoir Pumping Record", "Water Transfer", "Irrigation Scheduler Run",
+		"Irrigation Settings", "Irrigation Scheduler", "Irrigation Pump Profile",
+	)
+
+	def test_the_roles_the_app_depends_on_exist(self):
+		missing = [r for r in APP_ROLES if not frappe.db.exists("Role", r)]
+		self.assertEqual(missing, [], f"install.ensure_roles did not create: {missing}")
+
+	def test_every_doctype_has_a_docperm_for_a_role_that_exists(self):
+		orphaned = {}
+		for doctype in self.APP_DOCTYPES:
+			roles = frappe.get_all("DocPerm", filters={"parent": doctype}, pluck="role")
+			roles += frappe.get_all("Custom DocPerm", filters={"parent": doctype}, pluck="role")
+			live = [r for r in roles if r and frappe.db.exists("Role", r)]
+			if not live:
+				orphaned[doctype] = roles
+		self.assertEqual(orphaned, {}, f"no usable DocPerm on: {orphaned}")
+
+	def test_weather_reading_is_reachable_by_a_normal_administrator(self):
+		"""Its only DocPerm was Irrigation User, a role no shipped app creates and
+		no System Manager automatically holds."""
+		roles = frappe.get_all("DocPerm", filters={"parent": "Weather Reading"}, pluck="role")
+		self.assertIn("System Manager", roles)
