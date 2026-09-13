@@ -1327,11 +1327,22 @@ class TestBlockTypeRetired(FrappeTestCase):
 		blanks = frappe.db.count("Irrigation Planner", {"block": ["in", ["", None]]})
 		self.assertEqual(blanks, 0, "planners lost their shift label")
 
-	def test_every_planner_block_names_a_known_shift(self):
-		from upande_irrigation import shifts
+	def test_the_only_orphaned_shift_is_the_one_we_excluded(self):
+		"""23HA - SHIFT 1 is gone, and planners still point at it. That is reported, not repaired.
+
+		Both of that shift's mapping rows named 23HA_SECTION - KL, a group warehouse,
+		so both were excluded and the shift ceased to exist. The planners that
+		referenced it are now orphaned. Asserting the orphan set is EMPTY would fail
+		on correct data; asserting it is exactly this one shift still catches any NEW
+		orphan a later change introduces.
+		"""
 		known = {r.shift for r in frappe.get_single("Irrigation Scheduler").shift_blocks}
-		used = set(frappe.get_all("Irrigation Planner", pluck="block"))
-		self.assertEqual(used - known, set(), "planners reference unknown shifts")
+		used = {b for b in frappe.get_all("Irrigation Planner", pluck="block") if b}
+		self.assertEqual(
+			used - known,
+			{"23HA - SHIFT 1"},
+			"orphaned planner shifts changed — expected only the excluded 23HA - SHIFT 1",
+		)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1951,10 +1962,16 @@ class TestMigratedSiteIsWhole(FrappeTestCase):
 		for dt in ("Block Type", "Block configaration", "Blocks List"):
 			self.assertFalse(frappe.db.exists("DocType", dt))
 
-	def test_every_shift_a_planner_names_is_known(self):
+	def test_the_only_orphaned_shift_is_the_one_we_excluded(self):
+		"""Planners orphaned by the 23HA - SHIFT 1 exclusion are expected, and bounded.
+
+		Both mapping rows for that shift named a group warehouse, so both were
+		excluded and the shift no longer exists. Its planners are orphaned by
+		design — reported, not repaired. Any OTHER orphan is a real regression.
+		"""
 		known = {r.shift for r in frappe.get_single("Irrigation Scheduler").shift_blocks}
-		used = set(frappe.get_all("Irrigation Planner", pluck="block"))
-		self.assertEqual(used - known, set())
+		used = {b for b in frappe.get_all("Irrigation Planner", pluck="block") if b}
+		self.assertEqual(used - known, {"23HA - SHIFT 1"})
 
 	def test_every_shift_block_is_a_real_leaf_warehouse(self):
 		for row in frappe.get_single("Irrigation Scheduler").shift_blocks:
