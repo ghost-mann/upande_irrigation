@@ -33,7 +33,7 @@ def active_shifts(farm, prefix):
 		for r in _rows()
 		if r.is_active and r.farm == farm and (r.shift or "").startswith(wanted)
 	}
-	return sorted(names, key=_shift_number)
+	return sorted(names, key=lambda s: (_shift_number(s), s))
 
 
 def count_active_shifts(farm, prefix):

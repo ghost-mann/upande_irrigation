@@ -20,6 +20,10 @@ ROWS = [
 	 "application_rate_mm_hr": 0, "irrigation_coverage": 0},
 	{"shift": "ZZ - SHIFT 3", "block": None, "farm": FARM, "is_active": 0,
 	 "application_rate_mm_hr": 0, "irrigation_coverage": 0},
+	{"shift": "YY - SHIFT 1", "block": None, "farm": FARM, "is_active": 1,
+	 "application_rate_mm_hr": 0, "irrigation_coverage": 0},
+	{"shift": "YY - SHIFT 01", "block": None, "farm": FARM, "is_active": 1,
+	 "application_rate_mm_hr": 0, "irrigation_coverage": 0},
 ]
 
 
@@ -70,4 +74,16 @@ class TestShiftLookup(FrappeTestCase):
 		self.assertEqual(
 			shifts.shift_overrides("NOPE - SHIFT 1"),
 			{"application_rate_mm_hr": 0.0, "irrigation_coverage": 0.0},
+		)
+
+	def test_shifts_tying_on_shift_number_sort_deterministically(self):
+		"""Bug locked out: names were deduped through a set before sorting, so two
+
+		shifts tying on _shift_number (e.g. a stray leading zero, "SHIFT 01" next to
+		"SHIFT 1") came back in whatever order that process's PYTHONHASHSEED gave the
+		set iteration — a different, silently wrong order on every run, not just a
+		wrong one.
+		"""
+		self.assertEqual(
+			shifts.active_shifts(FARM, "YY"), ["YY - SHIFT 01", "YY - SHIFT 1"]
 		)
