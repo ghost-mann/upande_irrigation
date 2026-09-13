@@ -168,6 +168,19 @@ website_redirects = [
     {"source": "/irrigation-control", "target": "/upande-irrigation#control"},
 ]
 
+# The /apps launcher tile. The logo is copied into this app rather than read from
+# /assets/upande_core/ so the tile does not break on a site that has irrigation
+# without upande_core — the destination has both today, but the app should not
+# depend on that.
+add_to_apps_screen = [
+	{
+		"name": "upande_irrigation",
+		"logo": "/assets/upande_irrigation/images/upande-logo.png",
+		"title": "Upande Irrigation",
+		"route": "/app/smart-irrigation",
+	}
+]
+
 # Scheduled Tasks
 # ---------------
 scheduler_events = {
