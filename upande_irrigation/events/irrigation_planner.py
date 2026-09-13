@@ -61,9 +61,9 @@ def shift_settings(settings, block):
 	if not block:
 		return out
 
-	row = frappe.db.get_value(
-		"Block Type", block, ["application_rate_mm_hr", "irrigation_coverage"], as_dict=True
-	) or {}
+	from upande_irrigation.shifts import shift_overrides
+
+	row = shift_overrides(block)
 
 	rate = float(row.get("application_rate_mm_hr") or 0)
 	coverage = float(row.get("irrigation_coverage") or 0)
@@ -198,7 +198,6 @@ def compute_shift(doc, method=None):
 	# ── Anthracnose index over the same measured week ─────────────
 	doc.z_value, doc.z_risk_level = D.anthracnose(agg)
 
-	doc.active_shift_count = frappe.db.count(
-		"Block Type",
-		{"name": ["like", f"{section_prefix} - SHIFT %"], "is_active": 1, "farm": doc.farm},
-	)
+	from upande_irrigation.shifts import count_active_shifts
+
+	doc.active_shift_count = count_active_shifts(doc.farm, section_prefix)

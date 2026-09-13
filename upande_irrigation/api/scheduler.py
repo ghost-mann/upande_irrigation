@@ -357,14 +357,9 @@ def run(triggered_by="Manual", for_week=None):
 				log_err(f"  Could not derive prefix from {sw['warehouse_name']}")
 				continue
 
-			shifts = frappe.db.sql("""
-				SELECT name
-				FROM `tabBlock Type`
-				WHERE name LIKE %s
-				  AND is_active = 1
-				  AND farm = %s
-				ORDER BY CAST(SUBSTRING_INDEX(name, ' - SHIFT ', -1) AS UNSIGNED) ASC
-			""", (prefix + " - SHIFT %", farm), as_dict=True)
+			from upande_irrigation.shifts import active_shifts
+
+			shifts = [{"name": s} for s in active_shifts(farm, prefix)]
 
 			if not shifts:
 				log(f"  [{prefix}] no active shifts")
