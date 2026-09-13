@@ -12,7 +12,18 @@ import frappe
 
 
 def insert_preserving(doctype, records):
-	"""Insert records keeping name/creation/owner. Returns how many were inserted."""
+	"""Insert records keeping name/creation/owner. Returns how many were inserted.
+
+	doc.flags.ignore_validate suppresses validate and before_save only. It does NOT
+	suppress: before_validate, before_insert, after_insert, on_update, or on_change.
+
+	This function is safe ONLY while none of the six migrated doctypes
+	(Tank And Valve, Weather Reading, Irrigation Planner, Reservoir Pumping Record,
+	Water Transfer, Irrigation Scheduler Run) define or register hooks for those
+	unsuppressed entry points. If a hook is added to any of them, imported values
+	will silently corrupt without warning (as happened to et_pan: 2.5 → 17.2 when
+	validate ran during migration). Add one before making changes to this pattern.
+	"""
 	inserted = 0
 	for record in records:
 		if frappe.db.exists(doctype, record["name"]):

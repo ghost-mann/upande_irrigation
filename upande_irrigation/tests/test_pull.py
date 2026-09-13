@@ -93,3 +93,85 @@ class TestInsertPreservingSkipsHooks(FrappeTestCase):
 		self.assertEqual(float(stored.cumulative_temperature), 666.0)
 		self.assertEqual(float(stored.swd), -555.0)
 		self.assertEqual(float(stored.z_value), 444.0)
+
+
+class TestInsertPreservingAssumptions(FrappeTestCase):
+	"""
+	insert_preserving suppresses only validate and before_save via ignore_validate.
+	It does NOT suppress before_validate, before_insert, after_insert, on_update,
+	or on_change. If any of the six migrated doctypes later gain hooks for those
+	entry points, imported data will silently corrupt (as happened to et_pan when
+	validate ran during migration). This test fails the build if that assumption
+	stops holding, forcing explicit review of insert_preserving before adding such
+	hooks.
+	"""
+
+	MIGRATED_DOCTYPES = (
+		"Tank And Valve",
+		"Weather Reading",
+		"Irrigation Planner",
+		"Reservoir Pumping Record",
+		"Water Transfer",
+		"Irrigation Scheduler Run",
+	)
+
+	UNSUPPRESSED_ENTRY_POINTS = (
+		"before_validate",
+		"before_insert",
+		"after_insert",
+		"on_update",
+		"on_change",
+	)
+
+	def test_no_unsuppressed_hooks_on_migrated_doctypes(self):
+		"""Fail if upande_irrigation registers unsuppressed hooks on migrated doctypes."""
+		doc_events = frappe.get_hooks("doc_events") or {}
+		failures = []
+
+		for doctype in self.MIGRATED_DOCTYPES:
+			hooks = doc_events.get(doctype, {})
+			for entry_point in self.UNSUPPRESSED_ENTRY_POINTS:
+				if entry_point in hooks:
+					# Check only upande_irrigation hooks, not system or other app hooks
+					ui_hooks = [h for h in hooks[entry_point] if "upande_irrigation" in h]
+					if ui_hooks:
+						failures.append(
+							f"{doctype}: upande_irrigation registered '{entry_point}' hook. "
+							f"insert_preserving suppresses only validate/before_save, so this hook "
+							f"will run and silently corrupt imported data. Review insert_preserving and update it "
+							f"before adding this hook."
+						)
+
+		self.assertEqual(
+			failures,
+			[],
+			"\n".join(failures) if failures else None,
+		)
+
+	def test_no_unsuppressed_methods_on_migrated_doctype_controllers(self):
+		"""Fail if any migrated doctype controller defines unsuppressed entry point methods."""
+		failures = []
+
+		for doctype in self.MIGRATED_DOCTYPES:
+			try:
+				controller_class = frappe.get_doc(doctype).get_controller()
+			except (frappe.DoesNotExistError, ImportError):
+				continue
+
+			for entry_point in self.UNSUPPRESSED_ENTRY_POINTS:
+				if hasattr(controller_class, entry_point) and callable(getattr(controller_class, entry_point)):
+					method = getattr(controller_class, entry_point)
+					# Skip inherited methods from Document base class
+					if not method.__qualname__.startswith("Document."):
+						failures.append(
+							f"{doctype}: method '{entry_point}' defined in controller. "
+							f"insert_preserving suppresses only validate/before_save, so this method "
+							f"will run and silently corrupt imported data. Review insert_preserving and update it "
+							f"before adding this method."
+						)
+
+		self.assertEqual(
+			failures,
+			[],
+			"\n".join(failures) if failures else None,
+		)
