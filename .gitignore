@@ -5,3 +5,8 @@
 tags
 node_modules
 __pycache__
+
+# Production data exported from kaitet-group.c.frappe.cloud for the v16 migration
+# (Task 9). Keep the faithful shift_mapping.json record tracked though.
+upande_irrigation/migration/data/*.json
+!upande_irrigation/migration/data/shift_mapping.json
