@@ -651,16 +651,39 @@ class IrrigationPumpProfile(Document):
 
 The site already has it under `Upande Kaitet`; the code definition must take it over rather than collide.
 
-Append to `upande_irrigation/patches/v1_0/adopt_custom_doctypes_as_code.py`, inside `execute()` before `frappe.clear_cache()`:
+This goes in its **own patch file**, not appended to Task 3's. Frappe records every applied patch in `tabPatch Log` and never runs it twice, so Task 3's patch has already executed by now and anything added to it would silently never run.
+
+Create `upande_irrigation/patches/v1_0/adopt_pump_profile.py`:
 
 ```python
-	# Irrigation Pump Profile was created under Upande Kaitet, an app the v16
-	# destination does not have. The engine calls it, so it moves here.
-	if frappe.db.exists("DocType", "Irrigation Pump Profile"):
-		frappe.db.set_value(
-			"DocType", "Irrigation Pump Profile", "module", "Upande Irrigation",
-			update_modified=False,
-		)
+"""Move Irrigation Pump Profile into this app.
+
+It was created under Upande Kaitet, an app the v16 destination does not have,
+while allocate.py, resources.py and irrigation_planner.py all query it. A missing
+DocType raises rather than degrading, so the module moves with the callers.
+
+pre_model_sync, so the reassignment lands before migrate reads the DocTypes and
+syncs the code definition onto the existing table.
+"""
+
+import frappe
+
+DOCTYPE = "Irrigation Pump Profile"
+
+
+def execute():
+	if not frappe.db.exists("DocType", DOCTYPE):
+		return
+
+	frappe.db.set_value("DocType", DOCTYPE, "module", "Upande Irrigation", update_modified=False)
+	frappe.db.set_value("DocType", DOCTYPE, "custom", 0, update_modified=False)
+	frappe.clear_cache()
+```
+
+Register it under `[pre_model_sync]` in `upande_irrigation/patches.txt`, on the line after Task 3's patch:
+
+```
+upande_irrigation.patches.v1_0.adopt_pump_profile
 ```
 
 Then:
@@ -1548,7 +1571,33 @@ Singles are exported separately as one dict each. When loading
 `Irrigation Scheduler`, **do not overwrite `shift_blocks`** — Task 7 populated it,
 and the source site has no such field.
 
-- [ ] **Step 6: Load and reconcile counts**
+- [ ] **Step 6: Clear the bench's divergent irrigation data**
+
+`kaitet.local` holds data that matches neither the source nor a clean site — 1,650 planners against the source's 1,346, 5,394 weather readings against 5,431, zero water transfers against 279, 35 scheduler runs against 32. The extra records are local test-run debris. `insert_preserving` skips names that already exist, so loading on top would produce a blend belonging to no real site, and the count assertions in this task and Task 12 would be meaningless.
+
+upande.com is a clean install, so the dry-run starts clean too.
+
+**This is destructive and has been explicitly approved.** The backup at `/home/austin/frappe-v16-bench/pre-v16-migration-irrigation.sql.gz` covers exactly these tables.
+
+```bash
+cd /home/austin/frappe-v16-bench
+bench --site kaitet.local mariadb -e "
+  DELETE FROM \`tabIrrigation Scheduler Run Shift\`;
+  DELETE FROM \`tabIrrigation Scheduler Run\`;
+  DELETE FROM \`tabIrrometer Reading\`;
+  DELETE FROM \`tabIrrigation Planner\`;
+  DELETE FROM \`tabWeather Reading\`;
+  DELETE FROM \`tabWater Transfer\`;
+  DELETE FROM \`tabReservoir Pumping Record\`;
+  DELETE FROM \`tabTank And Valve\`;"
+bench --site kaitet.local mariadb -e "
+  SELECT 'planner' k, COUNT(*) n FROM \`tabIrrigation Planner\`
+  UNION SELECT 'weather', COUNT(*) FROM \`tabWeather Reading\`;"
+```
+
+Expected: both counts `0`. Child tables are deleted before their parents so no orphan rows survive. **Do not** delete `Irrigation Scheduler` or `Irrigation Settings` — they are Singles, and `Irrigation Scheduler` holds the `shift_blocks` rows Task 7 loaded.
+
+- [ ] **Step 7: Load and reconcile counts**
 
 ```bash
 cd /home/austin/frappe-v16-bench
@@ -1750,10 +1799,12 @@ add_to_apps_screen = [
 		"name": "upande_irrigation",
 		"logo": "/assets/upande_irrigation/images/upande-logo.png",
 		"title": "Upande Irrigation",
-		"route": "/app/upande-irrigation",
+		"route": "/app/smart-irrigation",
 	}
 ]
 ```
+
+The route is `/app/smart-irrigation`, not `/app/upande-irrigation`: the workspace this app ships is named **Smart Irrigation**, and `/upande-irrigation` (no `/app`) is the www dashboard, which the sidebar already pins at the bottom. A tile pointing at a route with no workspace behind it renders an empty desk page.
 
 - [ ] **Step 5: Write the sidebar**
 
