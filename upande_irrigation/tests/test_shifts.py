@@ -5,6 +5,9 @@ so SHIFT 10 sorted after SHIFT 9, not between SHIFT 1 and SHIFT 2. A naive strin
 sort over the new table silently reorders every section's irrigation.
 """
 
+import io
+import unittest
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
@@ -99,63 +102,56 @@ class TestShiftLookup(FrappeTestCase):
 
 
 class TestShiftBlocksSnapshotRestore(FrappeTestCase):
-	"""Regression for the bug in this file's own fixture (TestShiftLookup's
-	setUpClass/tearDownClass above): snapshotting shift_blocks rows with plain
-	row.as_dict() keeps `name`. setUpClass swaps in a throwaway fixture and commits —
-	really deleting the original rows — then tearDownClass restores the snapshot and
-	commits again. Because each restored row still carries its old `name`, Frappe
-	treats it as an update to a row that commit already deleted, so the "restore"
-	silently writes nothing back and the table nets to zero.
+	"""Regression for the bug in TestShiftLookup's own setUpClass/tearDownClass,
+	above: snapshotting shift_blocks rows with plain row.as_dict() keeps `name`.
+	setUpClass swaps in the ZZ/YY fixture and commits — really deleting the original
+	rows — then tearDownClass restores the snapshot and commits again. Because each
+	restored row still carried its old `name`, Frappe treated it as an update to a
+	row that commit already deleted, so the "restore" silently wrote nothing back
+	and the table netted to zero.
 
-	This only reproduces with the same two-commit shape the real fixture uses: a
-	committed swap, then a committed restore from a *separate* frappe.get_single()
-	instance. A single uncommitted clear-and-reappend on one instance does not
-	reproduce it — Frappe reconciles that correctly since nothing was actually
-	deleted yet.
+	This drives TestShiftLookup's actual setUpClass/tearDownClass through the same
+	unittest.TestLoader + runner machinery frappe's own test discovery uses — not a
+	reimplementation of the snapshot/restore — so a regression in that class's own
+	ROW_META_KEYS strip fails this test. A version of this test that instead
+	rebuilt the snapshot/restore logic itself passed even when the strip was
+	reverted, because it wasn't exercising the code that broke; this one does.
 
-	The `finally` block re-restores for real (with ROW_META_KEYS stripped, which is
-	the actual fix) if the count comes out wrong, so a failure here still leaves the
-	site's shift_blocks table intact rather than wiped.
+	The `finally` block restores from an independently-taken, correctly stripped
+	snapshot if the count comes out wrong, so a failure here still leaves the site's
+	shift_blocks table intact rather than wiped.
 	"""
 
-	def test_a_committed_swap_and_restore_preserves_the_row_count(self):
+	def test_running_test_shift_lookup_preserves_the_row_count(self):
 		sched = frappe.get_single("Irrigation Scheduler")
 		before = len(sched.shift_blocks)
 		self.assertGreater(before, 0, "need at least one real shift_blocks row to prove this")
 
-		# This is the fixed (stripped) form. The `finally` block below also relies on
-		# it to guarantee real data survives this test regardless of outcome.
-		snapshot = [
+		# Independent of whatever TestShiftLookup does below -- this is only the
+		# `finally` block's safety net, never the thing under test.
+		safety_snapshot = [
 			{k: v for k, v in row.as_dict().items() if k not in ROW_META_KEYS}
 			for row in sched.shift_blocks
 		]
-		wh = frappe.get_all("Warehouse", filters={"is_group": 0}, pluck="name", limit=1)
-		if not wh:
-			self.skipTest("no leaf warehouse on this site to swap in")
 
 		try:
-			sched.set("shift_blocks", [])
-			sched.append(
-				"shift_blocks",
-				{"shift": "TEST SWAP - SHIFT 1", "block": wh[0], "farm": "Lokitela", "is_active": 1},
+			suite = unittest.TestLoader().loadTestsFromTestCase(TestShiftLookup)
+			result = unittest.TextTestRunner(stream=io.StringIO(), verbosity=0).run(suite)
+			self.assertTrue(
+				result.wasSuccessful(),
+				f"TestShiftLookup itself must pass: "
+				f"{[str(e) for e in result.errors + result.failures]}",
 			)
-			sched.save(ignore_permissions=True)
-			frappe.db.commit()
-
-			restore = frappe.get_single("Irrigation Scheduler")
-			restore.set("shift_blocks", [])
-			for row in snapshot:
-				restore.append("shift_blocks", row)
-			restore.save(ignore_permissions=True)
-			frappe.db.commit()
 
 			after = len(frappe.get_single("Irrigation Scheduler").shift_blocks)
-			self.assertEqual(after, before, "snapshot/restore cycle must not lose rows")
+			self.assertEqual(
+				after, before, "TestShiftLookup's setUpClass/tearDownClass must not lose rows"
+			)
 		finally:
 			final = frappe.get_single("Irrigation Scheduler")
 			if len(final.shift_blocks) != before:
 				final.set("shift_blocks", [])
-				for row in snapshot:
+				for row in safety_snapshot:
 					final.append("shift_blocks", row)
 				final.save(ignore_permissions=True)
 				frappe.db.commit()
