@@ -54,27 +54,51 @@ class TestShiftSettings(FrappeTestCase):
 		self.assertEqual(H.shift_settings(self.BASE, None), self.BASE)
 
 	def test_a_shift_with_no_overrides_inherits(self):
-		block = frappe.db.get_value("Block Type", {"is_active": 1}, "name")
+		from upande_irrigation import shifts
+		names = shifts.active_shifts("Lokitela", "70HA")
+		block = names[0] if names else None
 		if not block:
-			self.skipTest("no active Block Type on this site")
-		frappe.db.set_value(
-			"Block Type", block,
-			{"application_rate_mm_hr": 0, "irrigation_coverage": 0},
-			update_modified=False,
+			self.skipTest("no active shifts on this site")
+
+		# First prove the override is actually used, with a value distinct from the
+		# farm default — only then clear it and check the farm default comes back.
+		# The two figures below must differ, or a fallback to zero and a fallback to
+		# the farm default would be indistinguishable.
+		sched = frappe.get_single("Irrigation Scheduler")
+		for row in sched.shift_blocks:
+			if row.shift == block:
+				row.application_rate_mm_hr = 5.5
+				row.irrigation_coverage = 60.0
+		sched.save(ignore_permissions=True)
+		overridden = H.shift_settings(self.BASE, block)
+		self.assertAlmostEqual(overridden["default_application_rate_mm_hr"], 5.5)
+		self.assertAlmostEqual(overridden["default_irrigation_coverage"], 60.0)
+		self.assertNotAlmostEqual(
+			overridden["default_application_rate_mm_hr"], self.BASE["default_application_rate_mm_hr"]
 		)
+
+		sched.reload()
+		for row in sched.shift_blocks:
+			if row.shift == block:
+				row.application_rate_mm_hr = 0
+				row.irrigation_coverage = 0
+		sched.save(ignore_permissions=True)
 		out = H.shift_settings(self.BASE, block)
 		self.assertAlmostEqual(out["default_application_rate_mm_hr"], 2.8)
 		self.assertAlmostEqual(out["default_irrigation_coverage"], 70.0)
 
 	def test_a_shift_override_reaches_the_calculation(self):
-		block = frappe.db.get_value("Block Type", {"is_active": 1}, "name")
+		from upande_irrigation import shifts
+		names = shifts.active_shifts("Lokitela", "70HA")
+		block = names[0] if names else None
 		if not block:
-			self.skipTest("no active Block Type on this site")
-		frappe.db.set_value(
-			"Block Type", block,
-			{"application_rate_mm_hr": 4.0, "irrigation_coverage": 90.0},
-			update_modified=False,
-		)
+			self.skipTest("no active shifts on this site")
+		sched = frappe.get_single("Irrigation Scheduler")
+		for row in sched.shift_blocks:
+			if row.shift == block:
+				row.application_rate_mm_hr = 4.0
+				row.irrigation_coverage = 90.0
+		sched.save(ignore_permissions=True)
 		out = H.shift_settings(self.BASE, block)
 		self.assertAlmostEqual(out["default_application_rate_mm_hr"], 4.0)
 		self.assertAlmostEqual(out["default_irrigation_coverage"], 90.0)

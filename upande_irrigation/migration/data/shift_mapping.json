@@ -1,0 +1,714 @@
+[
+ {
+  "shift": "56HA - SHIFT 1",
+  "block": "MIMA BLK 9 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 2",
+  "block": "MIMA BLK 10 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 3",
+  "block": "MIMA BLK 11 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 3",
+  "block": "MIMA BLK 12 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 4",
+  "block": "MIMA BLK 13 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 4",
+  "block": "MIMA BLK 14 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 4",
+  "block": "MIMA BLK 15 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 5",
+  "block": "DAIRY BLK 5 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 5",
+  "block": "DAIRY BLK 9 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 6",
+  "block": "DAIRY BLK 6 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 6",
+  "block": "DAIRY BLK 7 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 6",
+  "block": "DAIRY BLK 8 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 7",
+  "block": "AIRSTRIP BLK 10 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 8",
+  "block": "AIRSTRIP BLK 8 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 8",
+  "block": "AIRSTRIP BLK 11 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 9",
+  "block": "AIRSTRIP BLK 8 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 9",
+  "block": "AIRSTRIP BLK 9 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 10",
+  "block": "AIRSTRIP BLK 5 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 10",
+  "block": "AIRSTRIP BLK 6 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 11",
+  "block": "AIRSTRIP BLK 7 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 12",
+  "block": "AIRSTRIP BLK 1 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 13",
+  "block": "AIRSTRIP BLK 2 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 14",
+  "block": "AIRSTRIP BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "56HA - SHIFT 15",
+  "block": "AIRSTRIP BLK 4 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 1",
+  "block": "MUHAMMED BLK 1 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 1",
+  "block": "MUHAMMED BLK 2 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 2",
+  "block": "MUHAMMED BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 0,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 3",
+  "block": "MUHAMMED BLK 4 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 3",
+  "block": "MUHAMMED BLK 5 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 4",
+  "block": "MLIMA BLK 1 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 5",
+  "block": "MLIMA BLK 2 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 6",
+  "block": "MLIMA BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 7",
+  "block": "DAIRY BLK 7 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 7",
+  "block": "DAIRY BLK 4 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 8",
+  "block": "DAIRY BLK 2 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 9",
+  "block": "DAIRY BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 10",
+  "block": "MIMA BLK 1 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 10",
+  "block": "MIMA BLK 6 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 11",
+  "block": "MIMA BLK 2 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 12",
+  "block": "MIMA BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 12",
+  "block": "MIMA BLK 6 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 13",
+  "block": "MIMA BLK 4 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 14",
+  "block": "MIMA BLK 5 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 15",
+  "block": "MIMA BLK 7 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "65HA - SHIFT 15",
+  "block": "MIMA BLK 8 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 1",
+  "block": "KINYORO BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 1",
+  "block": "KINYORO BLK 4 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 2",
+  "block": "KINYORO BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 2",
+  "block": "KINYORO BLK 4 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 3",
+  "block": "KINYORO BLK 2 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 3",
+  "block": "WESA BLK 8 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 4",
+  "block": "KINYORO BLK 1 - KL",
+  "farm": "Lokitela",
+  "is_active": 0,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 4",
+  "block": "WESA BLK 8 - KL",
+  "farm": "Lokitela",
+  "is_active": 0,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 5",
+  "block": "KINYORO BLK 1 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 5",
+  "block": "WESA BLK 7 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 6",
+  "block": "WESA BLK 6 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 7",
+  "block": "WESA BLK 5 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 8",
+  "block": "WESA BLK 4 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 9",
+  "block": "WESA BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 10",
+  "block": "WESA BLK 11 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 10",
+  "block": "WESA BLK 10 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 11",
+  "block": "WESA BLK 11 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 11",
+  "block": "WESA BLK 10 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 12",
+  "block": "WESA BLK 2 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 13",
+  "block": "WESA BLK 9 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 14",
+  "block": "WESA BLK 1 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 14",
+  "block": "BONDENI BLK 1 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 15",
+  "block": "BONDENI BLK 2 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 15",
+  "block": "BONDENI BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 16",
+  "block": "BONDENI BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 16",
+  "block": "BONDENI BLK 4 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 17",
+  "block": "BONDENI BLK 5 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 18",
+  "block": "BONDENI BLK 6 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 19",
+  "block": "BONDENI BLK 7 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 19",
+  "block": "BONDENI BLK 8 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 20",
+  "block": "BONDENI BLK 7 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "70HA - SHIFT 20",
+  "block": "BONDENI BLK 8 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 1",
+  "block": "23HA_SECTION - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 1",
+  "block": "23HA_SECTION - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 2",
+  "block": "23HA_SECTION - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 2",
+  "block": "BLOCK BLK 9 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 3",
+  "block": "BLOCK BLK 3 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 4",
+  "block": "BLOCK BLK 4 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 4",
+  "block": "BLOCK BLK 5 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 5",
+  "block": "BLOCK BLK 6 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 6",
+  "block": "BLOCK BLK 7 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 6",
+  "block": "BLOCK BLK 12 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 7",
+  "block": "BLOCK BLK 10 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ },
+ {
+  "shift": "23HA - SHIFT 7",
+  "block": "BLOCK BLK 11 - KL",
+  "farm": "Lokitela",
+  "is_active": 1,
+  "application_rate_mm_hr": 0,
+  "irrigation_coverage": 0
+ }
+]

@@ -25,9 +25,9 @@ class TestPlannerOverAMeasuredWeek(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		cls.block = frappe.db.get_value(
-			"Block Type", {"farm": FARM, "is_active": 1, "name": ["like", "% - SHIFT %"]}, "name"
-		)
+		from upande_irrigation import shifts
+		names = shifts.active_shifts(FARM, "70HA")
+		cls.block = names[0] if names else None
 		cls.readings = frappe.db.count(
 			"Weather Reading", {"farm": FARM, "date": ["between", [MEASURED_FROM, MEASURED_TO]]}
 		)
