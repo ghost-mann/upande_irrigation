@@ -144,6 +144,9 @@ doc_events = {
 	"Weather Reading": {
 		"before_save": "upande_irrigation.events.weather_reading.compute_derived",
 	},
+	"Irrigation Scheduler": {
+		"validate": "upande_irrigation.upande_irrigation.doctype.irrigation_shift_block.irrigation_shift_block.validate_shift_blocks",
+	},
 }
 
 # Client-side form scripts (DB Client Scripts moved into app source)
