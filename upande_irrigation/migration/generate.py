@@ -30,8 +30,15 @@ def write_doctype(effective, module_path):
 
 	open(os.path.join(path, "__init__.py"), "a").close()
 
-	klass = effective["name"].replace(" ", "").replace("-", "")
-	with open(os.path.join(path, f"{folder}.py"), "w") as fh:
-		fh.write(CONTROLLER.format(name=effective["name"], klass=klass))
+	# The JSON is regenerated every time -- that's the point of this task. The
+	# controller is not: an existing controller.py may carry hand-written
+	# validate()/hooks logic (e.g. Tank And Valve's manual_state stamping), and
+	# overwriting it would silently delete live business logic. Only write the
+	# stub when no controller exists yet.
+	controller_path = os.path.join(path, f"{folder}.py")
+	if not os.path.exists(controller_path):
+		klass = effective["name"].replace(" ", "").replace("-", "")
+		with open(controller_path, "w") as fh:
+			fh.write(CONTROLLER.format(name=effective["name"], klass=klass))
 
 	return path
