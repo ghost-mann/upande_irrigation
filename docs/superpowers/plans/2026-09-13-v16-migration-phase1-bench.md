@@ -1408,10 +1408,29 @@ Expected: no errors; the patch runs once.
 Run: `bench --site kaitet.local run-tests --module upande_irrigation.tests.test_retire_block_type`
 Expected: PASS, 4 tests
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: Delete the two dead fixture files**
+
+Task 3 established that `frappe.utils.fixtures.import_fixtures` reads the fixtures **directory**, not the `fixtures` list in `hooks.py` — that hook governs only export. So any `.json` left in `upande_irrigation/fixtures/` is re-imported on every single migrate, and a stale one will overwrite the code definition it duplicates.
+
+After this task, both remaining files are dead weight:
+
+- `custom_field.json` holds only `Block Type` entries, and `Block Type` no longer exists.
+- `doctype.json` holds only `Tank And Valve`, which has been a code DocType since Task 2. Leaving it means every migrate re-imports a fixture copy over the code definition — harmless while the two agree, a silent revert the first time someone edits the code JSON.
 
 ```bash
-git add upande_irrigation/upande_irrigation/doctype/irrigation_planner/ upande_irrigation/patches/ upande_irrigation/patches.txt upande_irrigation/tests/test_retire_block_type.py
+git rm upande_irrigation/fixtures/doctype.json upande_irrigation/fixtures/custom_field.json
+cd /home/austin/frappe-v16-bench && bench --site kaitet.local migrate 2>&1 | tail -15
+bench --site kaitet.local mariadb -e "
+  SELECT name, custom FROM \`tabDocType\` WHERE module='Upande Irrigation' ORDER BY name;
+  SELECT COUNT(*) AS tank_and_valve FROM \`tabTank And Valve\`;"
+```
+
+Expected: migrate clean, every DocType still `custom = 0`, `Tank And Valve` still 58 rows. `property_setter.json` and `custom_html_block.json` stay — they carry the Pump Profile defaults and the dashboard block, neither of which is a DocType definition.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add -A upande_irrigation/upande_irrigation/doctype/irrigation_planner/ upande_irrigation/patches/ upande_irrigation/patches.txt upande_irrigation/tests/test_retire_block_type.py upande_irrigation/fixtures/
 git commit -m "feat(migration): retire Block Type, planner.block becomes Data"
 ```
 
