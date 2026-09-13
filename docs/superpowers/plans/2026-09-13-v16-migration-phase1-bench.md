@@ -306,7 +306,7 @@ for dt in doctypes:
 PY
 ```
 
-Expected: 10 folders written (the 9 custom ones plus `tank_and_valve`, which is regenerated from the same source so the two agree). `Irrigation Planner` should report **39** fields — 16 from the DocType plus 23 Custom Fields.
+Expected: 10 folders written (the 9 custom ones plus `tank_and_valve`, which is regenerated from the same source so the two agree). `Irrigation Planner` should report **43** fields — 20 DocFields (4 of them layout breaks) plus 23 Custom Fields; `Irrigation Settings` **41** (31 + 10).
 
 - [ ] **Step 6: Reconcile the two disagreeing DocTypes**
 
