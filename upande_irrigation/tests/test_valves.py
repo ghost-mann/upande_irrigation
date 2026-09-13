@@ -37,6 +37,23 @@ class TestListStates(FrappeTestCase):
 		for v in out["valves"]:
 			self.assertEqual(v["farm"], "Lokitela")
 
+	def test_the_shift_join_actually_resolved_rows(self):
+		"""A join that returns no rows looks identical to "nothing is scheduled
+		right now": every valve still falls through to schedule_state="OFF"
+		with null schedule fields, and the shape assertions above cannot tell
+		the two apart. sb.shift swapped for sb.block, a misspelled column, or
+		a parenttype/parentfield constraint that excludes everything would
+		all leave list_states() looking healthy while reporting nothing.
+
+		Assert the join is not empty: on current site data every valve has a
+		next_scheduled_at, so at least one non-null value proves rows matched.
+		"""
+		out = list_states()
+		self.assertTrue(
+			any(v["next_scheduled_at"] or v["schedule_state"] == "ON" for v in out["valves"]),
+			"no valve has a next_scheduled_at or is ON — the shift join returned no rows",
+		)
+
 
 class TestGeojson(FrappeTestCase):
 	def test_it_does_not_raise_and_returns_a_feature_collection(self):
