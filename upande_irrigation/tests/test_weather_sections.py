@@ -10,7 +10,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from upande_irrigation.api import weather
-from upande_irrigation.tests.helpers import make_farm, make_warehouse
+from upande_irrigation.tests.helpers import NoCommit, make_farm, make_warehouse
 
 FARM = "_Test Sections Farm"
 
@@ -24,7 +24,7 @@ def _shift_row(shift, block, farm, active=1, rate=None, coverage=None):
 	}).db_insert()
 
 
-class TestSections(FrappeTestCase):
+class TestSections(NoCommit, FrappeTestCase):
 	def setUp(self):
 		make_farm(FARM)
 		self.section = make_warehouse("_Test Sec 10HA", is_group=1, farm=FARM)

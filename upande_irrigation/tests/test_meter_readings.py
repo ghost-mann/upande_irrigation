@@ -10,7 +10,7 @@ form's formula does not, and silently recomputing them would change history).
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from upande_irrigation.tests.helpers import make_warehouse
+from upande_irrigation.tests.helpers import NoCommit, make_warehouse
 
 SECTION_A = "_Test Meter Section A"
 SECTION_B = "_Test Meter Section B"
@@ -20,7 +20,7 @@ def _section(name):
 	return make_warehouse(name, is_group=1)
 
 
-class TestMeterReadings(FrappeTestCase):
+class TestMeterReadings(NoCommit, FrappeTestCase):
 	def setUp(self):
 		frappe.db.delete("Electricity Meter Reading")
 		frappe.db.delete("Water Meter Reading")

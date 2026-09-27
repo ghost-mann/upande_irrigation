@@ -15,7 +15,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from upande_irrigation.api import valves as api
-from upande_irrigation.tests.helpers import make_farm, make_warehouse
+from upande_irrigation.tests.helpers import NoCommit, make_farm, make_warehouse
 
 FARM_A = "_Test Valve Farm A"
 FARM_B = "_Test Valve Farm B"
@@ -33,7 +33,7 @@ def _valve(label, farm, block=None):
 	}).insert(ignore_permissions=True).name
 
 
-class TestSetOverrideBulk(FrappeTestCase):
+class TestSetOverrideBulk(NoCommit, FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
@@ -95,7 +95,7 @@ class TestSetOverrideBulk(FrappeTestCase):
 		self.assertEqual(self.state(self.a1), "Auto")
 
 
-class TestGeometryIsFarmScoped(FrappeTestCase):
+class TestGeometryIsFarmScoped(NoCommit, FrappeTestCase):
 	def test_valve_geojson_honours_farm(self):
 		make_farm(FARM_A)
 		_valve("_TV A1", FARM_A)
