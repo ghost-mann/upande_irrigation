@@ -24,7 +24,7 @@
  */
 
 import { pagehead, kpi, statusStrip, icon } from "./shell.js";
-import { BASEMAPS, MAP_MAX_ZOOM, basemapStyle, bounds, loadLibs, setBasemap as applyBasemap } from "./maplib.js";
+import { BASEMAPS, MAP_MAX_ZOOM, addBlockOutlines, basemapStyle, bounds, loadLibs, setBasemap as applyBasemap } from "./maplib.js";
 
 /* Block names appear once the blocks are big enough on screen to carry them. */
 const LABEL_MIN_ZOOM = 15.5;
@@ -44,7 +44,6 @@ function hashParam(key) {
 }
 
 const BLOCK_FILL = "#c25a2e";
-const BLOCK_LINE = "#7c2f16";
 const WHEEL_CLOSED = 0xd9962e;
 const WHEEL_OPEN = 0x3f8f4f;
 
@@ -535,6 +534,7 @@ ${pagehead(
 		const el = this.el.querySelector("#map-block-card");
 		if (!el || !block) return;
 		const token = (this.cardToken = (this.cardToken || 0) + 1);
+		if (this.outlines) this.outlines.select(block);
 		el.hidden = false;
 		el.innerHTML = '<div class="irm__meta">Loading block…</div>';
 		let info;
@@ -622,6 +622,7 @@ ${section(
 		if (close) {
 			close.addEventListener("click", () => {
 				el.hidden = true;
+				if (this.outlines) this.outlines.select("");
 				this.cardToken = (this.cardToken || 0) + 1;
 			});
 		}
@@ -631,17 +632,9 @@ ${section(
 		const { charts } = this.ctx;
 		if (map.getSource("irr-blocks")) return;
 		map.addSource("irr-blocks", { type: "geojson", data: fc });
-		map.addLayer({
-			id: "irr-blocks-fill",
-			type: "fill",
-			source: "irr-blocks",
-			paint: { "fill-color": BLOCK_FILL, "fill-opacity": 0.16 },
-		});
-		map.addLayer({
-			id: "irr-blocks-line",
-			type: "line",
-			source: "irr-blocks",
-			paint: { "line-color": BLOCK_LINE, "line-width": 1.4, "line-opacity": 0.85 },
+		this.outlines = addBlockOutlines(map, "irr-blocks", "irr-blocks", {
+			"fill-color": BLOCK_FILL,
+			"fill-opacity": 0.14,
 		});
 		/* No glyph server, so labels are HTML markers at each block's centre. */
 		this.labelMarkers = (fc.features || []).map((f) => {
@@ -661,12 +654,6 @@ ${section(
 		};
 		map.on("zoom", showLabels);
 		showLabels();
-		map.on("mouseenter", "irr-blocks-fill", () => {
-			map.getCanvas().style.cursor = "pointer";
-		});
-		map.on("mouseleave", "irr-blocks-fill", () => {
-			map.getCanvas().style.cursor = "";
-		});
 	},
 
 	/* Project each valve to screen space and take the closest within maxPx.

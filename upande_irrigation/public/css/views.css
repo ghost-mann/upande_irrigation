@@ -1608,3 +1608,25 @@
 .bc__valve:hover {
 	border-color: var(--ink);
 }
+
+.irm__farms {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.irm__farms button {
+	border: 1px solid var(--hairline);
+	background: var(--surface-2);
+	border-radius: 999px;
+	padding: 5px 11px;
+	font: 500 12px var(--sans);
+	color: var(--ink-4);
+	cursor: pointer;
+}
+
+.irm__farms button.on {
+	background: var(--ink);
+	border-color: var(--ink);
+	color: #fafaf6;
+}

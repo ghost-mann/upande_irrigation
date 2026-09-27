@@ -146,3 +146,73 @@ export function whenLoaded(map, ms = 15000) {
 		setTimeout(() => done(false), ms);
 	});
 }
+
+/* Block outlines that read on any imagery: a light line over a dark casing
+ * (the Upande map standard), widening with zoom, plus a hover and a selected
+ * outline. `fillPaint` is the caller's fill (the Field Map's flat clay, the
+ * irrometer map's tension colours). Returns select(block) / hover(block). */
+const W = (a, b) => ["interpolate", ["linear"], ["zoom"], 12, a, 15, (a + b) / 2, 18, b];
+
+export function addBlockOutlines(map, source, prefix, fillPaint) {
+	const none = ["==", ["get", "block"], ""];
+	map.addLayer({ id: `${prefix}-fill`, type: "fill", source, paint: fillPaint });
+	map.addLayer({
+		id: `${prefix}-hover`,
+		type: "fill",
+		source,
+		filter: none,
+		paint: { "fill-color": "#fafaf6", "fill-opacity": 0.22 },
+	});
+	map.addLayer({
+		id: `${prefix}-casing`,
+		type: "line",
+		source,
+		layout: { "line-join": "round" },
+		paint: { "line-color": "#0a0a0a", "line-opacity": 0.55, "line-width": W(2.6, 6) },
+	});
+	map.addLayer({
+		id: `${prefix}-line`,
+		type: "line",
+		source,
+		layout: { "line-join": "round" },
+		paint: { "line-color": "#fdf8ef", "line-width": W(1.1, 2.6) },
+	});
+	map.addLayer({
+		id: `${prefix}-sel-casing`,
+		type: "line",
+		source,
+		filter: none,
+		layout: { "line-join": "round" },
+		paint: { "line-color": "#0a0a0a", "line-opacity": 0.7, "line-width": W(6, 10) },
+	});
+	map.addLayer({
+		id: `${prefix}-sel`,
+		type: "line",
+		source,
+		filter: none,
+		layout: { "line-join": "round" },
+		paint: { "line-color": "#f4b400", "line-width": W(3, 5) },
+	});
+
+	let hovered = "";
+	map.on("mousemove", `${prefix}-fill`, (e) => {
+		const b = (e.features && e.features[0] && e.features[0].properties.block) || "";
+		if (b === hovered) return;
+		hovered = b;
+		map.setFilter(`${prefix}-hover`, ["==", ["get", "block"], b]);
+		map.getCanvas().style.cursor = b ? "pointer" : "";
+	});
+	map.on("mouseleave", `${prefix}-fill`, () => {
+		hovered = "";
+		map.setFilter(`${prefix}-hover`, none);
+		map.getCanvas().style.cursor = "";
+	});
+
+	return {
+		select(block) {
+			const f = ["==", ["get", "block"], block || ""];
+			map.setFilter(`${prefix}-sel-casing`, f);
+			map.setFilter(`${prefix}-sel`, f);
+		},
+	};
+}

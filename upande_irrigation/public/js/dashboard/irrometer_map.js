@@ -16,7 +16,7 @@
  * device position. Exact device pins come later, once devices have GPS points.
  */
 
-import { basemapStyle, basemapToggle, bounds, loadMapLibre, MAP_MAX_ZOOM, setBasemap, whenLoaded } from "./maplib.js";
+import { addBlockOutlines, basemapStyle, basemapToggle, bounds, loadMapLibre, MAP_MAX_ZOOM, setBasemap, whenLoaded } from "./maplib.js";
 
 /* MapLibre paint needs real colours, not CSS variables: the tension bands'. */
 const BAND = {
@@ -49,6 +49,7 @@ export function irrometerMap(host, ctx, { tension, shortSection }) {
 			<button class="btn ghost small" type="button" id="${id}-all">All dates</button>
 		</div>
 		<span class="meta" id="${id}-count"></span>
+		<div class="irm__farms" id="${id}-farms" role="group" aria-label="Jump to farm"></div>
 		${basemapToggle(`${id}-base`, state.basemap)}
 	</div>
 	<div class="irm__wrap">
@@ -160,6 +161,7 @@ export function irrometerMap(host, ctx, { tension, shortSection }) {
 		}
 		const p = f.properties;
 		state.openBlock = block;
+		if (state.outlines) state.outlines.select(block);
 		const r = state.readings.get(block);
 		const hist = ((r && r.irrometer_history) || []).filter((h) => h.ft1 != null || h.ft2 != null);
 		const t1 = tension(r ? r.irrometer_1ft : null);
@@ -195,6 +197,7 @@ ${hist
 		el.hidden = false;
 		el.querySelector(".irm__close").addEventListener("click", () => {
 			el.hidden = true;
+			if (state.outlines) state.outlines.select("");
 		});
 	}
 
@@ -265,39 +268,42 @@ ${hist
 		}
 		setBasemap(map, state.basemap);
 		map.addSource("irm-blocks", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-		map.addLayer({
-			id: "irm-fill",
-			type: "fill",
-			source: "irm-blocks",
-			paint: { "fill-color": ["get", "color"], "fill-opacity": 0.42 },
-		});
-		map.addLayer({
-			id: "irm-line",
-			type: "line",
-			source: "irm-blocks",
-			paint: { "line-color": "#fafaf6", "line-width": 1.2, "line-opacity": 0.9 },
+		state.outlines = addBlockOutlines(map, "irm-blocks", "irm", {
+			"fill-color": ["get", "color"],
+			"fill-opacity": 0.5,
 		});
 		map.on("click", "irm-fill", (e) => {
 			const f = e.features && e.features[0];
 			if (f) focus(f.properties.block, false);
 		});
-		map.on("mouseenter", "irm-fill", () => {
-			map.getCanvas().style.cursor = "pointer";
+		/* Never open on every farm at once: Kaitet's farms sit ~20 km apart, and
+		 * framing them together shrinks every block to a speck. Open on the
+		 * farm with readings (else the one with most blocks); the farm buttons
+		 * jump between them. */
+		const byFarm = {};
+		state.features.forEach((x) => {
+			(byFarm[x.properties.farm || "—"] = byFarm[x.properties.farm || "—"] || []).push(x);
 		});
-		map.on("mouseleave", "irm-fill", () => {
-			map.getCanvas().style.cursor = "";
-		});
-		/* Open on what has been read: with every farm selected the blocks span
-		 * two farms ~20 km apart and start out too small to click. */
-		const read = state.features.filter((x) => state.readings.get(x.properties.block)?.irrometer_1ft != null);
-		const fb = read.length ? bounds(read) : b;
-		map.fitBounds(
-			[
-				[fb.minX, fb.minY],
-				[fb.maxX, fb.maxY],
-			],
-			{ padding: 60, maxZoom: 16, duration: 0 }
-		);
+		const readIn = (list) => list.filter((x) => state.readings.get(x.properties.block)?.irrometer_1ft != null).length;
+		const farms = Object.keys(byFarm).sort((a, c) => readIn(byFarm[c]) - readIn(byFarm[a]) || byFarm[c].length - byFarm[a].length);
+		const fitFarm = (name, duration) => {
+			const fb = bounds(byFarm[name]);
+			map.fitBounds(
+				[
+					[fb.minX, fb.minY],
+					[fb.maxX, fb.maxY],
+				],
+				{ padding: 40, maxZoom: 16.5, duration }
+			);
+			host.querySelectorAll(`#${id}-farms button`).forEach((x) => x.classList.toggle("on", x.getAttribute("data-farm") === name));
+		};
+		const farmBar = $(`#${id}-farms`);
+		farmBar.innerHTML =
+			farms.length > 1
+				? farms.map((n) => `<button class="chip" type="button" data-farm="${charts.esc(n)}">${charts.esc(n)} · ${byFarm[n].length}</button>`).join("")
+				: "";
+		farmBar.querySelectorAll("button").forEach((x) => x.addEventListener("click", () => fitFarm(x.getAttribute("data-farm"), 700)));
+		if (farms.length) fitFarm(farms[0], 0);
 		paint();
 		if (overlay()) overlay().classList.add("hidden");
 	}
