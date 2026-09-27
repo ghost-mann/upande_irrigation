@@ -21,6 +21,14 @@ POST /api/method/upande_irrigation.api.valves.set_override
         args: {valve, state}  where state in {Auto, Forced Open, Forced Closed}
         → {ok, valve, manual_state, by, at}
 
+POST /api/method/upande_irrigation.api.valves.set_override_bulk
+        args: {state, valves?, section?, farm?, all_valves?}
+        → {ok, state, updated: [names], count}
+
+GET  /api/method/upande_irrigation.api.valves.blocks_geojson
+        args: {farm?}
+        → FeatureCollection of block boundaries (Warehouse.custom_raw_geojson)
+
 GET  /api/method/upande_irrigation.api.valves.geojson
         → FeatureCollection of every Tank And Valve row that has a
           location_geojson set. Drop-in replacement for the
@@ -194,6 +202,113 @@ def set_override(valve, state):
 		"manual_state": doc.manual_state,
 		"set_by":       doc.manual_state_set_by,
 		"set_at":       str(doc.manual_state_set_at or ""),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_override_bulk(state, valves=None, section=None, farm=None, all_valves=0):
+	"""Apply one manual state to many valves at once.
+
+	Scope is any combination of an explicit `valves` list (JSON or list), a
+	`section` (valves whose block's parent_warehouse is that section) and a
+	`farm`; they intersect. With no scope at all the call is refused unless
+	`all_valves` is set — "no filter" must never silently mean "every valve on
+	every farm".
+
+	Each valve is saved through its controller (which stamps set_at/by) with the
+	caller's permissions, and the whole batch commits once: a permission error
+	part-way leaves no valve changed.
+	"""
+	if state not in _VALID_OVERRIDES:
+		frappe.throw(f"`state` must be one of {', '.join(_VALID_OVERRIDES)}. Got: {state!r}")
+	if not frappe.has_permission("Tank And Valve", "write"):
+		raise frappe.PermissionError("Not permitted to override valves.")
+
+	if isinstance(valves, str):
+		valves = json.loads(valves) if valves.strip() else None
+	all_valves = frappe.utils.cint(all_valves)
+	if not (valves or section or farm or all_valves):
+		frappe.throw("Choose valves, a section or a farm — or pass all_valves=1 to override every valve.")
+
+	filters = {"asset_type": "Valve"}
+	if valves:
+		filters["name"] = ["in", list(valves)]
+	if farm:
+		filters["farm"] = farm
+	if section:
+		blocks = frappe.get_all("Warehouse", filters={"parent_warehouse": section}, pluck="name")
+		if not blocks:
+			return {"ok": True, "state": state, "updated": [], "count": 0}
+		filters["block"] = ["in", blocks]
+
+	names = frappe.get_all("Tank And Valve", filters=filters, pluck="name", order_by="name asc")
+	updated = []
+	for name in names:
+		doc = frappe.get_doc("Tank And Valve", name)
+		if doc.manual_state == state:
+			continue
+		doc.manual_state = state
+		doc.save()
+		updated.append(name)
+	frappe.db.commit()
+
+	return {"ok": True, "state": state, "updated": updated, "count": len(updated)}
+
+
+@frappe.whitelist()
+def blocks_geojson(farm=None):
+	"""Block boundaries for the Field Map, from Warehouse.custom_raw_geojson.
+
+	That field is shipped by upande_scp, which not every irrigation site has.
+	The map used to request it straight from the client, so on such a site the
+	whole block query failed; here its absence is reported, not raised.
+	"""
+	empty = {"type": "FeatureCollection", "features": [], "meta": {"unavailable": True, "blocks": 0}}
+	meta = frappe.get_meta("Warehouse")
+	if not meta.has_field("custom_raw_geojson"):
+		return empty
+
+	filters = {"disabled": 0, "is_group": 0}
+	if frappe.db.exists("Warehouse Type", "Block"):
+		filters["warehouse_type"] = "Block"
+	if farm and meta.has_field("custom_farm"):
+		filters["custom_farm"] = farm
+	fields = ["name", "warehouse_name", "parent_warehouse", "custom_raw_geojson"]
+	if meta.has_field("custom_farm"):
+		fields.append("custom_farm")
+
+	features = []
+	rows = frappe.get_all(
+		"Warehouse", filters=filters,
+		fields=fields, order_by="name asc", limit_page_length=0,
+	)
+	for wh in rows:
+		raw = wh.get("custom_raw_geojson")
+		if not raw:
+			continue
+		try:
+			geo = json.loads(raw)
+		except (ValueError, TypeError):
+			continue
+		parts = geo.get("features") if isinstance(geo, dict) and geo.get("type") == "FeatureCollection" else [geo]
+		for f in parts or []:
+			geometry = f.get("geometry") if isinstance(f, dict) and f.get("type") == "Feature" else f
+			if not isinstance(geometry, dict) or not geometry.get("type"):
+				continue
+			features.append({
+				"type": "Feature",
+				"geometry": geometry,
+				"properties": {
+					"block": wh["name"],
+					"block_label": wh.get("warehouse_name") or wh["name"],
+					"farm": wh.get("custom_farm") or "",
+					"section": wh.get("parent_warehouse") or "",
+				},
+			})
+	return {
+		"type": "FeatureCollection",
+		"features": features,
+		"meta": {"unavailable": False, "blocks": len(rows), "farm": farm},
 	}
 
 
