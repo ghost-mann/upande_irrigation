@@ -134,6 +134,8 @@ Export from `kaitet-group.c.frappe.cloud` (read-only) into
 | `reservoir_pumping_record.json` | 369 | |
 | `water_transfer.json` | 279 | |
 | `irrigation_scheduler_run.json` | 32 | fetch each individually so `shift_results` children come too |
+| `water_meter_reading.json` | 82 | added 2026-09-27; source module was Upande Kaitet |
+| `electricity_meter_reading.json` | 310 | added 2026-09-27; source module was Upande Kaitet |
 | `irrigation_settings.json` | Single | |
 | `irrigation_scheduler.json` | Single | |
 

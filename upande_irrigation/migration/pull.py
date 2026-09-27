@@ -69,9 +69,10 @@ def insert_preserving(doctype, records):
 	doc.flags.ignore_validate suppresses validate and before_save only. It does NOT
 	suppress: before_validate, before_insert, after_insert, on_update, or on_change.
 
-	This function is safe ONLY while none of the six migrated doctypes
+	This function is safe ONLY while none of the migrated doctypes
 	(Tank And Valve, Weather Reading, Irrigation Planner, Reservoir Pumping Record,
-	Water Transfer, Irrigation Scheduler Run) define or register hooks for those
+	Water Transfer, Irrigation Scheduler Run, Water Meter Reading, Electricity
+	Meter Reading) define or register hooks for those
 	unsuppressed entry points. If a hook is added to any of them, imported values
 	will silently corrupt without warning (as happened to et_pan: 2.5 → 17.2 when
 	validate ran during migration). Add one before making changes to this pattern.
@@ -121,6 +122,10 @@ LOAD_ORDER = (
 	("Reservoir Pumping Record", "reservoir_pumping_record.json"),
 	("Water Transfer", "water_transfer.json"),
 	("Irrigation Scheduler Run", "irrigation_scheduler_run.json"),
+	# Adopted from the retired upande_kaitet (2026-09-27). Both link Warehouse
+	# and Irrigation Planner, so they load after the planners.
+	("Water Meter Reading", "water_meter_reading.json"),
+	("Electricity Meter Reading", "electricity_meter_reading.json"),
 )
 
 # Informational only — the volumes the 2026-09-13 export happened to carry.
@@ -134,6 +139,8 @@ COUNTS_AT_FIRST_EXPORT = {
 	"Reservoir Pumping Record": 369,
 	"Water Transfer": 279,
 	"Irrigation Scheduler Run": 32,
+	"Water Meter Reading": 82,         # counted 2026-09-27
+	"Electricity Meter Reading": 310,  # counted 2026-09-27
 }
 
 # The two Singles. `preserve` names child tables/fields the load must NOT touch:

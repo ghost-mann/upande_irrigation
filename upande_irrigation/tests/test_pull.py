@@ -121,6 +121,8 @@ class TestInsertPreservingAssumptions(FrappeTestCase):
 		"Reservoir Pumping Record",
 		"Water Transfer",
 		"Irrigation Scheduler Run",
+		"Water Meter Reading",
+		"Electricity Meter Reading",
 	)
 
 	UNSUPPRESSED_ENTRY_POINTS = (

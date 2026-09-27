@@ -1,0 +1,146 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:WMR-{YYYY}-{MM}-{#####}",
+ "creation": "2026-09-27 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_main",
+  "date",
+  "irrigation_section",
+  "irrigation_planner",
+  "column_break_readings",
+  "previous_reading",
+  "new_reading",
+  "units_used",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_main",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Datetime",
+   "label": "Captured At",
+   "reqd": 1,
+   "in_list_view": 1,
+   "default": "Now"
+  },
+  {
+   "fieldname": "irrigation_section",
+   "fieldtype": "Link",
+   "label": "Irrigation Section",
+   "options": "Warehouse",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "irrigation_planner",
+   "fieldtype": "Link",
+   "label": "Irrigation Planner (shift)",
+   "options": "Irrigation Planner"
+  },
+  {
+   "fieldname": "column_break_readings",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "previous_reading",
+   "fieldtype": "Float",
+   "label": "Previous Reading",
+   "read_only": 1,
+   "description": "The last reading's New Reading for this section; filled on save."
+  },
+  {
+   "fieldname": "new_reading",
+   "fieldtype": "Float",
+   "label": "New Reading",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "units_used",
+   "fieldtype": "Float",
+   "label": "Units Used",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "Water Meter Reading",
+   "read_only": 1,
+   "no_copy": 1,
+   "print_hide": 1,
+   "search_index": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-09-27 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Irrigation",
+ "name": "Water Meter Reading",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "custom": 0,
+ "permissions": [
+  {
+   "role": "System Manager",
+   "permlevel": 0,
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "share": 1,
+   "print": 1,
+   "email": 1
+  },
+  {
+   "role": "Agriculture Manager",
+   "permlevel": 0,
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "share": 1,
+   "print": 1,
+   "email": 1
+  },
+  {
+   "role": "Irrigation User",
+   "permlevel": 0,
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 0,
+   "amend": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 0,
+   "share": 1,
+   "print": 1,
+   "email": 1
+  }
+ ],
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
