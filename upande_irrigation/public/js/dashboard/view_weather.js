@@ -522,7 +522,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 			this.irroMap = irrometerMap(this.el.querySelector("#wx-irro-map"), this.ctx, { tension, shortSection });
 		}
 		/* The map loads its own libraries and geometry; never hold the view up. */
-		this.irroMap.render(blocks, this.ctx.filters.farm).catch((err) => console.warn("[irrigation] irrometer map", err));
+		this.irroMap.render(blocks, this.ctx.filters.farm, { from: this.ctx.filters.from, to: this.ctx.filters.to }).catch((err) => console.warn("[irrigation] irrometer map", err));
 	},
 
 	renderIrrometer(blocks) {

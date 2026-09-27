@@ -1523,3 +1523,22 @@
 		margin-top: 10px;
 	}
 }
+
+.irm__range {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.irm__range label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font: 500 12px var(--sans);
+	color: var(--ink-4);
+}
+
+.irm__range .input {
+	width: 150px;
+}

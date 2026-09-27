@@ -7,6 +7,11 @@
  * blocks that carry readings get a marker at their centre showing the value.
  * Clicking a block or its marker opens that block's readings and history.
  *
+ * The From/To range on the toolbar picks which readings count: each block shows
+ * its latest reading inside the range, and its card's history is limited to it.
+ * It starts from the sidebar's range and follows it until the operator sets
+ * their own; "All dates" clears it.
+ *
  * Irrometers are per block today: an Irrometer Reading names a block, not a
  * device position. Exact device pins come later, once devices have GPS points.
  */
@@ -27,13 +32,22 @@ let seq = 0;
 export function irrometerMap(host, ctx, { tension, shortSection }) {
 	const { api, charts } = ctx;
 	const id = `irm-${++seq}`;
-	const state = { map: null, farm: undefined, features: [], readings: new Map(), markers: [], gen: 0, basemap: "hybrid" };
+	const state = {
+		map: null, farm: undefined, features: [], raw: [], readings: new Map(), markers: [], gen: 0, basemap: "hybrid",
+		/* range: {from, to} as YYYY-MM-DD ("" = open); own = operator changed it here. */
+		range: { from: "", to: "" }, ownRange: false,
+	};
 
 	host.innerHTML = `
 <div class="irm">
 	<div class="irm__bar">
 		<input class="input irm__search" id="${id}-search" type="search" placeholder="Find a block…" list="${id}-blocks" aria-label="Find a block">
 		<datalist id="${id}-blocks"></datalist>
+		<div class="irm__range" role="group" aria-label="Reading dates">
+			<label>From <input class="input" type="date" id="${id}-from"></label>
+			<label>To <input class="input" type="date" id="${id}-to"></label>
+			<button class="btn ghost small" type="button" id="${id}-all">All dates</button>
+		</div>
 		<span class="meta" id="${id}-count"></span>
 		${basemapToggle(`${id}-base`, state.basemap)}
 	</div>
@@ -58,6 +72,47 @@ export function irrometerMap(host, ctx, { tension, shortSection }) {
 		);
 		if (f) focus(f.properties.block, true);
 	});
+
+	const onRange = () => {
+		state.range = { from: $(`#${id}-from`).value, to: $(`#${id}-to`).value };
+		state.ownRange = true;
+		derive();
+		paint();
+		refreshCard();
+	};
+	$(`#${id}-from`).addEventListener("change", onRange);
+	$(`#${id}-to`).addEventListener("change", onRange);
+	$(`#${id}-all`).addEventListener("click", () => {
+		$(`#${id}-from`).value = "";
+		$(`#${id}-to`).value = "";
+		onRange();
+	});
+
+	/* Per block: its latest reading inside the range, and the in-range history. */
+	function derive() {
+		const { from, to } = state.range;
+		const inRange = (d) => d && (!from || d >= from) && (!to || d <= to);
+		state.readings = new Map();
+		state.raw.forEach((b) => {
+			const hist = (b.irrometer_history || []).filter((h) => inRange(String(h.date || "").slice(0, 10)));
+			const last = [...hist].reverse().find((h) => h.ft1 != null || h.ft2 != null);
+			state.readings.set(b.name, {
+				...b,
+				irrometer_history: hist,
+				irrometer_1ft: last ? last.ft1 : null,
+				irrometer_2ft: last ? last.ft2 : null,
+				irrometer_date: last ? last.date : null,
+			});
+		});
+	}
+
+	function rangeLabel() {
+		const { from, to } = state.range;
+		if (!from && !to) return "all dates";
+		const f = (d) => charts.fmtDate(d);
+		if (from && to) return from === to ? `on ${f(from)}` : `${f(from)} – ${f(to)}`;
+		return from ? `from ${f(from)}` : `to ${f(to)}`;
+	}
 
 	function band(block) {
 		const r = state.readings.get(block);
@@ -93,7 +148,7 @@ export function irrometerMap(host, ctx, { tension, shortSection }) {
 			);
 		});
 		const read = state.features.filter((f) => state.readings.get(f.properties.block)?.irrometer_1ft != null).length;
-		$(`#${id}-count`).textContent = `${state.features.length} blocks · ${read} with readings`;
+		$(`#${id}-count`).textContent = `${state.features.length} blocks · ${read} read ${rangeLabel()}`;
 	}
 
 	function card(block) {
@@ -104,6 +159,7 @@ export function irrometerMap(host, ctx, { tension, shortSection }) {
 			return;
 		}
 		const p = f.properties;
+		state.openBlock = block;
 		const r = state.readings.get(block);
 		const hist = ((r && r.irrometer_history) || []).filter((h) => h.ft1 != null || h.ft2 != null);
 		const t1 = tension(r ? r.irrometer_1ft : null);
@@ -130,12 +186,21 @@ ${hist
 </tbody></table>`
 		: ""
 }`
-		: `<div class="irm__empty">No irrometer readings for this block yet. They are entered in the Irrometer table on the Weather Reading form.</div>`
+		: `<div class="irm__empty">${
+				state.range.from || state.range.to
+					? `No irrometer reading for this block ${charts.esc(rangeLabel())}. Widen the dates or choose All dates.`
+					: "No irrometer readings for this block yet. They are entered in the Irrometer table on the Weather Reading form."
+			}</div>`
 }`;
 		el.hidden = false;
 		el.querySelector(".irm__close").addEventListener("click", () => {
 			el.hidden = true;
 		});
+	}
+
+	function refreshCard() {
+		const open = $(`#${id}-card`);
+		if (open && !open.hidden && state.openBlock) card(state.openBlock);
 	}
 
 	function focus(block, fly) {
@@ -239,8 +304,15 @@ ${hist
 
 	return {
 		/* blocks: api.weather.fetch's `blocks` (latest reading + history per block). */
-		async render(blocks, farm) {
-			state.readings = new Map((blocks || []).map((x) => [x.name, x]));
+		/* blocks: api.weather.fetch's `blocks`; range: the sidebar's {from, to}. */
+		async render(blocks, farm, range) {
+			state.raw = blocks || [];
+			if (!state.ownRange && range) {
+				state.range = { from: range.from || "", to: range.to || "" };
+				$(`#${id}-from`).value = state.range.from;
+				$(`#${id}-to`).value = state.range.to;
+			}
+			derive();
 			const f = farm || "";
 			if (f !== state.farm) {
 				state.farm = f;
@@ -248,12 +320,7 @@ ${hist
 			} else {
 				paint();
 			}
-			const open = $(`#${id}-card`);
-			if (open && !open.hidden) {
-				const title = open.querySelector(".irm__title");
-				const f2 = title && state.features.find((x) => x.properties.block_label === title.textContent);
-				if (f2) card(f2.properties.block);
-			}
+			refreshCard();
 		},
 		destroy() {
 			state.gen++;
