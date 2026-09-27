@@ -110,8 +110,9 @@ ${pagehead(
 
 		/* Group by tank where one is assigned. Where none is — which is every
 		 * valve on Lokitela today — fall back to the block-name prefix
-		 * ("Airstrip 3 · #3,#4" → "Airstrip"). Without that, 58 identical cards
-		 * render as one undifferentiated wall. */
+		 * ("AIRSTRIP BLK 1 - KL" → "Airstrip"). The valve's own label is no use
+		 * for this: "VLV-AIRSTRIP-1-KL" has no spaces, so splitting it made one
+		 * group per valve. */
 		const groups = {};
 		const labels = {};
 		valves.forEach((v) => {
@@ -121,9 +122,10 @@ ${pagehead(
 				key = `tank:${v.tank}`;
 				label = tankLabel[v.tank] || v.tank;
 			} else {
-				const prefix = String(v.asset_label || v.name).trim().split(/[\s·]+/)[0] || "Other";
+				const src = String(v.block || v.asset_label || v.name).trim().replace(/^VLV[-\s]+/i, "");
+				const prefix = src.split(/\s+BLK\b|[\s·\-]+/i)[0] || "Other";
 				key = `prefix:${prefix.toLowerCase()}`;
-				label = prefix;
+				label = prefix.charAt(0).toUpperCase() + prefix.slice(1).toLowerCase();
 			}
 			labels[key] = label;
 			(groups[key] = groups[key] || []).push(v);

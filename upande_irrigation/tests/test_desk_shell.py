@@ -7,8 +7,13 @@ an External link to /app/smart-irrigation, so it was not refreshed on migrate
 and did not show as the Upande app.
 """
 
+import json
+import os
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
+
+import upande_irrigation
 
 from upande_irrigation import setup
 
@@ -25,6 +30,18 @@ class TestDeskShell(FrappeTestCase):
 		self.assertEqual(icon.link_type, "Workspace Sidebar")
 		self.assertEqual(icon.link_to, "Upande Irrigation")
 		self.assertEqual(icon.logo_url, "/assets/upande_irrigation/images/upande-logo.png")
+
+	def test_the_shipped_icon_is_visible(self):
+		"""The bug being locked out: in developer mode a save of a standard
+		Desktop Icon re-exports its JSON, so a test that hides the tile once
+		wrote "hidden": 1 into the shipped file — every site synced from it got
+		an invisible app, the very symptom this work set out to fix."""
+		path = os.path.join(os.path.dirname(upande_irrigation.__file__), "desktop_icon", "upande_irrigation.json")
+		with open(path) as f:
+			shipped = json.load(f)
+		self.assertEqual(shipped["hidden"], 0)
+		self.assertEqual(shipped["standard"], 1)
+		self.assertEqual(shipped["link_type"], "Workspace Sidebar")
 
 	def test_a_user_hidden_tile_stays_hidden_across_migrate(self):
 		frappe.db.set_value("Desktop Icon", setup.DESKTOP_ICON, "hidden", 1)

@@ -27,6 +27,8 @@ required_apps = ["erpnext", "upande_core"]
 # include js, css files in header of desk.html
 # app_include_css = "/assets/upande_irrigation/css/upande_irrigation.css"
 # app_include_js = "/assets/upande_irrigation/js/upande_irrigation.js"
+# Desk-side redirect for the renamed v15 workspace -- see the file.
+app_include_js = "/assets/upande_irrigation/js/desk_routes.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/upande_irrigation/css/upande_irrigation.css"
@@ -172,8 +174,6 @@ website_redirects = [
     {"source": "/meniscus", "target": "/upande-irrigation"},
     {"source": "/irrigation-now", "target": "/upande-irrigation#now"},
     {"source": "/irrigation-control", "target": "/upande-irrigation#control"},
-    # The v15 workspace was renamed to match its sidebar (the upande_travel pattern).
-    {"source": "/app/smart-irrigation", "target": "/desk/upande-irrigation"},
 ]
 
 # The /apps launcher tile. The logo is copied into this app rather than read from
