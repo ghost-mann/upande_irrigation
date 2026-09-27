@@ -39,6 +39,7 @@ def agronomy():
 		"rain_loss_mm": f(s.get("rain_loss_mm"), 2.0),
 		"rain_efficiency": f(s.get("rain_efficiency"), 0.9),
 		"irrometer_weight": f(s.get("irrometer_weight"), 0.5),
+		"fallback_epan_mm": f(s.get("fallback_epan_mm"), 4.0),
 		"bands": [
 			{
 				"age_from": float(b.age_from or 0),
@@ -80,13 +81,14 @@ def profiles(farm=None):
 	filters = {"is_active": 1}
 	if farm:
 		filters["farm"] = farm
+	rows = frappe.get_all("Irrigation Block Profile", filters=filters, fields=["*"])
+	labels = dict(frappe.get_all("Warehouse", filters={"name": ["in", [p.block for p in rows] or [""]]},
+	                             fields=["name", "warehouse_name"], as_list=True))
 	out = {}
-	for p in frappe.get_all("Irrigation Block Profile", filters=filters, fields=["*"]):
+	for p in rows:
 		r, used = resolved_profile(p)
-		out[p.block] = {
-			"resolved": r, "used": used, "farm": p.farm, "section": p.section,
-			"label": frappe.db.get_value("Warehouse", p.block, "warehouse_name") or p.block,
-		}
+		out[p.block] = {"resolved": r, "used": used, "farm": p.farm, "section": p.section,
+		                "label": labels.get(p.block) or p.block}
 	return out
 
 
@@ -112,28 +114,39 @@ def _days(start, end):
 def farm_weather(farm, start, end):
 	"""{date: {rain, cups, estimated}} for every day, estimating any gap from the
 	mean pan evaporation of the previous recorded days."""
-	depth = agronomy()["params"]["depth_per_cup_mm"]
+	params = agronomy()["params"]
+	depth = params["depth_per_cup_mm"]
 	rows = frappe.get_all(
 		"Weather Reading",
-		filters={"farm": farm, "date": ["between", [start - datetime.timedelta(days=30), end]]},
+		filters={"farm": farm, "date": ["between", [start, end]]},
 		fields=["date", "rainfall_mm", "pan_cups"],
 		order_by="date asc",
 		limit_page_length=0,
 	)
+	# Seed the gap estimate from the last readings on record, however old — a
+	# fixed look-back window let a long gap estimate evaporation as 0, which reads
+	# as a full soil profile and quietly takes every block out of "due".
+	before = frappe.get_all(
+		"Weather Reading",
+		filters={"farm": farm, "date": ["<", start]},
+		fields=["rainfall_mm", "pan_cups"],
+		order_by="date desc",
+		limit=ESTIMATE_FROM_DAYS,
+	)
+	recent = [B.epan(float(r.rainfall_mm or 0), float(r.pan_cups or 0), depth) for r in reversed(before)]
 	by_date = {frappe.utils.getdate(r.date): r for r in rows}
-	recent = []
 	out = {}
-	for day in _days(start - datetime.timedelta(days=30), end):
+	for day in _days(start, end):
 		r = by_date.get(day)
 		if r is not None:
 			rain, cups = float(r.rainfall_mm or 0), float(r.pan_cups or 0)
 			recent = (recent + [B.epan(rain, cups, depth)])[-ESTIMATE_FROM_DAYS:]
 			rec = {"rain": rain, "cups": cups, "estimated": False}
 		else:
-			mean = sum(recent) / len(recent) if recent else 0.0
+			# A farm that has never logged weather uses the stated fallback.
+			mean = sum(recent) / len(recent) if recent else float(params.get("fallback_epan_mm") or 4.0)
 			rec = {"rain": 0.0, "cups": mean / depth if depth else 0.0, "estimated": True}
-		if day >= start:
-			out[day] = rec
+		out[day] = rec
 	return out
 
 
@@ -148,10 +161,12 @@ def irrometers(blocks, start, end):
 		order_by="date asc",
 		limit_page_length=0,
 	)
+	# Float columns are NOT NULL in v16, so a blank 1 ft field reads back as 0 —
+	# which would mean "saturated" and pull depletion to zero. Treat 0 as missing.
 	return {
 		(r.irrigation_block, frappe.utils.getdate(r.date)): float(r.irrometer_1ft_reading)
 		for r in rows
-		if r.irrometer_1ft_reading is not None
+		if float(r.irrometer_1ft_reading or 0) > 0
 	}
 
 
@@ -251,14 +266,24 @@ _ROW_FIELDS = (
 )
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def rebuild(farm=None, start=None, end=None):
 	"""Recompute and store the balance for every active block (of `farm`), from the
-	balance origin (or `start`) to yesterday (or `end`). Idempotent."""
+	balance origin (or `start`) to yesterday (or `end`). Idempotent; serialised per
+	site so the morning cron and a button press cannot interleave their
+	delete-then-insert and duplicate rows."""
 	frappe.only_for(("System Manager", "Agriculture Manager", "Irrigation User"))
+	from frappe.utils.synchronization import filelock
+
+	with filelock("upande_irrigation_balance_rebuild", timeout=120):
+		return _rebuild(farm, start, end)
+
+
+def _rebuild(farm=None, start=None, end=None):
 	origin = balance_start()
 	start = frappe.utils.getdate(start) if start else origin
 	end = frappe.utils.getdate(end) if end else frappe.utils.add_days(frappe.utils.getdate(), -1)
+	end = min(end, frappe.utils.getdate(frappe.utils.add_days(frappe.utils.getdate(), -1)))
 	if end < start:
 		return {"blocks": 0, "rows": 0}
 	a = agronomy()
@@ -291,11 +316,11 @@ def rebuild(farm=None, start=None, end=None):
 			days = []
 			for day in _days(start, end):
 				w = weather[day]
-				hours, source = 0.0, ""
-				if valves.get((block, day)):
-					hours, source = valves[(block, day)], "Valve Log"
-				elif sheet.get((block, day)):
-					hours, source = sheet[(block, day)], "Run Sheet"
+				# The larger of the two records. Only manual overrides write Valve
+				# Events, so a 30-minute test opening must not hide a 5 h cycle the
+				# operator ticked Done — and the same water is never added twice.
+				v, rs = valves.get((block, day), 0.0), sheet.get((block, day), 0.0)
+				hours, source = (v, "Valve Log") if v >= rs and v > 0 else (rs, "Run Sheet") if rs > 0 else (0.0, "")
 				days.append({
 					"date": day, "month": day.month, "rain": w["rain"], "cups": w["cups"],
 					"estimated": w["estimated"], "irrigation_hours": hours, "irrigation_source": source,
@@ -322,11 +347,13 @@ def rebuild(farm=None, start=None, end=None):
 # ── questions ───────────────────────────────────────────────────
 
 
-def state(farm=None, as_of=None):
+def state(farm=None, as_of=None, blocks=None):
 	"""Per block: today's opening depletion, TAW/RAW, recent mean ETc and the projection."""
 	as_of = frappe.utils.getdate(as_of) if as_of else frappe.utils.getdate()
 	yesterday = frappe.utils.add_days(as_of, -1)
 	profs = profiles(farm)
+	if blocks:
+		profs = {b: v for b, v in profs.items() if b in set(blocks)}
 	if not profs:
 		return {}
 	rows = frappe.get_all(
@@ -385,5 +412,5 @@ def block_series(block, days=30):
 		order_by="date asc",
 		limit_page_length=0,
 	)
-	st = state().get(block) or {}
+	st = state(blocks=[block]).get(block) or {}
 	return {"rows": rows, "status": st}

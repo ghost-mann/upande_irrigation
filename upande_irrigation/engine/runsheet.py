@@ -83,7 +83,40 @@ def windows_for_date(date, rows, rest_dates=""):
 		if end <= start:
 			end += datetime.timedelta(days=1)
 		out.append((start, end))
-	return sorted(out)
+	return merge(out)
+
+
+def merge(intervals):
+	"""Sorted, with overlapping or touching intervals joined — so two windows that
+	overlap can never let the pump be booked twice for the same hour."""
+	out = []
+	for a, b in sorted(intervals):
+		if out and a <= out[-1][1]:
+			out[-1] = (out[-1][0], max(out[-1][1], b))
+		else:
+			out.append((a, b))
+	return out
+
+
+def free(windows, busy=(), not_before=None):
+	"""Windows minus the busy intervals and minus everything before `not_before`."""
+	cut = merge(list(busy or []) + ([(datetime.datetime.min, not_before)] if not_before else []))
+	out = []
+	for a, b in merge(windows):
+		segs = [(a, b)]
+		for c, d in cut:
+			nxt = []
+			for x, y in segs:
+				if d <= x or c >= y:
+					nxt.append((x, y))
+					continue
+				if x < c:
+					nxt.append((x, c))
+				if d < y:
+					nxt.append((d, y))
+			segs = nxt
+		out.extend(s for s in segs if s[1] > s[0])
+	return out
 
 
 def _time(v):
@@ -99,11 +132,18 @@ def _time(v):
 	return datetime.time(*parts)
 
 
-def place(requests_by_pump, windows_by_pump, settings):
+def place(requests_by_pump, windows_by_pump, settings, busy=None, not_before=None):
+	"""`busy`: {pump: [(start, end)]} already taken (cycles kept on the sheet);
+	`not_before`: no cycle starts earlier (now, when planning today)."""
 	rest = datetime.timedelta(hours=float(settings.get("cycle_rest_hours") or 0))
 	out = []
 	for pump, requests in requests_by_pump.items():
-		windows = list(windows_by_pump.get(pump) or [])
+		all_windows = list(windows_by_pump.get(pump) or [])
+		windows = free(all_windows, (busy or {}).get(pump), not_before)
+		no_rate = [r for r in requests if not r["hours"]]
+		for r in no_rate:
+			out.append(_row(pump, r, 1, 1, None, None, 0, "Not placed"))
+		requests = [r for r in requests if r["hours"]]
 		pending = []
 		order = sorted(requests, key=lambda r: (r["kind"] != "Due", -float(r["urgency"] or 0)))
 		for rank, r in enumerate(order):
@@ -112,10 +152,9 @@ def place(requests_by_pump, windows_by_pump, settings):
 				pending.append({"req": r, "rank": rank, "cycle": i + 1, "cycles": count, "each": each,
 				                "ready": None})
 		if not windows:
+			why = "no run window for this pump today" if not all_windows else "no free window time left today"
 			for r in order:
-				if r["hours"]:
-					out.append(_row(pump, r, 1, 1, None, None, r["hours"], "Not placed",
-					                extra="no run window for this pump today"))
+				out.append(_row(pump, r, 1, 1, None, None, r["hours"], "Not placed", extra=why))
 			continue
 
 		cursor = windows[0][0]
@@ -144,7 +183,7 @@ def place(requests_by_pump, windows_by_pump, settings):
 			else:
 				wi += 1
 				if wi < len(windows):
-					cursor = windows[wi][0]
+					cursor = max(cursor, windows[wi][0])
 
 		left = {}
 		for p in pending:

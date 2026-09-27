@@ -177,7 +177,7 @@ def sync_desktop_layouts():
 # only into empty tables and blank fields, so anything calibrated on site stays.
 
 SCALAR_DEFAULTS = {
-	"rain_loss_mm": 2.0, "rain_efficiency": 0.9, "depletion_fraction": 0.5, "irrometer_weight": 0.5,
+	"rain_loss_mm": 2.0, "rain_efficiency": 0.9, "fallback_epan_mm": 4.0, "depletion_fraction": 0.5, "irrometer_weight": 0.5,
 	"min_run_hours": 0.5, "max_run_hours_per_day": 12.0, "irrigate_ahead_days": 1,
 	"default_soil_texture": "Loam", "default_emitters_per_tree": 1.0, "default_emitter_flow_lph": 70.0,
 	"default_application_efficiency": 0.9, "default_depletion_fraction": 0.5,

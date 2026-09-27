@@ -571,8 +571,8 @@ ${pagehead(
 			.map(
 				(s) => `<div class="bc__row">
 	<b>${charts.esc(s.shift)}</b> <span class="sev ${s.is_active ? "lo" : "ink"}">${s.is_active ? "Active" : "Inactive"}</span>
-	<div class="irm__meta">${s.application_rate_mm_hr ? `${charts.fmtNum(s.application_rate_mm_hr, 1)} mm/hr` : "farm-default rate"} · ${s.irrigation_coverage ? `${charts.fmtNum(s.irrigation_coverage, 0)}% coverage` : "farm-default coverage"}${
-		s.other_blocks && s.other_blocks.length ? `<br>with ${s.other_blocks.map((x) => charts.esc(x.replace(/ - [A-Z]{2,4}$/, ""))).join(", ")}` : ""
+	<div class="irm__meta">${
+		s.other_blocks && s.other_blocks.length ? `with ${s.other_blocks.map((x) => charts.esc(x.replace(/ - [A-Z]{2,4}$/, ""))).join(", ")}` : ""
 	}</div>
 </div>`
 			)
@@ -580,17 +580,10 @@ ${pagehead(
 
 		const plans = (info.planners || [])
 			.map(
-				(p) => `<a class="bc__row bc__plan" href="/app/irrigation-planner/${encodeURIComponent(p.name)}" target="_blank" rel="noopener">
-	<b>${charts.esc(p.block)}</b> <span class="irm__meta">${day(p.from_date)} – ${day(p.to_date)}${p.is_current ? "" : " · latest"}</span>
-	<div class="bc__grid">
-		<span><small>Required</small>${hrs(p.required_hours)}</span>
-		<span><small>Shift</small>${hrs(p.shift_hours)}</span>
-		<span><small>Cycles</small>${p.cycles_count || "—"}${p.cycle_hours_each ? ` × ${charts.fmtNum(p.cycle_hours_each, 1)} h` : ""}</span>
-		<span><small>Deficit</small>${p.this_week_deficit == null ? "—" : `${charts.fmtNum(p.this_week_deficit, 1)} mm`}</span>
-	</div>
-	<div class="irm__meta">${slot(p)}${p.z_risk_level ? ` · Z ${charts.esc(p.z_risk_level)}` : ""}${p.docstatus === 1 ? " · submitted" : " · draft"}</div>
-	${p.no_irrigation_reason ? `<div class="irm__meta">${charts.esc(p.no_irrigation_reason)}</div>` : ""}
-	${p.capacity_warning ? `<div class="irm__meta" style="color:var(--ui-warn)">${charts.esc(p.capacity_warning)}</div>` : ""}
+				(p) => `<a class="bc__row bc__plan" href="#planner">
+	<b>${charts.esc(p.block)}</b> <span class="sev ${p.status === "Done" ? "lo" : p.status === "Not placed" || p.status === "Skipped" ? "hi" : "ink"}">${charts.esc(p.status)}</span>
+	<div class="irm__meta">${p.scheduled_start ? `${charts.esc(charts.fmtClock(p.scheduled_start))}–${charts.esc(charts.fmtClock(p.scheduled_end))} · ` : ""}cycle ${p.cycle_no || 1}/${p.cycles || 1} · ${hrs(p.shift_hours)}${p.net_mm ? ` · refill ${charts.fmtNum(p.net_mm, 0)} mm` : ""}</div>
+	${p.reason ? `<div class="irm__meta">${charts.esc(p.reason)}</div>` : ""}
 </a>`
 			)
 			.join("");
@@ -613,7 +606,7 @@ ${w.stale_weather ? '<br><span style="color:var(--ui-warn)">Weather estimated �
 })()) : ""}
 ${section(`Valves · ${(info.valves || []).length}`, valves || '<div class="irm__empty">No valve is mapped to this block.</div>')}
 ${section("Shifts", shifts || '<div class="irm__empty">Not in any shift — set it on Irrigation Scheduler.</div>')}
-${section("This week", plans || '<div class="irm__empty">No planner for this block\'s shifts yet.</div>')}
+${section("Today's run sheet", plans || '<div class="irm__empty">Nothing on today\'s run sheet for this block.</div>')}
 ${section(
 	"Irrometer",
 	ir

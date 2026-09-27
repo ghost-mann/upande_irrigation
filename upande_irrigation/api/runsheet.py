@@ -55,9 +55,10 @@ def pumps(farm):
 
 
 def _ensure_balance(farm, date):
-	"""Balance up to the day before `date`: a short partial rebuild when yesterday's
-	stored state is there, else a full one from the origin."""
-	yesterday = frappe.utils.add_days(date, -1)
+	"""Balance up to the day before `date` — never past yesterday, so planning a
+	future date does not store balance rows for days that have not happened: a short
+	partial rebuild when the stored state is there, else a full one from the origin."""
+	yesterday = min(frappe.utils.getdate(frappe.utils.add_days(date, -1)), frappe.utils.getdate(frappe.utils.add_days(frappe.utils.getdate(), -1)))
 	start = frappe.utils.add_days(date, -FULL_REBUILD_GAP_DAYS)
 	have = frappe.db.count("Irrigation Block Balance", {"farm": farm, "date": frappe.utils.add_days(start, -1)})
 	if have and frappe.utils.getdate(start) > BA.balance_start():
@@ -66,20 +67,33 @@ def _ensure_balance(farm, date):
 		BA.rebuild(farm=farm, end=yesterday)
 
 
-def plan(farm, date):
-	"""The requests and rows for (farm, date), without saving anything."""
+def plan(farm, date, skip_shifts=()):
+	"""The requests for (farm, date), without saving anything.
+
+	Shifts are sized most urgent first. A block that belongs to two shifts (ten
+	Lokitela blocks do) is credited with the water the first shift will give it,
+	so the second is not sized to refill the same block again."""
 	st = BA.state(farm, as_of=date)
 	members = BA.shift_members()
 	cfg = _settings()
 	pump_of = pumps(farm)
-	requests, windows, flows = {}, {}, {}
+	requests, windows = {}, {}
+	depletion = {b: dict(v) for b, v in st.items()}
+	first = []
 	for shift, blocks in members.items():
+		if shift in skip_shifts:
+			continue
 		mine = [st[b] for b in blocks if b in st]
-		if not mine:
-			continue
+		if mine:
+			first.append((R.shift_need(mine, cfg)["urgency"], shift, blocks))
+	for _u, shift, blocks in sorted(first, key=lambda x: (-x[0], x[1])):
+		mine = [depletion[b] for b in blocks if b in depletion]
 		need = R.shift_need(mine, cfg)
-		if not need["kind"] or not need["hours"]:
+		if not need["kind"]:
 			continue
+		for m in mine:
+			# This run refills its blocks; a later shift sharing one sees it full.
+			m["depletion_mm"] = max(0.0, m["depletion_mm"] - need["hours"] * float(m["rate_mm_hr"] or 0) * float(m["application_efficiency"] or 0.9))
 		section = mine[0]["section"]
 		prof = pump_of.get(section)
 		reasons = list(need["reasons"])
@@ -105,7 +119,7 @@ def plan(farm, date):
 	return requests, windows, cfg
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def generate(farm=None, date=None):
 	"""Create or refresh the farm's run sheet for `date` (default today)."""
 	frappe.only_for(("System Manager", "Agriculture Manager", "Irrigation User"))
@@ -118,12 +132,17 @@ def generate(farm=None, date=None):
 		sheet = frappe.get_doc("Irrigation Run Sheet", name) if name else frappe.new_doc("Irrigation Run Sheet")
 		if not name:
 			sheet.farm, sheet.date, sheet.status = f, date, "Issued"
-		kept = [r for r in sheet.get("runs") or [] if r.status in KEEP]
-		acted = {r.shift for r in kept}
-		requests, windows, cfg = plan(f, date)
-		for pump in list(requests):
-			requests[pump] = [r for r in requests[pump] if r["shift"] not in acted]
-		rows = R.place(requests, windows, cfg)
+		# A shift the operator has touched keeps ALL its rows (its remaining
+		# cycles too) and is not re-planned; its placed time is busy for the pump.
+		acted = {r.shift for r in sheet.get("runs") or [] if r.status in KEEP}
+		kept = [r for r in sheet.get("runs") or [] if r.shift in acted]
+		busy = {}
+		for r in kept:
+			if r.planned_start and r.planned_end and r.status in ("Planned", "Running", "Done", "Partial"):
+				busy.setdefault(r.pump, []).append((frappe.utils.get_datetime(r.planned_start), frappe.utils.get_datetime(r.planned_end)))
+		requests, windows, cfg = plan(f, date, skip_shifts=acted)
+		now = frappe.utils.now_datetime()
+		rows = R.place(requests, windows, cfg, busy=busy, not_before=now if date == now.date() else None)
 		sheet.set("runs", [])
 		for r in kept:
 			sheet.append("runs", r.as_dict())
@@ -159,6 +178,7 @@ def set_status(run, status, actual_hours=None, skip_reason=None, notes=None):
 		raise frappe.DoesNotExistError(f"Run {run} not found")
 	sheet = frappe.get_doc("Irrigation Run Sheet", parent)
 	row = next(r for r in sheet.runs if r.name == run)
+	previous = row.status
 	now = frappe.utils.now_datetime()
 	if status == "Partial" and not frappe.utils.flt(actual_hours):
 		frappe.throw("Enter the hours actually run for a partial cycle.")
@@ -168,14 +188,19 @@ def set_status(run, status, actual_hours=None, skip_reason=None, notes=None):
 	if status == "Running":
 		row.actual_start = now
 	elif status in ("Done", "Partial"):
-		row.actual_start = row.actual_start or row.planned_start or now
-		row.actual_end = now if status == "Partial" or not row.planned_end else row.planned_end
+		if previous == "Not placed" and not frappe.utils.flt(actual_hours):
+			frappe.throw("This cycle was never placed — enter the hours actually run.")
 		row.actual_hours = frappe.utils.flt(actual_hours) or row.planned_hours
+		row.actual_start = row.actual_start or row.planned_start or now
+		row.actual_end = frappe.utils.add_to_date(frappe.utils.get_datetime(row.actual_start), hours=row.actual_hours)
 	elif status == "Skipped":
 		row.skip_reason = skip_reason.strip()
 	elif status == "Planned":
 		row.actual_start = row.actual_end = None
 		row.actual_hours = 0
+		row.skip_reason = None
+		if not row.planned_start:
+			row.status = "Not placed"  # undo returns a never-placed cycle to where it was
 	if notes is not None:
 		row.notes = notes
 	sheet.save(ignore_permissions=True)
@@ -317,7 +342,7 @@ def budget(farm=None, weeks=8):
 	weeks = max(1, min(int(weeks or 8), 52))
 	today = frappe.utils.getdate()
 	start = frappe.utils.add_days(today, -today.weekday() - 7 * (weeks - 1))
-	args = {"start": start, "farm": farm}
+	args = {"start": start, "farm": farm, "eff": BA.agronomy()["defaults"]["default_application_efficiency"] or 0.9}
 	farm_clause = " AND b.farm = %(farm)s" if farm else ""
 	# mm over ha → m³: 1 mm on 1 ha = 10 m³. Recorded net ÷ efficiency = gross applied.
 	rows = frappe.db.sql(
@@ -326,7 +351,7 @@ def budget(farm=None, weeks=8):
 		       DATE_SUB(b.date, INTERVAL WEEKDAY(b.date) DAY) AS week,
 		       SUM(b.etc_mm * p.area_ha * 10) AS needed_m3,
 		       SUM(b.effective_rain_mm * p.area_ha * 10) AS rain_m3,
-		       SUM(b.irrigation_mm / IF(p.application_efficiency > 0, p.application_efficiency, 0.9) * p.area_ha * 10) AS recorded_m3
+		       SUM(b.irrigation_mm / IF(p.application_efficiency > 0, p.application_efficiency, %(eff)s) * p.area_ha * 10) AS recorded_m3
 		FROM `tabIrrigation Block Balance` b
 		JOIN `tabIrrigation Block Profile` p ON p.name = b.block
 		JOIN `tabWarehouse` w ON w.name = b.block

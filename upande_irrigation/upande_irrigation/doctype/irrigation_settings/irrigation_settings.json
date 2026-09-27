@@ -50,6 +50,13 @@
    "default": "0.9"
   },
   {
+   "fieldname": "fallback_epan_mm",
+   "fieldtype": "Float",
+   "label": "Fallback pan evaporation (mm/day)",
+   "default": "4",
+   "description": "Used only for a farm that has never logged a Weather Reading. Every day using it is flagged as estimated."
+  },
+  {
    "fieldname": "col_balance",
    "fieldtype": "Column Break"
   },

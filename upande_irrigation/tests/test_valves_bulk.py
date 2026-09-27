@@ -139,12 +139,10 @@ class TestBlockInfo(NoCommit, FrappeTestCase):
 			"parentfield": "shift_blocks", "shift": "_TEST - SHIFT 1", "block": self.block, "farm": FARM_A,
 			"is_active": 1, "application_rate_mm_hr": 3.5, "irrigation_coverage": 75,
 		}).db_insert()
-		today = frappe.utils.getdate()
-		frappe.get_doc({
-			"doctype": "Irrigation Planner", "block": "_TEST - SHIFT 1", "farm": FARM_A,
-			"from_date": frappe.utils.add_days(today, -1), "to_date": frappe.utils.add_days(today, 5),
-			"required_hours": 6.5,
-		}).db_insert()
+		now = frappe.utils.now_datetime()
+		frappe.get_doc({"doctype": "Irrigation Run Sheet", "farm": FARM_A, "date": now.date(), "runs": [{
+			"shift": "_TEST - SHIFT 1", "status": "Planned", "planned_hours": 6.5, "cycle_no": 1, "cycles": 1,
+			"planned_start": now, "planned_end": now + datetime.timedelta(hours=6.5)}]}).insert(ignore_permissions=True)
 
 	def test_it_describes_the_block(self):
 		out = api.block_info(self.block)
@@ -154,7 +152,7 @@ class TestBlockInfo(NoCommit, FrappeTestCase):
 		self.assertEqual(out["shifts"][0]["application_rate_mm_hr"], 3.5)
 		self.assertEqual([v["name"] for v in out["valves"]], [self.valve])
 		self.assertEqual(len(out["planners"]), 1)
-		self.assertEqual(out["planners"][0]["required_hours"], 6.5)
+		self.assertEqual(out["planners"][0]["shift_hours"], 6.5)  # today's run-sheet cycle
 		self.assertIn("irrometer", out)
 
 	def test_an_unknown_block_is_refused(self):

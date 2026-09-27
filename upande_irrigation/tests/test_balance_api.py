@@ -103,7 +103,9 @@ class TestRebuild(NoCommit, FrappeTestCase):
 		self.assertAlmostEqual(r.irrigation_mm, 10 * 1.779 * 0.9, places=0)
 		frappe.delete_doc("Irrigation Run Sheet", sheet.name, force=True, ignore_permissions=True)
 
-	def test_the_valve_log_wins_over_the_run_sheet(self):
+	def test_the_larger_record_counts_never_both(self):
+		"""A 2 h test opening in the valve log must not hide a 10 h cycle ticked Done,
+		and the two are never added together."""
 		sheet = frappe.get_doc({"doctype": "Irrigation Run Sheet", "farm": FARM, "date": "2026-07-09", "runs": [
 			{"shift": "_TREB - SHIFT 1", "status": "Done", "planned_hours": 10, "planned_start": "2026-07-09 06:00:00"}]}).insert(ignore_permissions=True)
 		for at, state in (("2026-07-09 06:00:00", "Forced Open"), ("2026-07-09 08:00:00", "Auto")):
@@ -111,9 +113,51 @@ class TestRebuild(NoCommit, FrappeTestCase):
 			                "to_state": state, "source": "Operator"}).insert(ignore_permissions=True)
 		self.rebuild()
 		r = self.rows()["2026-07-09"]
-		self.assertEqual(r.irrigation_source, "Valve Log")
-		self.assertAlmostEqual(r.irrigation_mm, 2 * 1.779 * 0.9, places=1)  # 2 h, not 10 + 2
+		self.assertEqual(r.irrigation_source, "Run Sheet")
+		self.assertAlmostEqual(r.irrigation_mm, 10 * 1.779 * 0.9, places=0)  # 10 h, not 12
 		frappe.delete_doc("Irrigation Run Sheet", sheet.name, force=True, ignore_permissions=True)
+		frappe.db.delete("Valve Event", {"valve": self.valve})
+
+	def test_a_longer_valve_log_wins(self):
+		for at, state in (("2026-07-08 06:00:00", "Forced Open"), ("2026-07-08 12:00:00", "Auto")):
+			frappe.get_doc({"doctype": "Valve Event", "valve": self.valve, "block": self.block, "at": at,
+			                "to_state": state, "source": "Operator"}).insert(ignore_permissions=True)
+		self.rebuild()
+		r = self.rows()["2026-07-08"]
+		self.assertEqual(r.irrigation_source, "Valve Log")
+		self.assertAlmostEqual(r.irrigation_mm, 6 * 1.779 * 0.9, places=1)
+		frappe.db.delete("Valve Event", {"valve": self.valve})
+
+	def test_a_farm_with_no_weather_uses_the_fallback_not_zero(self):
+		other = "_Test NoWx Farm"
+		make_farm(other)
+		sec = make_warehouse("_Test NoWx Section", is_group=1, farm=other)
+		blk = make_warehouse("_Test NoWx Block", parent=sec, farm=other)
+		_profile(blk, area_ha=1, tree_count=250)
+		BA.rebuild(farm=other, start=self.start, end=self.start + datetime.timedelta(days=4))
+		rows = frappe.get_all("Irrigation Block Balance", filters={"block": blk}, fields=["epan_mm", "depletion_mm", "weather_estimated"], order_by="date asc")
+		self.assertTrue(all(r.weather_estimated for r in rows))
+		self.assertAlmostEqual(rows[0].epan_mm, 4.0)
+		self.assertGreater(rows[-1].depletion_mm, 0)
+
+	def test_a_long_gap_is_estimated_from_the_last_readings_on_record(self):
+		late = self.start + datetime.timedelta(days=60)
+		BA.rebuild(farm=FARM, start=late, end=late + datetime.timedelta(days=2))
+		r = frappe.get_all("Irrigation Block Balance", filters={"block": self.block, "date": str(late)}, fields=["epan_mm"])[0]
+		self.assertAlmostEqual(r.epan_mm, 5.0, places=2)  # the last logged days, not 0
+
+	def test_a_blank_1ft_irrometer_is_not_a_saturated_reading(self):
+		wr = frappe.get_all("Weather Reading", filters={"farm": FARM, "date": "2026-07-10"}, pluck="name")[0]
+		frappe.get_doc({"doctype": "Irrometer Reading", "parent": wr, "parenttype": "Weather Reading", "parentfield": "irrometer_reading",
+		                "irrigation_block": self.block, "date": "2026-07-10", "irrometer_2ft_reading": 40}).db_insert()
+		self.rebuild()
+		self.assertFalse(self.rows()["2026-07-10"].irrometer_adjusted)
+
+	def test_state_changing_endpoints_are_post_only(self):
+		from upande_irrigation.api import runsheet
+
+		for fn in (BA.rebuild, runsheet.generate, runsheet.set_status):
+			self.assertEqual(frappe.allowed_http_methods_for_whitelisted_func[fn], ["POST"], fn.__name__)
 
 	def test_missing_weather_is_estimated_and_flagged(self):
 		BA.rebuild(farm=FARM, start=self.start, end=self.start + datetime.timedelta(days=14))

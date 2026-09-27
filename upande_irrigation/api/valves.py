@@ -2,9 +2,8 @@
 
 For each Valve in `Tank And Valve` (asset_type='Valve'):
 
-  schedule_state   ON if NOW is between an Irrigation Planner's scheduled_start
-                   and scheduled_end whose shift contains the valve's block.
-                   OFF otherwise.
+  schedule_state   ON if NOW is inside a Planned/Running cycle on the Irrigation
+                   Run Sheet for a shift containing the valve's block. OFF otherwise.
 
   manual_state     Operator override: Auto / Forced Open / Forced Closed.
 
@@ -80,12 +79,17 @@ def list_states(farm=None):
 		       r.planned_start AS start_dt, r.planned_end AS end_dt, r.planned_hours AS shift_hours,
 		       r.status AS status
 		FROM `tabIrrigation Run` r
+		INNER JOIN `tabIrrigation Run Sheet` rs ON rs.name = r.parent
 		INNER JOIN `tabIrrigation Shift Block` sb
 		        ON sb.shift = r.shift AND sb.parenttype = 'Irrigation Scheduler' AND sb.parentfield = 'shift_blocks'
 		WHERE r.parenttype = 'Irrigation Run Sheet'
 		  AND r.status IN ('Planned', 'Running')
 		  AND r.planned_start IS NOT NULL
-		  AND (r.planned_start > %(now)s OR r.planned_end >= %(now)s OR r.status = 'Running')
+		  AND rs.date >= DATE_SUB(DATE(%(now)s), INTERVAL 1 DAY)
+		  -- A cycle left "Running" keeps its valves on only until 6 h past its
+		  -- planned end; after that it is a forgotten tick, not a running valve.
+		  AND (r.planned_start > %(now)s OR r.planned_end >= %(now)s
+		       OR (r.status = 'Running' AND r.planned_end >= DATE_SUB(%(now)s, INTERVAL 6 HOUR)))
 		ORDER BY r.planned_start ASC
 		""",
 		{"now": now_str},
@@ -434,20 +438,22 @@ def block_info(block):
 	for s in shifts:
 		s["other_blocks"] = sorted(partners.get(s["shift"], []))
 
-	today = frappe.utils.getdate()
+	# Today's run-sheet cycles for this block's shifts (the retired weekly
+	# Irrigation Planner is history only).
 	planners = []
-	for shift in names:
-		current = frappe.get_all(
-			"Irrigation Planner",
-			filters={"block": shift, "docstatus": ["<", 2], "from_date": ["<=", today], "to_date": [">=", today]},
-			fields=_PLANNER_FIELDS, order_by="from_date desc", limit=1,
-		) or frappe.get_all(
-			"Irrigation Planner", filters={"block": shift, "docstatus": ["<", 2]},
-			fields=_PLANNER_FIELDS, order_by="from_date desc", limit=1,
+	if names:
+		planners = frappe.db.sql(
+			"""
+			SELECT r.name, r.shift AS block, r.status, r.cycle_no, r.cycles, r.planned_start AS scheduled_start,
+			       r.planned_end AS scheduled_end, r.planned_hours AS shift_hours, r.net_mm, r.reason, r.kind,
+			       rs.name AS run_sheet
+			FROM `tabIrrigation Run` r JOIN `tabIrrigation Run Sheet` rs ON rs.name = r.parent
+			WHERE r.parenttype = 'Irrigation Run Sheet' AND rs.date = %(d)s AND r.shift IN %(s)s
+			ORDER BY r.planned_start IS NULL, r.planned_start
+			""",
+			{"d": frappe.utils.getdate(), "s": tuple(names)},
+			as_dict=True,
 		)
-		for p in current:
-			p["is_current"] = bool(p["from_date"] and p["to_date"] and p["from_date"] <= today <= p["to_date"])
-			planners.append(p)
 
 	valves = frappe.get_all(
 		"Tank And Valve", filters={"asset_type": "Valve", "block": block},

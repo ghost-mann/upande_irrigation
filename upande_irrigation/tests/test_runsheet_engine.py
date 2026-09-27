@@ -102,3 +102,35 @@ class TestWindows(FrappeTestCase):
 		        {"day": "Tuesday", "start_time": "06:00:00", "end_time": "18:00:00"}]
 		self.assertEqual(R.windows_for_date(DAY, rows, ""), [(at(6), at(12))])  # 2026-09-28 is a Monday
 		self.assertEqual(R.windows_for_date(DAY, rows, "2026-09-28\n2026-12-25"), [])
+
+
+class TestPlaceAroundExistingWork(FrappeTestCase):
+	"""Regeneration mid-day: never on top of a cycle already on the sheet, never in
+	the past, and overlapping windows must not double-book the pump."""
+
+	def req(self, shift, hours, urgency, kind="Due"):
+		return {"shift": shift, "section": "S", "hours": hours, "net_mm": 10, "urgency": urgency, "kind": kind, "reasons": []}
+
+	def test_busy_intervals_are_avoided(self):
+		rows = R.place({"P1": [self.req("B", 3, 1.4)]}, {"P1": [(at(6), at(18))]}, SETTINGS, busy={"P1": [(at(6), at(10))]})
+		self.assertEqual(rows[0]["planned_start"], at(10))
+
+	def test_nothing_is_placed_in_the_past(self):
+		rows = R.place({"P1": [self.req("B", 3, 1.4)]}, {"P1": [(at(6), at(18))]}, SETTINGS, not_before=at(15))
+		self.assertEqual(rows[0]["planned_start"], at(15))
+		late = R.place({"P1": [self.req("C", 4, 1.4)]}, {"P1": [(at(6), at(18))]}, SETTINGS, not_before=at(15))
+		self.assertEqual(late[0]["status"], "Not placed")
+
+	def test_overlapping_windows_are_merged(self):
+		w = R.windows_for_date(DAY, [{"day": "Every day", "start_time": "06:00:00", "end_time": "18:00:00"},
+		                             {"day": "Monday", "start_time": "08:00:00", "end_time": "12:00:00"}])
+		self.assertEqual(w, [(at(6), at(18))])
+		rows = R.place({"P1": [self.req(s, 3, 1.4 - i / 10) for i, s in enumerate("ABCD")]}, {"P1": w}, SETTINGS)
+		spans = sorted((r["planned_start"], r["planned_end"]) for r in rows if r["status"] == "Planned")
+		for (a0, a1), (b0, b1) in zip(spans, spans[1:]):
+			self.assertLessEqual(a1, b0)
+
+	def test_a_shift_with_no_rate_is_reported_not_dropped(self):
+		rows = R.place({"P1": [{**self.req("Z", 0, 1.4), "reasons": ["no application rate"]}]}, {"P1": [(at(6), at(18))]}, SETTINGS)
+		self.assertEqual(rows[0]["status"], "Not placed")
+		self.assertIn("no application rate", rows[0]["reason"])

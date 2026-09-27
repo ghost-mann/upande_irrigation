@@ -45,7 +45,10 @@ export default {
 		this.ctx = ctx;
 		this.el = el;
 		this.tab = tabFromHash();
-		this.date = new Date().toISOString().slice(0, 10);
+		/* Local date, not toISOString() — that is the UTC date, which between
+		 * 00:00 and 03:00 in Kenya is still yesterday. */
+		const d = new Date();
+		this.date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 		this.sort = { key: "ratio", dir: -1 };
 		el.innerHTML = `
 ${pagehead(
@@ -159,7 +162,9 @@ ${pagehead(
 			})
 			.join("");
 		body.querySelectorAll("[data-gen]").forEach((b) => b.addEventListener("click", () => this.generate()));
-		body.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => this.act(b.getAttribute("data-run"), b.getAttribute("data-act"))));
+		body.querySelectorAll("[data-act]").forEach((b) =>
+			b.addEventListener("click", () => this.act(b.getAttribute("data-run"), b.getAttribute("data-act"), b.getAttribute("data-from")))
+		);
 	},
 
 	timeline(runs) {
@@ -210,14 +215,16 @@ ${pagehead(
 	<td class="num">${r.net_mm != null ? `${charts.fmtNum(r.net_mm, 0)} mm` : "—"}</td>
 	<td>${blocks}${why ? `<div class="list__meta rs-why">${charts.esc(why)}</div>` : ""}</td>
 	<td><span class="sev ${STATUS_TONE[r.status] || "ink"}">${charts.esc(r.status)}</span></td>
-	<td class="rs-acts">${acts.map(([s, l]) => `<button class="btn ghost small" type="button" data-run="${charts.esc(r.name)}" data-act="${s}">${l}</button>`).join("")}</td>
+	<td class="rs-acts">${acts.map(([s, l]) => `<button class="btn ghost small" type="button" data-run="${charts.esc(r.name)}" data-act="${s}" data-from="${charts.esc(r.status)}">${l}</button>`).join("")}</td>
 </tr>`;
 	},
 
-	async act(run, status) {
+	async act(run, status, from) {
 		const { api } = this.ctx;
 		const args = { run, status };
-		if (status === "Partial") {
+		/* A cycle that was never placed has no planned time to credit, so Done
+		 * asks for the hours actually run, like Partial. */
+		if (status === "Partial" || (status === "Done" && from === "Not placed")) {
 			const h = window.prompt("Hours actually run?");
 			if (!h) return;
 			args.actual_hours = h;
