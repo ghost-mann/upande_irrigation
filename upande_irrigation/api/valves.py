@@ -401,3 +401,88 @@ def geojson(farm=None, asset_type=None):
 			"filters": {"farm": farm, "asset_type": asset_type},
 		},
 	}
+
+
+_PLANNER_FIELDS = [
+	"name", "block", "docstatus", "from_date", "to_date", "required_hours", "shift_hours",
+	"cycles_count", "cycle_hours_each", "cycle_plan", "scheduled_start", "scheduled_end",
+	"this_week_deficit", "total_water_needed_mm", "z_risk_level", "no_irrigation_reason",
+	"capacity_warning", "actually_irrigated",
+]
+
+
+@frappe.whitelist()
+def block_info(block):
+	"""Everything the Field Map's block card shows for one block warehouse:
+	the block itself, the shifts it belongs to (Irrigation Shift Block), this
+	week's planner for each shift (the one covering today, else the latest),
+	its valves and its latest irrometer reading. Valve state is not repeated
+	here — the map already holds it from list_states."""
+	if not frappe.db.exists("Warehouse", block):
+		raise frappe.DoesNotExistError(f"Block {block} not found")
+
+	meta = frappe.get_meta("Warehouse")
+	fields = ["name", "warehouse_name", "parent_warehouse", "warehouse_type", "is_group"]
+	fields += [f for f in ("custom_farm", "custom_area_ha") if meta.has_field(f)]
+	wh = frappe.db.get_value("Warehouse", block, fields, as_dict=True)
+
+	shifts = frappe.get_all(
+		"Irrigation Shift Block",
+		filters={"parenttype": "Irrigation Scheduler", "parentfield": "shift_blocks", "block": block},
+		fields=["shift", "farm", "is_active", "application_rate_mm_hr", "irrigation_coverage"],
+		order_by="shift asc",
+	)
+	# Every block the same shifts water, so the card can say "watered with …".
+	names = [s["shift"] for s in shifts]
+	partners = {}
+	if names:
+		for r in frappe.get_all(
+			"Irrigation Shift Block",
+			filters={"parenttype": "Irrigation Scheduler", "parentfield": "shift_blocks", "shift": ["in", names]},
+			fields=["shift", "block"],
+		):
+			if r["block"] != block:
+				partners.setdefault(r["shift"], []).append(r["block"])
+	for s in shifts:
+		s["other_blocks"] = sorted(partners.get(s["shift"], []))
+
+	today = frappe.utils.getdate()
+	planners = []
+	for shift in names:
+		current = frappe.get_all(
+			"Irrigation Planner",
+			filters={"block": shift, "docstatus": ["<", 2], "from_date": ["<=", today], "to_date": [">=", today]},
+			fields=_PLANNER_FIELDS, order_by="from_date desc", limit=1,
+		) or frappe.get_all(
+			"Irrigation Planner", filters={"block": shift, "docstatus": ["<", 2]},
+			fields=_PLANNER_FIELDS, order_by="from_date desc", limit=1,
+		)
+		for p in current:
+			p["is_current"] = bool(p["from_date"] and p["to_date"] and p["from_date"] <= today <= p["to_date"])
+			planners.append(p)
+
+	valves = frappe.get_all(
+		"Tank And Valve", filters={"asset_type": "Valve", "block": block},
+		fields=["name", "asset_label"], order_by="asset_label asc",
+	)
+
+	irro = frappe.get_all(
+		"Irrometer Reading", filters={"irrigation_block": block},
+		fields=["date", "irrometer_1ft_reading", "irrometer_2ft_reading"],
+		order_by="date desc", limit=1,
+	)
+
+	return {
+		"block": {
+			"name": wh["name"],
+			"label": wh.get("warehouse_name") or wh["name"],
+			"section": wh.get("parent_warehouse"),
+			"farm": wh.get("custom_farm"),
+			"area_ha": wh.get("custom_area_ha"),
+			"type": wh.get("warehouse_type"),
+		},
+		"shifts": shifts,
+		"planners": planners,
+		"valves": valves,
+		"irrometer": irro[0] if irro else None,
+	}

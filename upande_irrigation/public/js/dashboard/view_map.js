@@ -233,8 +233,11 @@ ${pagehead(
 <div class="status" id="map-status"></div>
 <div class="kpi-grid" id="map-kpis"></div>
 <div class="card">
-	<div class="fieldmap" id="map-canvas">
-		<div class="fieldmap__overlay" id="map-overlay">Loading map…</div>
+	<div class="irm__wrap">
+		<div class="fieldmap" id="map-canvas">
+			<div class="fieldmap__overlay" id="map-overlay">Loading map…</div>
+		</div>
+		<aside class="irm__card" id="map-block-card" hidden></aside>
 	</div>
 	<div class="clegend">
 		<span><i style="background:var(--ui-ok)"></i>Open · pulsing</span>
@@ -441,12 +444,18 @@ ${pagehead(
 			);
 		}
 
+		/* Valves stand inside blocks, so a valve near the click wins; otherwise
+		 * the block under it opens its card. */
 		map.on("click", (e) => {
-			const onBlock = map.queryRenderedFeatures(e.point, { layers: ["irr-blocks-fill"] });
-			if (onBlock && onBlock.length) return; // block handler runs instead
 			const hit = this.nearestValve(e.point, 28);
-			if (!hit) return;
-			this.openValvePopup(hit.name);
+			if (hit) {
+				this.openValvePopup(hit.name);
+				return;
+			}
+			const onBlock = map.getLayer("irr-blocks-fill")
+				? map.queryRenderedFeatures(e.point, { layers: ["irr-blocks-fill"] })
+				: [];
+			if (onBlock && onBlock.length) this.openBlockCard((onBlock[0].properties || {}).block);
 		});
 		this.maplibregl = maplibregl;
 
@@ -518,6 +527,106 @@ ${pagehead(
 		this.openValvePopup(name);
 	},
 
+	/* The block card: what the block is, which shifts water it, this week's
+	 * plan for them, its valves (live state from list_states) and its latest
+	 * irrometer reading. */
+	async openBlockCard(block) {
+		const { api, charts } = this.ctx;
+		const el = this.el.querySelector("#map-block-card");
+		if (!el || !block) return;
+		const token = (this.cardToken = (this.cardToken || 0) + 1);
+		el.hidden = false;
+		el.innerHTML = '<div class="irm__meta">Loading block…</div>';
+		let info;
+		try {
+			({ data: info } = await api.get("upande_irrigation.api.valves.block_info", { block }));
+		} catch (err) {
+			if (token === this.cardToken) el.innerHTML = `<button class="irm__close" type="button" aria-label="Close">&times;</button><div class="irm__empty">Could not load ${charts.esc(block)}: ${charts.esc(err.message)}</div>`;
+			this.bindCardClose(el);
+			return;
+		}
+		if (token !== this.cardToken || !info) return;
+
+		const b = info.block || {};
+		const hrs = (v) => (v == null ? "—" : `${charts.fmtNum(v, 1)} h`);
+		const day = (d) => (d ? charts.fmtDate(d) : "—");
+		const slot = (p) =>
+			p.scheduled_start && p.scheduled_end && p.scheduled_start !== p.scheduled_end
+				? `${charts.esc(charts.fmtDayClock(p.scheduled_start))} → ${charts.esc(charts.fmtClock(p.scheduled_end))}`
+				: "not scheduled";
+		const section = (title, body) => `<div class="bc__sec"><div class="bc__h">${title}</div>${body}</div>`;
+
+		const valves = (info.valves || [])
+			.map((v) => {
+				const st = this.stateByName ? this.stateByName.get(v.name) : null;
+				const on = st && st.effective_state === "ON";
+				return `<button class="bc__valve" type="button" data-valve="${charts.esc(v.name)}">
+	<span>${charts.esc(v.asset_label || v.name)}</span>
+	<span class="sev ${st && st.override_active ? "warn" : on ? "ok" : "ink"}">${st ? charts.esc(st.effective_state + (st.override_active ? " · override" : "")) : "—"}</span>
+</button>`;
+			})
+			.join("");
+
+		const shifts = (info.shifts || [])
+			.map(
+				(s) => `<div class="bc__row">
+	<b>${charts.esc(s.shift)}</b> <span class="sev ${s.is_active ? "lo" : "ink"}">${s.is_active ? "Active" : "Inactive"}</span>
+	<div class="irm__meta">${s.application_rate_mm_hr ? `${charts.fmtNum(s.application_rate_mm_hr, 1)} mm/hr` : "farm-default rate"} · ${s.irrigation_coverage ? `${charts.fmtNum(s.irrigation_coverage, 0)}% coverage` : "farm-default coverage"}${
+		s.other_blocks && s.other_blocks.length ? `<br>with ${s.other_blocks.map((x) => charts.esc(x.replace(/ - [A-Z]{2,4}$/, ""))).join(", ")}` : ""
+	}</div>
+</div>`
+			)
+			.join("");
+
+		const plans = (info.planners || [])
+			.map(
+				(p) => `<a class="bc__row bc__plan" href="/app/irrigation-planner/${encodeURIComponent(p.name)}" target="_blank" rel="noopener">
+	<b>${charts.esc(p.block)}</b> <span class="irm__meta">${day(p.from_date)} – ${day(p.to_date)}${p.is_current ? "" : " · latest"}</span>
+	<div class="bc__grid">
+		<span><small>Required</small>${hrs(p.required_hours)}</span>
+		<span><small>Shift</small>${hrs(p.shift_hours)}</span>
+		<span><small>Cycles</small>${p.cycles_count || "—"}${p.cycle_hours_each ? ` × ${charts.fmtNum(p.cycle_hours_each, 1)} h` : ""}</span>
+		<span><small>Deficit</small>${p.this_week_deficit == null ? "—" : `${charts.fmtNum(p.this_week_deficit, 1)} mm`}</span>
+	</div>
+	<div class="irm__meta">${slot(p)}${p.z_risk_level ? ` · Z ${charts.esc(p.z_risk_level)}` : ""}${p.docstatus === 1 ? " · submitted" : " · draft"}</div>
+	${p.no_irrigation_reason ? `<div class="irm__meta">${charts.esc(p.no_irrigation_reason)}</div>` : ""}
+	${p.capacity_warning ? `<div class="irm__meta" style="color:var(--ui-warn)">${charts.esc(p.capacity_warning)}</div>` : ""}
+</a>`
+			)
+			.join("");
+
+		const ir = info.irrometer;
+		el.innerHTML = `
+<button class="irm__close" type="button" aria-label="Close">&times;</button>
+<div class="irm__title">${charts.esc(b.label || block)}</div>
+<div class="irm__meta">${charts.esc(b.section || "—")}${b.farm ? ` · ${charts.esc(b.farm)}` : ""}${b.area_ha ? ` · ${charts.fmtNum(b.area_ha, 2)} ha` : ""}</div>
+${section(`Valves · ${(info.valves || []).length}`, valves || '<div class="irm__empty">No valve is mapped to this block.</div>')}
+${section("Shifts", shifts || '<div class="irm__empty">Not in any shift — set it on Irrigation Scheduler.</div>')}
+${section("This week", plans || '<div class="irm__empty">No planner for this block\'s shifts yet.</div>')}
+${section(
+	"Irrometer",
+	ir
+		? `<div class="irm__meta" style="margin:0">1 ft <b>${ir.irrometer_1ft_reading ?? "—"}</b> · 2 ft <b>${ir.irrometer_2ft_reading ?? "—"}</b> cb · ${day(ir.date)}</div>`
+		: '<div class="irm__empty">No readings yet.</div>'
+)}
+<a class="valve-locate" href="/app/warehouse/${encodeURIComponent(block)}" target="_blank" rel="noopener">Open block record</a>`;
+
+		el.querySelectorAll(".bc__valve").forEach((btn) => {
+			btn.addEventListener("click", () => this.openValvePopup(btn.getAttribute("data-valve")));
+		});
+		this.bindCardClose(el);
+	},
+
+	bindCardClose(el) {
+		const close = el.querySelector(".irm__close");
+		if (close) {
+			close.addEventListener("click", () => {
+				el.hidden = true;
+				this.cardToken = (this.cardToken || 0) + 1;
+			});
+		}
+	},
+
 	addBlockLayers(maplibregl, map, fc) {
 		const { charts } = this.ctx;
 		if (map.getSource("irr-blocks")) return;
@@ -552,17 +661,6 @@ ${pagehead(
 		};
 		map.on("zoom", showLabels);
 		showLabels();
-		map.on("click", "irr-blocks-fill", (e) => {
-			const f = e.features && e.features[0];
-			if (!f) return;
-			const p = f.properties || {};
-			new maplibregl.Popup({ closeOnClick: true })
-				.setLngLat(e.lngLat)
-				.setHTML(
-					`<div><strong>${charts.esc(p.block_label || p.block || "block")}</strong><br><span style="color:var(--ui-mute)">${charts.esc(p.section || "")}${p.farm ? ` · ${charts.esc(p.farm)}` : ""}</span></div>`
-				)
-				.addTo(map);
-		});
 		map.on("mouseenter", "irr-blocks-fill", () => {
 			map.getCanvas().style.cursor = "pointer";
 		});

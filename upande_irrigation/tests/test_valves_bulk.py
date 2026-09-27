@@ -119,3 +119,43 @@ class TestGeometryIsFarmScoped(NoCommit, FrappeTestCase):
 		self.assertEqual(out["type"], "FeatureCollection")
 		self.assertIsInstance(out["features"], list)
 		self.assertIn("unavailable", out["meta"])
+
+
+class TestBlockInfo(NoCommit, FrappeTestCase):
+	"""What the Field Map's block card shows: the block, its shifts, this
+	week's plan for them, its valves and its latest irrometer reading."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		self = cls
+		make_farm(FARM_A)
+		self.section = make_warehouse("_Test Info Section", is_group=1, farm=FARM_A)
+		self.block = make_warehouse("_Test Info Block", parent=self.section, farm=FARM_A)
+		self.valve = _valve("_TV INFO", FARM_A, self.block)
+		frappe.get_doc({
+			"doctype": "Irrigation Shift Block", "parent": "Irrigation Scheduler", "parenttype": "Irrigation Scheduler",
+			"parentfield": "shift_blocks", "shift": "_TEST - SHIFT 1", "block": self.block, "farm": FARM_A,
+			"is_active": 1, "application_rate_mm_hr": 3.5, "irrigation_coverage": 75,
+		}).db_insert()
+		today = frappe.utils.getdate()
+		frappe.get_doc({
+			"doctype": "Irrigation Planner", "block": "_TEST - SHIFT 1", "farm": FARM_A,
+			"from_date": frappe.utils.add_days(today, -1), "to_date": frappe.utils.add_days(today, 5),
+			"required_hours": 6.5,
+		}).db_insert()
+
+	def test_it_describes_the_block(self):
+		out = api.block_info(self.block)
+		self.assertEqual(out["block"]["section"], self.section)
+		self.assertEqual(out["block"]["farm"], FARM_A)
+		self.assertEqual([s["shift"] for s in out["shifts"]], ["_TEST - SHIFT 1"])
+		self.assertEqual(out["shifts"][0]["application_rate_mm_hr"], 3.5)
+		self.assertEqual([v["name"] for v in out["valves"]], [self.valve])
+		self.assertEqual(len(out["planners"]), 1)
+		self.assertEqual(out["planners"][0]["required_hours"], 6.5)
+		self.assertIn("irrometer", out)
+
+	def test_an_unknown_block_is_refused(self):
+		with self.assertRaises(frappe.DoesNotExistError):
+			api.block_info("_No Such Block - XX")

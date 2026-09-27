@@ -1542,3 +1542,69 @@
 .irm__range .input {
 	width: 150px;
 }
+
+/* ══════════════════════════════════════════════ field map block card */
+.bc__sec {
+	border-top: 1px solid var(--hairline);
+	padding-top: 10px;
+	margin-top: 10px;
+}
+
+.bc__h {
+	font: 600 10px var(--sans);
+	text-transform: uppercase;
+	letter-spacing: 0.8px;
+	color: var(--ink-mute);
+	margin-bottom: 6px;
+}
+
+.bc__row {
+	display: block;
+	padding: 6px 0;
+	color: inherit;
+	text-decoration: none;
+}
+
+.bc__row + .bc__row {
+	border-top: 1px dashed var(--hairline);
+}
+
+.bc__plan:hover b {
+	text-decoration: underline;
+}
+
+.bc__grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 4px 10px;
+	margin: 6px 0 2px;
+	font-variant-numeric: tabular-nums;
+}
+
+.bc__grid small {
+	display: block;
+	font: 500 9px var(--sans);
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
+	color: var(--ink-mute);
+}
+
+.bc__valve {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	gap: 8px;
+	border: 1px solid var(--hairline);
+	background: transparent;
+	border-radius: 9px;
+	padding: 6px 9px;
+	margin-bottom: 5px;
+	font: 500 12px var(--sans);
+	color: var(--ink-3);
+	cursor: pointer;
+}
+
+.bc__valve:hover {
+	border-color: var(--ink);
+}
