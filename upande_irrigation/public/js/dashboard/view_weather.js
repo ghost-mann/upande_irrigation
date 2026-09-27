@@ -124,6 +124,16 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 </div>
 
 <div class="card">
+	<div class="card__head"><h3>Irrigation sections</h3><span class="meta" id="wx-sections-count"></span></div>
+	<div class="tablewrap scroll">
+		<table class="table">
+			<thead><tr><th>Section</th><th class="num">Blocks</th><th class="num">Shifts</th><th class="num">Valves</th><th class="num">Coverage %</th><th class="num">Rate mm/hr</th><th class="num">Status</th></tr></thead>
+			<tbody id="wx-sections"></tbody>
+		</table>
+	</div>
+</div>
+
+<div class="card">
 	<div class="card__head"><h3>Blocks</h3><span class="meta" id="wx-blocks-count"></span></div>
 	<div class="tablewrap scroll">
 		<table class="table">
@@ -279,6 +289,16 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		const status = this.el.querySelector("#wx-status");
 		if (!keepStatus) statusStrip(status, "");
 
+		/* Sections come from the shift mapping, not the weather window, so they
+		 * load alongside and fail on their own. */
+		const sectionsReq = api
+			.get("upande_irrigation.api.weather.sections", { farm: filters.farm })
+			.then(({ data: d }) => (d && d.sections) || [])
+			.catch((err) => {
+				console.warn("[irrigation] sections failed", err);
+				return null;
+			});
+
 		let data;
 		try {
 			({ data } = await api.get("upande_irrigation.api.weather.fetch", {
@@ -310,7 +330,40 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		this.renderKpis(data.kpis, weather);
 		this.renderCharts(weather, meta);
 		this.renderIrrometer(blocks);
+		this.renderSections(await sectionsReq);
 		this.renderBlocks(blocks);
+	},
+
+	renderSections(sections) {
+		const { charts } = this.ctx;
+		const body = this.el.querySelector("#wx-sections");
+		const count = this.el.querySelector("#wx-sections-count");
+		if (sections == null) {
+			count.textContent = "";
+			body.innerHTML = '<tr><td colspan="7"><div class="empty small">Sections could not be loaded.</div></td></tr>';
+			return;
+		}
+		count.textContent = `${sections.length} ${sections.length === 1 ? "section" : "sections"} · from the shift mapping`;
+		if (!sections.length) {
+			body.innerHTML = '<tr><td colspan="7"><div class="empty small">No shifts are mapped to blocks yet — set them on Irrigation Scheduler.</div></td></tr>';
+			return;
+		}
+		/* A blank rate/coverage means every shift inherits the farm default from
+		 * Irrigation Settings — say so rather than print a dash that reads as missing data. */
+		const inherit = '<span style="color:var(--ui-mute)">farm default</span>';
+		body.innerHTML = sections
+			.map(
+				(r) => `<tr>
+	<td><b>${charts.esc(shortSection(r.section) || r.section)}</b>${r.farm ? `<div class="list__meta">${charts.esc(r.farm)}</div>` : ""}</td>
+	<td class="num">${r.blocks}</td>
+	<td class="num">${r.shifts}</td>
+	<td class="num">${r.valves}</td>
+	<td class="num">${r.coverage_pct == null ? inherit : charts.fmtNum(r.coverage_pct, 0)}</td>
+	<td class="num">${r.application_rate_mm_hr == null ? inherit : charts.fmtNum(r.application_rate_mm_hr, 1)}</td>
+	<td class="num"><span class="sev ${r.active ? "lo" : "ink"}">${r.active ? "Active" : "Idle"}</span></td>
+</tr>`
+			)
+			.join("");
 	},
 
 	renderKpis(kpis, weather) {
@@ -388,6 +441,8 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 					xLabels: dates,
 					tooltip: true,
 					noFill: true,
+					/* The shaded min–max envelope Meniscus drew behind the lines. */
+					band: { lo, hi, color: T.heat },
 					yMin: Math.floor(Math.min(...loVals) - 2),
 					yMax: Math.ceil(Math.max(...hiVals) + 2),
 				}

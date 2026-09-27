@@ -223,3 +223,80 @@ def fetch(days=30, farm="", start_date="", end_date=""):
 		"block_summary": block_summary,
 		"blocks_error":  blocks_error,
 	}
+
+
+@frappe.whitelist()
+def sections(farm=""):
+	"""One row per irrigation section, for the Weather view's Sections table.
+
+	Built from the shift→block mapping (Irrigation Shift Block on the Irrigation
+	Scheduler single) and the valves in Tank And Valve. A section is a block's
+	parent_warehouse — the 2026-09-13 migration verified that agrees with the
+	stated section on all 89 rows, so it is derived rather than stored.
+
+	Rate and coverage average the shifts that override them; a section whose
+	shifts all inherit the farm default reports None for that column.
+	"""
+	params = {}
+	farm_clause = ""
+	if farm:
+		farm_clause = " AND sb.farm = %(farm)s"
+		params["farm"] = farm
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT sb.shift, sb.block, sb.farm, sb.is_active,
+		       sb.application_rate_mm_hr, sb.irrigation_coverage,
+		       w.parent_warehouse AS section
+		FROM `tabIrrigation Shift Block` sb
+		LEFT JOIN `tabWarehouse` w ON w.name = sb.block
+		WHERE sb.parenttype = 'Irrigation Scheduler'
+		  AND sb.parentfield = 'shift_blocks'{farm_clause}
+		""",
+		params,
+		as_dict=True,
+	)
+
+	valves = dict(frappe.db.sql(
+		"""SELECT block, COUNT(*) FROM `tabTank And Valve`
+		   WHERE asset_type = 'Valve' AND IFNULL(block, '') != '' GROUP BY block"""
+	))
+
+	by_section = {}
+	for r in rows:
+		key = r["section"] or "(no section)"
+		s = by_section.setdefault(key, {
+			"section": key, "farm": r["farm"], "blocks": set(), "shifts": set(),
+			"rates": {}, "coverages": {}, "active": False,
+		})
+		if r["block"]:
+			s["blocks"].add(r["block"])
+		if r["shift"]:
+			s["shifts"].add(r["shift"])
+		# Shift-level attributes repeat across a shift's block rows; key by shift
+		# so a three-block shift counts once in the average.
+		if r["application_rate_mm_hr"]:
+			s["rates"][r["shift"]] = float(r["application_rate_mm_hr"])
+		if r["irrigation_coverage"]:
+			s["coverages"][r["shift"]] = float(r["irrigation_coverage"])
+		if r["is_active"]:
+			s["active"] = True
+
+	def avg(d):
+		return round(sum(d.values()) / len(d), 2) if d else None
+
+	out = [
+		{
+			"section": s["section"],
+			"farm": s["farm"],
+			"blocks": len(s["blocks"]),
+			"shifts": len(s["shifts"]),
+			"valves": sum(valves.get(b, 0) for b in s["blocks"]),
+			"application_rate_mm_hr": avg(s["rates"]),
+			"coverage_pct": avg(s["coverages"]),
+			"active": s["active"],
+		}
+		for s in by_section.values()
+	]
+	out.sort(key=lambda r: r["section"])
+	return {"sections": out, "farm": farm or "all"}

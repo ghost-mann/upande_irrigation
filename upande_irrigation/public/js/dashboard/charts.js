@@ -278,15 +278,22 @@ export function mkChart(host, series, W, H, opts = {}) {
 
 	/* Optional min/max envelope behind the lines (temperature). */
 	if (opts.band && opts.band.lo && opts.band.hi) {
-		const gid = nextId();
-		defs += `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${opts.band.color}" stop-opacity=".20"/><stop offset="100%" stop-color="${opts.band.color}" stop-opacity=".05"/></linearGradient>`;
-		const top = opts.band.hi.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" L ");
-		const bot = opts.band.lo
-			.map((v, i) => ({ v, i }))
-			.reverse()
-			.map((p) => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`)
-			.join(" L ");
-		body += `<path d="M ${top} L ${bot} Z" fill="url(#${gid})"/>`;
+		/* Only days carrying both bounds; a null would put NaN in the path and
+		 * the browser drops the whole shape. */
+		const idx = opts.band.hi
+			.map((v, i) => i)
+			.filter((i) => opts.band.hi[i] != null && opts.band.lo[i] != null);
+		if (idx.length > 1) {
+			const gid = nextId();
+			defs += `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${opts.band.color}" stop-opacity=".20"/><stop offset="100%" stop-color="${opts.band.color}" stop-opacity=".05"/></linearGradient>`;
+			const top = idx.map((i) => `${x(i).toFixed(1)},${y(opts.band.hi[i]).toFixed(1)}`).join(" L ");
+			const bot = idx
+				.slice()
+				.reverse()
+				.map((i) => `${x(i).toFixed(1)},${y(opts.band.lo[i]).toFixed(1)}`)
+				.join(" L ");
+			body += `<path d="M ${top} L ${bot} Z" fill="url(#${gid})"/>`;
+		}
 	}
 
 	series.forEach((s, si) => {
