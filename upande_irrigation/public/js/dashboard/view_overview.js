@@ -52,7 +52,7 @@ ${pagehead(
 
 <div class="card" id="ov-week-card">
 	<div class="card__head">
-		<h3>${icon("calendar")}This week's schedule</h3>
+		<h3>${icon("calendar")}Next 7 days — shifts due</h3>
 		<span class="meta">one column per day · each block is a shift, labelled with its hours</span>
 	</div>
 	<div id="ov-week-grid"><div class="skel skel-card" style="height:170px"></div></div>
@@ -78,7 +78,7 @@ ${pagehead(
 		<div id="ov-coverage"></div>
 	</div>
 	<div class="card">
-		<div class="card__head"><h3>${icon("trend")}Deficit carried</h3><span class="meta">mean mm unmet per shift, recent weeks</span></div>
+		<div class="card__head"><h3>${icon("trend")}Root-zone depletion</h3><span class="meta">mean % of available water used, last 30 days</span></div>
 		<div id="ov-trend"></div>
 	</div>
 </div>`;
@@ -106,17 +106,16 @@ ${pagehead(
 		const week = data.week || {};
 		const weekEl = this.el.querySelector("#ov-week");
 		if (weekEl) {
-			const span = `Week of ${charts.fmtDate(week.from_date)} – ${charts.fmtDate(week.to_date)}`;
+			const span = `${charts.fmtDate(week.from_date)} – ${charts.fmtDate(week.to_date)}`;
 			/* "0 planners across 0 farms · 0 shift hours" is noise; say the one
 			 * thing that is true instead. */
 			const rain = week.rainfall_mm;
 			const et = week.et_crop_mm;
 			const water =
-				rain != null && et != null ? ` · ${charts.fmtNum(rain)} mm rain against ${charts.fmtNum(et)} mm ET crop` : "";
+				et != null ? ` · crop using about ${charts.fmtNum(et)} mm a week` : "";
 			weekEl.textContent = week.planners
-				? `${span} · ${week.planners} planner${week.planners === 1 ? "" : "s"} across ` +
-					`${week.farms} farm${week.farms === 1 ? "" : "s"} · ${week.shift_hours} shift hours${water}`
-				: `${span} · no planners generated yet`;
+				? `${span} · ${week.planners} cycle${week.planners === 1 ? "" : "s"} on today's run sheet · ${week.shift_hours} h${water}`
+				: `${span} · no run sheet for today yet${water}`;
 		}
 
 		this.renderTiles(data.tiles || []);
@@ -167,11 +166,11 @@ ${pagehead(
 		if (!schedule || !(schedule.sections || []).length) {
 			host.innerHTML = `<div class="empty lg">
 	<div class="ic">${icon("calendar")}</div>
-	<h4>No shifts scheduled this week</h4>
-	<p>The scheduler builds the week's planners every Friday at 06:00. Run it now to fill this week.</p>
+	<h4>No shift comes due in the next 7 days</h4>
+	<p>Every block stays above its irrigation point on the current water balance. Block profiles set how much water each root zone holds.</p>
 	<div class="acts">
-		<a class="btn" href="/app/irrigation-scheduler">Open scheduler</a>
-		<a class="btn ghost" href="/app/irrigation-planner">See all planners</a>
+		<a class="btn" href="#planner">Open the irrigation plan</a>
+		<a class="btn ghost" href="/app/irrigation-block-profile">Block profiles</a>
 	</div>
 </div>`;
 			return;
@@ -281,7 +280,7 @@ ${pagehead(
 				value: `${Math.round(s.coverage_pct)}%`,
 			}));
 		if (!rows.length) {
-			host.innerHTML = '<div class="empty small">Coverage appears once this week\'s planners carry a water demand.</div>';
+			host.innerHTML = '<div class="empty small">Water replaced appears once irrigation is recorded on a run sheet.</div>';
 			return;
 		}
 		charts.healthBars(host, rows);
@@ -291,18 +290,18 @@ ${pagehead(
 		const { charts } = this.ctx;
 		const host = this.el.querySelector("#ov-trend");
 		if (!trend || !(trend.values || []).length) {
-			host.innerHTML = '<div class="empty small">Needs a few weeks of planners before a trend means anything.</div>';
+			host.innerHTML = '<div class="empty small">The trend appears once the water balance has a few days of history.</div>';
 			return;
 		}
 		/* An all-zero series plots as five "0" gridlines and a flat line, which
 		 * looks like a broken axis. The fact itself is good news — say it. */
 		if (trend.values.every((v) => !v)) {
-			host.innerHTML = `<div class="empty">${icon("check")}No deficit carried in the last ${trend.values.length} weeks — every shift met its demand.</div>`;
+			host.innerHTML = `<div class="empty">${icon("check")}Every root zone stayed full over the last ${trend.values.length} days.</div>`;
 			return;
 		}
 		charts.mkChart(
 			host,
-			[{ label: "Unmet per shift", color: "var(--ui-hot)", values: trend.values, unit: "mm" }],
+			[{ label: "Mean depletion", color: "var(--ui-hot)", values: trend.values, unit: "%" }],
 			560,
 			195,
 			{ xLabels: trend.labels, tooltip: true }

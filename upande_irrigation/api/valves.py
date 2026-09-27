@@ -460,7 +460,16 @@ def block_info(block):
 		order_by="date desc", limit=1,
 	)
 
+	water = None
+	try:
+		from upande_irrigation.api.balance import state
+
+		water = state(wh.get("custom_farm")).get(block)
+	except Exception:
+		frappe.log_error(title=f"Upande Irrigation — block water state for {block}")
+
 	return {
+		"water": water,
 		"block": {
 			"name": wh["name"],
 			"label": wh.get("warehouse_name") or wh["name"],

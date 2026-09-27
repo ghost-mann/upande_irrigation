@@ -113,6 +113,10 @@ from a button:
 3. Per pump, order by urgency (max D/RAW, then trigger day) and place cycles one at a time in
    that pump's run windows for the date. Cycles of the same shift are separated by
    `cycle_rest_hours`.
+   A section with **no Irrigation Pump Profile** uses the settings' default run window
+   (06:00–18:00), and all such sections share one queue, because an unknown pump might be one
+   pump. The rows say so. A profile whose window table is empty still gets nothing placed.
+   *(Decided during implementation: without it a fresh site would place nothing at all.)*
 4. Whatever does not fit is written as **Not placed**, with the hours needed. Its blocks'
    deficit keeps growing, so it ranks higher tomorrow. Nothing is silently dropped.
 5. It is idempotent: regenerating replaces only rows still **Planned** or **Not placed**. Rows

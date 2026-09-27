@@ -64,7 +64,7 @@ export function icon(name, extra = "") {
 /* Sidebar order. The separator splits "look at the data" from "act on it". */
 const NAV = [
 	["overview", "Overview"],
-	["planner", "Planning"],
+	["planner", "Irrigation plan"],
 	["weather", "Weather"],
 	["compare", "Compare"],
 	["iot", "IoT Sensors"],
@@ -188,11 +188,11 @@ export class Shell {
 		<div class="side__section">
 			<div class="side__label">Legend</div>
 			<div class="side__legend">
-				<span><i style="background:var(--sev-high)"></i>Deficit · action needed</span>
-				<span><i style="background:var(--sev-mod)"></i>Watch · pump-capped</span>
-				<span><i style="background:var(--sev-low)"></i>On track · irrigating</span>
-				<span><i style="background:var(--trap-500)"></i>Scheduled shift</span>
-				<span><i style="background:rgba(10,10,10,0.06)"></i>Not scheduled</span>
+				<span><i style="background:var(--sev-high)"></i>Past its irrigation point · due</span>
+				<span><i style="background:var(--sev-mod)"></i>Due soon · not placed</span>
+				<span><i style="background:var(--sev-low)"></i>Irrigating · done</span>
+				<span><i style="background:var(--trap-500)"></i>Planned cycle</span>
+				<span><i style="background:rgba(10,10,10,0.06)"></i>Not due</span>
 			</div>
 		</div>
 

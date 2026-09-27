@@ -600,6 +600,17 @@ ${pagehead(
 <button class="irm__close" type="button" aria-label="Close">&times;</button>
 <div class="irm__title">${charts.esc(b.label || block)}</div>
 <div class="irm__meta">${charts.esc(b.section || "—")}${b.farm ? ` · ${charts.esc(b.farm)}` : ""}${b.area_ha ? ` · ${charts.fmtNum(b.area_ha, 2)} ha` : ""}</div>
+${info.water ? section("Soil water", (() => {
+	const w = info.water;
+	const d = w.taw_mm ? Math.min(100, (100 * w.depletion_mm) / w.taw_mm) : 0;
+	const raw = w.taw_mm ? (100 * w.raw_mm) / w.taw_mm : 0;
+	const due = w.depletion_mm >= w.raw_mm;
+	return `<div class="bk-gauge" style="width:100%;margin:4px 0 8px"><i style="width:${d}%;background:${due ? "var(--ui-hot)" : "var(--ui-teal)"}"></i><b style="left:${raw}%"></b></div>
+<div class="irm__meta" style="margin:0">${charts.fmtNum(w.depletion_mm, 1)} of ${charts.fmtNum(w.taw_mm, 0)} mm used (${Math.round(w.depletion_pct)}%) · irrigate at ${charts.fmtNum(w.raw_mm, 0)} mm<br>
+<b>${due ? "Due now" : w.trigger_day != null ? `Due in ${w.trigger_day} d` : "Not due within 7 days"}</b> · last irrigated ${w.last_irrigated ? charts.esc(charts.fmtDate(w.last_irrigated)) : "— none recorded"}
+${w.stale_weather ? '<br><span style="color:var(--ui-warn)">Weather estimated — no reading for 3+ days</span>' : ""}</div>
+<a class="valve-locate" href="#planner?tab=blocks">Open in the irrigation plan</a>`;
+})()) : ""}
 ${section(`Valves · ${(info.valves || []).length}`, valves || '<div class="irm__empty">No valve is mapped to this block.</div>')}
 ${section("Shifts", shifts || '<div class="irm__empty">Not in any shift — set it on Irrigation Scheduler.</div>')}
 ${section("This week", plans || '<div class="irm__empty">No planner for this block\'s shifts yet.</div>')}

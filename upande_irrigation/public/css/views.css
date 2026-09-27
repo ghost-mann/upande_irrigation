@@ -1640,3 +1640,187 @@
 .r-mon-note:empty {
 	display: none;
 }
+
+/* ══════════════════════════════════════════════ irrigation plan */
+.rs-tl {
+	margin: 4px 0 16px;
+	font: 500 11px var(--sans);
+}
+
+.rs-tl__scale {
+	position: relative;
+	height: 16px;
+	margin-left: 150px;
+	color: var(--ink-mute);
+}
+
+.rs-tl__scale span {
+	position: absolute;
+	transform: translateX(-50%);
+}
+
+.rs-tl__row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 6px;
+}
+
+.rs-tl__pump {
+	flex: 0 0 140px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: var(--ink-4);
+}
+
+.rs-tl__lane {
+	position: relative;
+	flex: 1;
+	height: 26px;
+	background: rgba(10, 10, 10, 0.04);
+	border-radius: 8px;
+}
+
+.rs-tl__bar {
+	position: absolute;
+	top: 3px;
+	bottom: 3px;
+	border-radius: 6px;
+	background: var(--ui-teal);
+	color: #fff;
+	font-size: 10px;
+	line-height: 20px;
+	text-align: center;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+.rs-tl__bar.done,
+.rs-tl__bar.partial {
+	background: var(--ui-ok);
+}
+
+.rs-tl__bar.skipped {
+	background: var(--ui-hot);
+	opacity: 0.6;
+}
+
+.rs-tl__bar.ahead {
+	background: repeating-linear-gradient(45deg, var(--ui-teal), var(--ui-teal) 5px, #3a9d98 5px, #3a9d98 10px);
+}
+
+.rs-tl__now {
+	position: absolute;
+	top: -4px;
+	bottom: -4px;
+	width: 2px;
+	background: var(--ui-hot);
+	z-index: 2;
+}
+
+.rs-chip {
+	display: inline-block;
+	margin: 0 4px 3px 0;
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: rgba(10, 10, 10, 0.05);
+	font: 500 11px var(--sans);
+	color: var(--ink-4);
+}
+
+.rs-chip.due {
+	background: rgba(196, 48, 43, 0.12);
+	color: var(--ui-hot);
+}
+
+.rs-why {
+	max-width: 420px;
+}
+
+.rs-acts {
+	white-space: nowrap;
+}
+
+.rs-acts .btn {
+	margin: 0 3px 3px 0;
+}
+
+.wk-due {
+	display: inline-block;
+	padding: 3px 8px;
+	border-radius: 7px;
+	background: var(--ui-teal);
+	color: #fff;
+	font: 600 11px var(--sans);
+}
+
+.wk-dry {
+	color: var(--ink-mute);
+	font-size: 11px;
+}
+
+.wk-load td {
+	background: rgba(10, 10, 10, 0.025);
+}
+
+.bk-table tr[data-block] {
+	cursor: pointer;
+}
+
+.bk-table tr.on td {
+	background: rgba(34, 136, 131, 0.08);
+}
+
+.bk-table th.sortable {
+	cursor: pointer;
+	user-select: none;
+}
+
+.bk-gauge {
+	position: relative;
+	width: 120px;
+	height: 10px;
+	border-radius: 999px;
+	background: rgba(10, 10, 10, 0.07);
+	overflow: visible;
+}
+
+.bk-gauge i {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	border-radius: 999px;
+}
+
+.bk-gauge b {
+	position: absolute;
+	top: -3px;
+	bottom: -3px;
+	width: 2px;
+	background: var(--ui-warn);
+}
+
+.bk-facts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 18px;
+	margin-top: 12px;
+	font: 400 12.5px var(--sans);
+	color: var(--ink-4);
+}
+
+.bk-facts b {
+	color: var(--ink);
+}
+
+@media (max-width: 900px) {
+	.rs-tl__scale {
+		margin-left: 90px;
+	}
+
+	.rs-tl__pump {
+		flex-basis: 80px;
+	}
+}

@@ -6,9 +6,8 @@
  * honest between polls instead of drifting off a 30-second-old
  * seconds_remaining.
  *
- * Note this view depends on Irrigation Planner.cycles_count / cycle_hours_each,
- * which patches/v1_0/add_planner_cycle_fields.py creates — live_sections raised
- * "Unknown column" before that patch, taking this whole page with it.
+ * Since 2026-09-28 the cycles come from today's Irrigation Run Sheet
+ * (api.runsheet.live_sections), not the retired weekly planner.
  */
 
 import { pagehead, kpi, statusStrip, icon } from "./shell.js";
@@ -77,7 +76,7 @@ ${pagehead(
 
 		let data;
 		try {
-			({ data } = await api.get("upande_irrigation.api.scheduler.live_sections", {
+			({ data } = await api.get("upande_irrigation.api.runsheet.live_sections", {
 				farm: filters.farm,
 			}));
 		} catch (err) {
@@ -95,14 +94,14 @@ ${pagehead(
 		shell.setCount("now", active.length || "");
 
 		this.el.querySelector("#now-kpis").innerHTML =
-			kpi("var(--ui-ink4)", "Sections", sections.length, "", "with planners scheduled") +
+			kpi("var(--ui-ink4)", "Sections", sections.length, "", "on today's run sheet") +
 			kpi("var(--ui-ok)", "Irrigating now", active.length, "", active.length ? "running" : "none running") +
 			kpi("var(--ui-mute)", "Idle", sections.length - active.length, "", "awaiting next shift") +
 			kpi("var(--ui-clay)", "Farms", farms.length, "", "in this view");
 
 		const body = this.el.querySelector("#now-body");
 		if (!farms.length) {
-			body.innerHTML = `<div class="card"><div class="empty">No active or upcoming shifts. Run the scheduler to generate this week's planners.<div style="margin-top:12px"><a class="btn ghost small" href="/app/irrigation-scheduler" style="text-decoration:none">Open scheduler</a></div></div></div>`;
+			body.innerHTML = `<div class="card"><div class="empty">No cycles running or planned for the rest of today. The run sheet is generated each morning — or generate it now from the Irrigation plan.<div style="margin-top:12px"><a class="btn ghost small" href="#planner" style="text-decoration:none">Open the irrigation plan</a></div></div></div>`;
 			return;
 		}
 

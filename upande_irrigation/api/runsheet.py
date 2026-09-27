@@ -267,3 +267,96 @@ def week(farm=None, date=None):
 				capacity.setdefault(pump, {})[d] = round(sum((b - a).total_seconds() for a, b in w) / 3600.0, 1)
 		out.append({"farm": f, "days": days, "shifts": shifts, "load": load, "capacity": capacity})
 	return {"date": str(date), "farms": out}
+
+
+@frappe.whitelist()
+def live_sections(farm=None):
+	"""Irrigation Now: per section, the cycle running now and the next few, from
+	today's run sheet. Same shape the Now view has always rendered."""
+	now = frappe.utils.now_datetime()
+	date = now.date()
+	out = []
+	for f in ([farm] if farm else _balance_farms()):
+		_sheet, rows = _sheet_rows(f, date)
+		by_section = {}
+		for r in rows:
+			if r["status"] not in ("Planned", "Running") or not r.get("planned_start"):
+				continue
+			by_section.setdefault(r.get("section") or "—", []).append(r)
+		sections = []
+		for section, rs in sorted(by_section.items()):
+			rs.sort(key=lambda r: r["planned_start"])
+			current = None
+			for r in rs:
+				start, end = frappe.utils.get_datetime(r["planned_start"]), frappe.utils.get_datetime(r["planned_end"])
+				if r["status"] == "Running" or start <= now <= end:
+					same = [x for x in rs if x["shift"] == r["shift"]]
+					current = {
+						"shift": r["shift"], "started_at": str(r.get("actual_start") or start), "ends_at": str(end),
+						"cycles_count": r.get("cycles") or 1, "cycle_hours_each": r.get("planned_hours") or 0,
+						"cycles": [{"n": x["cycle_no"], "starts_at": str(x["planned_start"]), "ends_at": str(x["planned_end"])} for x in same],
+						"run": r["name"],
+					}
+					break
+			upcoming = [
+				{"shift": r["shift"], "starts_at": str(r["planned_start"]), "shift_hours": r["planned_hours"],
+				 "cycles_count": r.get("cycles") or 1, "cycle_hours_each": r["planned_hours"]}
+				for r in rs if frappe.utils.get_datetime(r["planned_start"]) > now
+			][:3]
+			sections.append({"section": section, "current": current, "upcoming": upcoming})
+		if sections:
+			out.append({"farm": f, "sections": sections})
+	return {"farms": out, "now": str(now)}
+
+
+@frappe.whitelist()
+def budget(farm=None, weeks=8):
+	"""Per section per week (Monday start): water the crop needed (ETc over the
+	block areas), water recorded as applied (gross, from the balance), and water
+	metered (Water Meter Reading), with the recorded-vs-metered gap."""
+	weeks = max(1, min(int(weeks or 8), 52))
+	today = frappe.utils.getdate()
+	start = frappe.utils.add_days(today, -today.weekday() - 7 * (weeks - 1))
+	args = {"start": start, "farm": farm}
+	farm_clause = " AND b.farm = %(farm)s" if farm else ""
+	# mm over ha → m³: 1 mm on 1 ha = 10 m³. Recorded net ÷ efficiency = gross applied.
+	rows = frappe.db.sql(
+		f"""
+		SELECT w.parent_warehouse AS section, b.farm AS farm,
+		       DATE_SUB(b.date, INTERVAL WEEKDAY(b.date) DAY) AS week,
+		       SUM(b.etc_mm * p.area_ha * 10) AS needed_m3,
+		       SUM(b.effective_rain_mm * p.area_ha * 10) AS rain_m3,
+		       SUM(b.irrigation_mm / IF(p.application_efficiency > 0, p.application_efficiency, 0.9) * p.area_ha * 10) AS recorded_m3
+		FROM `tabIrrigation Block Balance` b
+		JOIN `tabIrrigation Block Profile` p ON p.name = b.block
+		JOIN `tabWarehouse` w ON w.name = b.block
+		WHERE b.date >= %(start)s {farm_clause}
+		GROUP BY section, b.farm, week
+		ORDER BY section, week
+		""",
+		args,
+		as_dict=True,
+	)
+	metered = frappe.db.sql(
+		"""
+		SELECT irrigation_section AS section, DATE_SUB(DATE(date), INTERVAL WEEKDAY(date) DAY) AS week,
+		       SUM(units_used) AS m3
+		FROM `tabWater Meter Reading`
+		WHERE docstatus = 1 AND date >= %(start)s
+		GROUP BY section, week
+		""",
+		args,
+		as_dict=True,
+	)
+	meter = {(m.section, str(m.week)): float(m.m3 or 0) for m in metered}
+	out = []
+	for r in rows:
+		m3 = meter.get((r.section, str(r.week)))
+		rec = float(r.recorded_m3 or 0)
+		out.append({
+			"section": r.section, "farm": r.farm, "week": str(r.week),
+			"needed_m3": round(float(r.needed_m3 or 0), 0), "rain_m3": round(float(r.rain_m3 or 0), 0),
+			"recorded_m3": round(rec, 0), "metered_m3": round(m3, 0) if m3 is not None else None,
+			"gap_pct": round(100.0 * (m3 - rec) / m3, 0) if m3 else None,
+		})
+	return {"weeks": weeks, "from": str(start), "rows": out}
