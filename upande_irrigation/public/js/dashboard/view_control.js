@@ -7,6 +7,11 @@
  *
  * effective_state comes from api.valves.list_states — manual override wins, else
  * the schedule window from the active planner.
+ *
+ * Bulk actions (Close all / Open all / Reset all to Auto, and the same per
+ * group) call api.valves.set_override_bulk with an explicit valve list, so
+ * what gets overridden is exactly what the operator is looking at — the farm
+ * filter included. Each asks for confirmation naming the count.
  */
 
 import { pagehead, kpi, statusStrip, icon } from "./shell.js";
@@ -35,9 +40,23 @@ ${pagehead(
 )}
 <div class="status" id="vc-status"></div>
 <div class="kpi-grid stagger" id="vc-kpis"></div>
+<div class="card bulkbar" id="vc-bulk" hidden>
+	<div class="bulkbar__label"><b>All valves in view</b><span id="vc-bulk-meta"></span></div>
+	<div class="bulkbar__actions">
+		<button class="btn ghost" type="button" data-bulk="Auto">${icon("refresh")}Reset all to Auto</button>
+		<button class="btn ghost" type="button" data-bulk="Forced Open">Open all</button>
+		<button class="btn danger" type="button" data-bulk="Forced Closed">Close all</button>
+	</div>
+</div>
 <div id="vc-body"><div class="loading">Loading…</div></div>`;
 
 		el.querySelector("#vc-refresh").addEventListener("click", () => this.refresh());
+		el.querySelectorAll("#vc-bulk [data-bulk]").forEach((btn) => {
+			btn.addEventListener("click", () => {
+				const names = (this.valves || []).map((v) => v.name);
+				this.bulk(btn.getAttribute("data-bulk"), names, "every valve in this view");
+			});
+		});
 		this.unsubscribe = ctx.onFilterChange(() => {});
 	},
 
@@ -59,6 +78,10 @@ ${pagehead(
 
 		const valves = data.valves || [];
 		const tanks = data.tanks || [];
+		this.valves = valves;
+		const bulkbar = this.el.querySelector("#vc-bulk");
+		bulkbar.hidden = !valves.length;
+		this.el.querySelector("#vc-bulk-meta").textContent = `${valves.length} valve${valves.length === 1 ? "" : "s"}${filters.farm ? ` · ${filters.farm}` : " · all farms"}`;
 		shell.setFarms(valves.map((v) => v.farm).filter(Boolean));
 
 		const on = valves.filter((v) => v.effective_state === "ON").length;
@@ -107,6 +130,7 @@ ${pagehead(
 		});
 
 		/* Tanks first, then prefixes, each alphabetically. */
+		this.groups = groups;
 		const keys = Object.keys(groups).sort((a, b) => {
 			const aTank = a.startsWith("tank:");
 			const bTank = b.startsWith("tank:");
@@ -130,6 +154,9 @@ ${pagehead(
 	<div class="card__head">
 		<h3>${icon("drop")}${charts.esc(labels[k])}</h3>
 		<span class="meta">${list.length} valve${list.length === 1 ? "" : "s"} · ${onCount} open${overrides ? ` · ${overrides} override${overrides === 1 ? "" : "s"}` : ""}</span>
+		<div class="valve-actions group-actions" data-group="${charts.esc(k)}" data-label="${charts.esc(labels[k])}">
+			${STATES.map(([state, label, kind]) => `<button class="vbtn ${kind}" data-group-state="${state}" type="button" title="${label} — every valve in ${charts.esc(labels[k])}">${label} all</button>`).join("")}
+		</div>
 	</div>
 	<div class="valve-grid stagger">${list.map((v, i) => this.valveCard(v, i)).join("")}</div>
 </div>`;
@@ -164,12 +191,53 @@ ${pagehead(
 	<div class="valve-actions">
 		${STATES.map(([state, label, kind]) => `<button class="vbtn ${kind}${v.manual_state === state ? " active" : ""}" data-state="${state}" type="button">${label}</button>`).join("")}
 	</div>
+	${v.location_geojson ? `<a class="valve-locate" href="#map?valve=${encodeURIComponent(v.name)}">${icon("pin")}Show on map</a>` : ""}
 </div>`;
+	},
+
+	/* Override many valves at once, after the operator confirms the count. */
+	async bulk(state, names, what) {
+		const { api } = this.ctx;
+		const status = this.el.querySelector("#vc-status");
+		if (!names.length) return;
+		const verb = { Auto: "Reset to Auto", "Forced Open": "Force OPEN", "Forced Closed": "Force CLOSED" }[state];
+		if (!window.confirm(`${verb} ${names.length} valve${names.length === 1 ? "" : "s"} — ${what}?`)) return;
+
+		const buttons = this.el.querySelectorAll("#vc-bulk button, .group-actions button");
+		buttons.forEach((b) => {
+			b.disabled = true;
+		});
+		statusStrip(status, "");
+		try {
+			const { data } = await api.post("upande_irrigation.api.valves.set_override_bulk", {
+				state,
+				valves: JSON.stringify(names),
+			});
+			statusStrip(status, `${verb}: ${data ? data.count : 0} valve${data && data.count === 1 ? "" : "s"} changed.`, "ok");
+			await this.refresh();
+		} catch (err) {
+			statusStrip(status, `Bulk override failed: ${err.message}`);
+		} finally {
+			buttons.forEach((b) => {
+				b.disabled = false;
+			});
+		}
 	},
 
 	bindOverrides() {
 		const { api } = this.ctx;
 		const status = this.el.querySelector("#vc-status");
+
+		this.el.querySelectorAll(".group-actions").forEach((bar) => {
+			const key = bar.getAttribute("data-group");
+			const label = bar.getAttribute("data-label");
+			bar.querySelectorAll("[data-group-state]").forEach((btn) => {
+				btn.addEventListener("click", () => {
+					const names = ((this.groups || {})[key] || []).map((v) => v.name);
+					this.bulk(btn.getAttribute("data-group-state"), names, label);
+				});
+			});
+		});
 
 		this.el.querySelectorAll(".valve").forEach((card) => {
 			const valve = card.getAttribute("data-valve");

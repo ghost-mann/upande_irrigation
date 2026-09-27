@@ -1,6 +1,6 @@
 /* Field Map — 3D valves over block boundaries on a MapLibre basemap.
  *
- * Ported from meniscus's irrigation tab. Two changes worth knowing:
+ * Ported from meniscus's irrigation tab. Changes worth knowing:
  *
  * 1. Valve highlights now reflect REAL state. Meniscus paired fake switch ids
  *    ("70ha-v3") to real valves with a string-matching heuristic
@@ -12,6 +12,15 @@
  * 2. MapLibre and Three.js are imported dynamically here rather than loaded in
  *    the page head, so the other seven views don't pay for ~1 MB of map
  *    libraries they never use.
+ *
+ * 3. Basemaps are Esri (Satellite / Hybrid / Streets), the Upande map standard.
+ *    All three live in one style and switch by layer visibility — setStyle()
+ *    would wipe the block layers and the Three.js valve layer. There is no
+ *    `glyphs` key, so block labels are HTML markers, not a symbol layer.
+ *
+ * 4. The map is also a control surface: a valve's popup carries Auto/On/Off,
+ *    and #map?valve=<name> (Valve Control's "Show on map") flies to a valve.
+ *    Geometry follows the farm filter; changing farm rebuilds the map.
  */
 
 import { pagehead, kpi, statusStrip, icon } from "./shell.js";
@@ -19,7 +28,47 @@ import { pagehead, kpi, statusStrip, icon } from "./shell.js";
 const MAPLIBRE_JS = "https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js";
 const MAPLIBRE_CSS = "https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css";
 const THREE_ESM = "https://unpkg.com/three@0.160.0/build/three.module.js";
-const BASEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+/* Past z18 Esri answers with grey "Map data not available" tiles over Kenya. */
+const SAT_MAXZOOM = 18;
+const esri = (path, attribution) => ({
+	type: "raster",
+	tiles: [`${ESRI}${path}/MapServer/tile/{z}/{y}/{x}`],
+	tileSize: 256,
+	maxzoom: SAT_MAXZOOM,
+	attribution,
+});
+const BASEMAPS = {
+	satellite: ["base-sat"],
+	hybrid: ["base-sat", "base-ref"],
+	streets: ["base-streets"],
+};
+const BASEMAP_STYLE = {
+	version: 8,
+	sources: {
+		sat: esri("World_Imagery", "Imagery © Esri, Maxar"),
+		ref: esri("Reference/World_Boundaries_and_Places", ""),
+		streets: esri("World_Street_Map", "© Esri"),
+	},
+	layers: [
+		{ id: "base-sat", type: "raster", source: "sat" },
+		{ id: "base-ref", type: "raster", source: "ref" },
+		{ id: "base-streets", type: "raster", source: "streets", layout: { visibility: "none" } },
+	],
+};
+/* Block names appear once the blocks are big enough on screen to carry them. */
+const LABEL_MIN_ZOOM = 15.5;
+const STATES = [
+	["Auto", "Auto", "auto"],
+	["Forced Open", "On", "on"],
+	["Forced Closed", "Off", "off"],
+];
+
+/* "#map?valve=X" → "X". */
+function hashParam(key) {
+	const q = (location.hash || "").split("?")[1] || "";
+	return new URLSearchParams(q).get(key);
+}
 
 const BLOCK_FILL = "#c25a2e";
 const BLOCK_LINE = "#7c2f16";
@@ -247,6 +296,11 @@ ${pagehead(
 	"Valves and block boundaries",
 	'Live valve state · click a valve or block for detail',
 	`<span class="sev ink" id="map-stat">Loading…</span>
+	 <div class="pillgroup" id="map-basemap" role="group" aria-label="Basemap">
+		<button type="button" data-base="satellite">Satellite</button>
+		<button type="button" data-base="hybrid" class="on">Hybrid</button>
+		<button type="button" data-base="streets">Streets</button>
+	 </div>
 	 <button class="btn ghost" id="map-refresh" type="button">${icon("refresh")}Refresh state</button>`
 )}
 <div class="status" id="map-status"></div>
@@ -263,7 +317,47 @@ ${pagehead(
 </div>`;
 
 		el.querySelector("#map-refresh").addEventListener("click", () => this.refresh());
+		this.basemap = "hybrid";
+		el.querySelectorAll("#map-basemap button").forEach((b) => {
+			b.addEventListener("click", () => this.setBasemap(b.getAttribute("data-base")));
+		});
 		this.unsubscribe = ctx.onFilterChange(() => {});
+		/* The shell ignores a hash change within the same view, so a second
+		 * "Show on map" while already here is handled by the view itself. */
+		this.onHash = () => {
+			if ((location.hash || "").startsWith("#map")) this.focusFromHash();
+		};
+		window.addEventListener("hashchange", this.onHash);
+	},
+
+	setBasemap(key) {
+		if (!BASEMAPS[key]) return;
+		this.basemap = key;
+		this.el.querySelectorAll("#map-basemap button").forEach((b) => {
+			b.classList.toggle("on", b.getAttribute("data-base") === key);
+		});
+		if (!this.map) return;
+		const visible = new Set(BASEMAPS[key]);
+		["base-sat", "base-ref", "base-streets"].forEach((id) => {
+			if (this.map.getLayer(id)) this.map.setLayoutProperty(id, "visibility", visible.has(id) ? "visible" : "none");
+		});
+	},
+
+	/* Tear the map down so the next refresh rebuilds it for a new farm. */
+	teardown() {
+		if (this.labelMarkers) this.labelMarkers.forEach((m) => m.remove());
+		this.labelMarkers = [];
+		if (this.popup) this.popup.remove();
+		this.popup = null;
+		if (this.map) this.map.remove();
+		this.map = null;
+		this.layer = null;
+		this.initialised = false;
+		this.initialising = null;
+		this.mapFailed = false;
+		this.valveFeatures = new Map();
+		const canvas = this.el.querySelector("#map-canvas");
+		if (canvas) canvas.innerHTML = '<div class="fieldmap__overlay" id="map-overlay">Loading map…</div>';
 	},
 
 	async refresh() {
@@ -271,6 +365,9 @@ ${pagehead(
 		 * libraries come from external CDNs and WebGL may be unavailable; when
 		 * that happens the operator should still get the counts rather than a
 		 * view stuck on "Loading map…". */
+		const farm = this.ctx.filters.farm || "";
+		if (this.initialised && this.builtFarm !== farm) this.teardown();
+
 		await this.paintState();
 
 		if (this.initialised || this.mapFailed) return;
@@ -280,6 +377,7 @@ ${pagehead(
 			/* build() is what counts the block boundaries, so repaint the tiles
 			 * now that blockCount is known and light the valves in the layer. */
 			await this.paintState();
+			this.focusFromHash();
 		} catch (err) {
 			/* build() has already written an explanation into the overlay. */
 			this.mapFailed = true;
@@ -287,7 +385,9 @@ ${pagehead(
 	},
 
 	async build() {
-		const { api, charts } = this.ctx;
+		const { api, charts, filters } = this.ctx;
+		const farm = filters.farm || "";
+		this.builtFarm = farm;
 		const status = this.el.querySelector("#map-status");
 		const overlay = this.el.querySelector("#map-overlay");
 
@@ -305,48 +405,15 @@ ${pagehead(
 		/* Valves and blocks fetch in parallel; either can fail alone. */
 		const [valves, blocksFC] = await Promise.all([
 			api
-				.get("upande_irrigation.api.valves.geojson", { asset_type: "Valve" })
+				.get("upande_irrigation.api.valves.geojson", { asset_type: "Valve", farm })
 				.then(({ data }) => ((data && data.features) || []).filter((f) => (f.properties || {}).asset_type === "Valve"))
 				.catch((err) => {
 					console.warn("[irrigation] valve geojson failed", err);
 					return [];
 				}),
 			api
-				.getList("Warehouse", {
-					filters: [
-						["warehouse_type", "=", "Block"],
-						["disabled", "=", 0],
-					],
-					fields: ["name", "warehouse_name", "custom_farm", "parent_warehouse", "custom_raw_geojson"],
-					orderBy: "name asc",
-				})
-				.then(({ data }) => {
-					const features = [];
-					(data || []).forEach((wh) => {
-						if (!wh.custom_raw_geojson) return;
-						let geo;
-						try {
-							geo = JSON.parse(wh.custom_raw_geojson);
-						} catch (e) {
-							return;
-						}
-						((geo && geo.features) || []).forEach((f) => {
-							if (!f || !f.geometry) return;
-							features.push({
-								type: "Feature",
-								geometry: f.geometry,
-								properties: {
-									...(f.properties || {}),
-									block: wh.name,
-									block_label: wh.warehouse_name || wh.name,
-									farm: wh.custom_farm || "",
-									section: wh.parent_warehouse || "",
-								},
-							});
-						});
-					});
-					return { type: "FeatureCollection", features };
-				})
+				.get("upande_irrigation.api.valves.blocks_geojson", { farm })
+				.then(({ data }) => ({ type: "FeatureCollection", features: (data && data.features) || [] }))
 				.catch((err) => {
 					console.warn("[irrigation] block boundaries failed", err);
 					return { type: "FeatureCollection", features: [] };
@@ -378,6 +445,7 @@ ${pagehead(
 			style: BASEMAP_STYLE,
 			center,
 			zoom: 15.5,
+			maxZoom: 19,
 			pitch: 55,
 			attributionControl: { compact: true },
 		});
@@ -403,7 +471,7 @@ ${pagehead(
 		if (!loaded) {
 			if (overlay) {
 				overlay.textContent =
-					"The basemap did not load. Valve counts above are live; the map needs access to tiles.openfreemap.org and unpkg.com.";
+					"The basemap did not load. Valve counts above are live; the map needs access to server.arcgisonline.com and unpkg.com.";
 			}
 			statusStrip(
 				status,
@@ -413,6 +481,7 @@ ${pagehead(
 			throw new Error("basemap did not load");
 		}
 
+		this.setBasemap(this.basemap);
 		if (this.blockCount) this.addBlockLayers(maplibregl, map, blocksFC);
 
 		if (valves.length) {
@@ -436,23 +505,76 @@ ${pagehead(
 			if (onBlock && onBlock.length) return; // block handler runs instead
 			const hit = this.nearestValve(e.point, 28);
 			if (!hit) return;
-			const p = hit.f.properties || {};
-			const state = this.stateByName ? this.stateByName.get(hit.name) : null;
-			new maplibregl.Popup({ closeOnClick: true })
-				.setLngLat(hit.f.geometry.coordinates)
-				.setHTML(
-					`<div><strong>${charts.esc(p.asset_label || p.asset_name || "valve")}</strong><br>` +
-						`<span style="color:var(--ui-mute)">${charts.esc(p.block || "")}${p.farm ? ` · ${charts.esc(p.farm)}` : ""}</span>` +
-						(state
-							? `<br>State: <strong>${charts.esc(state.effective_state)}</strong>${state.override_active ? " (override)" : ""}`
-							: "") +
-						"</div>"
-				)
-				.addTo(map);
+			this.openValvePopup(hit.name);
 		});
+		this.maplibregl = maplibregl;
 
 		this.initialised = true;
 		if (overlay) overlay.classList.add("hidden");
+	},
+
+	/* A valve's popup: identity, live state, and the same Auto/On/Off override
+	 * the Valve Control cards offer. */
+	openValvePopup(name) {
+		const { charts } = this.ctx;
+		const f = this.valveFeatures.get(name);
+		if (!f || !this.map) return;
+		const p = f.properties || {};
+		const state = this.stateByName ? this.stateByName.get(name) : null;
+		const manual = (state && state.manual_state) || "Auto";
+
+		const el = document.createElement("div");
+		el.className = "map-pop";
+		el.innerHTML =
+			`<strong>${charts.esc(p.asset_label || p.asset_name || "valve")}</strong>` +
+			`<div class="map-pop__meta">${charts.esc(p.block || "")}${p.farm ? ` · ${charts.esc(p.farm)}` : ""}</div>` +
+			(state
+				? `<div class="map-pop__state">State <b>${charts.esc(state.effective_state)}</b>${state.override_active ? ` · override by ${charts.esc(state.override_set_by || "—")}` : " · on schedule"}</div>`
+				: "") +
+			`<div class="valve-actions">${STATES.map(
+				([s, label, kind]) =>
+					`<button class="vbtn ${kind}${manual === s ? " active" : ""}" data-state="${s}" type="button">${label}</button>`
+			).join("")}</div>` +
+			'<div class="map-pop__err" hidden></div>';
+
+		el.querySelectorAll(".vbtn[data-state]").forEach((btn) => {
+			btn.addEventListener("click", async () => {
+				const err = el.querySelector(".map-pop__err");
+				el.querySelectorAll(".vbtn").forEach((b) => {
+					b.disabled = true;
+				});
+				err.hidden = true;
+				try {
+					await this.ctx.api.post("upande_irrigation.api.valves.set_override", {
+						valve: name,
+						state: btn.getAttribute("data-state"),
+					});
+					await this.paintState();
+					this.openValvePopup(name);
+				} catch (e) {
+					err.textContent = `Override failed: ${e.message}`;
+					err.hidden = false;
+					el.querySelectorAll(".vbtn").forEach((b) => {
+						b.disabled = false;
+					});
+				}
+			});
+		});
+
+		if (this.popup) this.popup.remove();
+		this.popup = new this.maplibregl.Popup({ closeOnClick: true, maxWidth: "260px" })
+			.setLngLat(f.geometry.coordinates)
+			.setDOMContent(el)
+			.addTo(this.map);
+	},
+
+	/* #map?valve=<name>: fly to that valve and open its popup. */
+	focusFromHash() {
+		const name = hashParam("valve");
+		if (!name || !this.map || !this.valveFeatures.has(name)) return;
+		const f = this.valveFeatures.get(name);
+		this.map.flyTo({ center: f.geometry.coordinates, zoom: 18, pitch: 55, duration: 900 });
+		this.openValvePopup(name);
 	},
 
 	addBlockLayers(maplibregl, map, fc) {
@@ -471,13 +593,24 @@ ${pagehead(
 			source: "irr-blocks",
 			paint: { "line-color": BLOCK_LINE, "line-width": 1.4, "line-opacity": 0.85 },
 		});
-		map.addLayer({
-			id: "irr-blocks-label",
-			type: "symbol",
-			source: "irr-blocks",
-			layout: { "text-field": ["get", "block_label"], "text-size": 11, "text-allow-overlap": false },
-			paint: { "text-color": "#3a3a34", "text-halo-color": "#f4f3ef", "text-halo-width": 1.5 },
+		/* No glyph server, so labels are HTML markers at each block's centre. */
+		this.labelMarkers = (fc.features || []).map((f) => {
+			const b = bounds([f]);
+			const el = document.createElement("div");
+			el.className = "map-label";
+			el.textContent = (f.properties || {}).block_label || (f.properties || {}).block || "";
+			return new maplibregl.Marker({ element: el })
+				.setLngLat([(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2])
+				.addTo(map);
 		});
+		const showLabels = () => {
+			const on = map.getZoom() >= LABEL_MIN_ZOOM;
+			this.labelMarkers.forEach((m) => {
+				m.getElement().style.display = on ? "" : "none";
+			});
+		};
+		map.on("zoom", showLabels);
+		showLabels();
 		map.on("click", "irr-blocks-fill", (e) => {
 			const f = e.features && e.features[0];
 			if (!f) return;
@@ -553,11 +686,15 @@ ${pagehead(
 
 	unmount() {
 		if (this.unsubscribe) this.unsubscribe();
+		if (this.onHash) window.removeEventListener("hashchange", this.onHash);
+		if (this.labelMarkers) this.labelMarkers.forEach((m) => m.remove());
+		this.labelMarkers = [];
 		if (this.map) {
 			this.map.remove();
 			this.map = null;
 		}
 		this.layer = null;
+		this.popup = null;
 		this.initialised = false;
 		this.initialising = null;
 		this.valveFeatures = new Map();

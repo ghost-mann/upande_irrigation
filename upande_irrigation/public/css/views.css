@@ -1238,3 +1238,105 @@
 	overscroll-behavior: contain;
 	padding-right: 4px;
 }
+
+/* ══════════════════════════════════════════════ bulk valve control */
+.bulkbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+	padding: 14px 18px;
+}
+
+.bulkbar__label {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font: 500 13px var(--sans);
+}
+
+.bulkbar__label span {
+	color: var(--ink-mute);
+	font-size: 12px;
+}
+
+.bulkbar__actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.btn.danger {
+	background: var(--sev-high);
+	border-color: var(--sev-high);
+	color: #fff;
+}
+
+.btn.danger:hover:not(:disabled) {
+	filter: brightness(0.92);
+}
+
+.group-actions {
+	flex: 0 0 auto;
+	min-width: 220px;
+}
+
+.group-actions .vbtn {
+	font-size: 11px;
+	padding: 5px 8px;
+}
+
+.valve-locate {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	margin-top: 10px;
+	font: 500 12px var(--sans);
+	color: var(--ink-4);
+	text-decoration: none;
+}
+
+.valve-locate:hover {
+	color: var(--ink);
+}
+
+.valve-locate svg {
+	width: 13px;
+	height: 13px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+}
+
+/* ══════════════════════════════════════════════ field map chrome */
+.map-pop {
+	min-width: 200px;
+}
+
+.map-pop__meta {
+	color: var(--ink-mute);
+	margin: 2px 0 6px;
+}
+
+.map-pop__state {
+	margin-bottom: 8px;
+}
+
+.map-pop .valve-actions {
+	display: flex;
+	gap: 6px;
+}
+
+.map-pop__err {
+	margin-top: 6px;
+	color: var(--sev-high);
+}
+
+.map-label {
+	font: 600 11px var(--sans);
+	color: #fafaf6;
+	text-shadow: 0 1px 3px rgba(10, 10, 10, 0.85);
+	white-space: nowrap;
+	pointer-events: none;
+}
