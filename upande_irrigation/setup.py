@@ -74,7 +74,7 @@ def ensure_desktop_icon():
 		doc = frappe.new_doc("Desktop Icon")
 		doc.name = DESKTOP_ICON
 		doc.hidden = 0
-	doc.update({
+	wanted = {
 		"label": DESKTOP_ICON,
 		"standard": 1,
 		"app": "upande_irrigation",
@@ -91,7 +91,13 @@ def ensure_desktop_icon():
 		"link": "/desk/upande-irrigation",
 		"logo_url": LOGO,
 		"bg_color": "gray",
-	})
+	}
+	# Save only on a real change: in developer mode every save of a standard
+	# Desktop Icon re-exports desktop_icon/upande_irrigation.json with a new
+	# `modified`, dirtying the working tree on every migrate.
+	if not doc.is_new() and all(doc.get(k) == v for k, v in wanted.items()):
+		return
+	doc.update(wanted)
 	doc.save(ignore_permissions=True)
 
 
