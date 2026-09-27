@@ -150,8 +150,10 @@ fields. Page ordered by `creation asc` so pages neither overlap nor gap.
 
 ```bash
 bench --site kaitet-group.upande.com execute \
-  upande_irrigation.migration.shift_loader.load_from_file --kwargs '{"strict": false}'
+  upande_irrigation.migration.shift_loader.load_from_file --kwargs '{"strict": False}'
 ```
+
+`--kwargs` is evaluated as Python, so it is `False`, not JSON `false`.
 
 **Expect 86 loaded, 3 excluded.** Three rows name `23HA_SECTION - KL`, which is a
 *group* warehouse rather than a block; the child table's validation rejects them by
