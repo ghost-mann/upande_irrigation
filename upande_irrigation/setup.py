@@ -181,6 +181,7 @@ SCALAR_DEFAULTS = {
 	"min_run_hours": 0.5, "max_run_hours_per_day": 12.0, "irrigate_ahead_days": 1,
 	"default_soil_texture": "Loam", "default_emitters_per_tree": 1.0, "default_emitter_flow_lph": 70.0,
 	"default_application_efficiency": 0.9, "default_depletion_fraction": 0.5,
+	"default_window_start": "06:00:00", "default_window_end": "18:00:00",
 }
 SOILS = [("Sand", 60), ("Loamy sand", 90), ("Sandy loam", 120), ("Loam", 160), ("Silt loam", 190), ("Clay loam", 170), ("Clay", 150)]
 AGE_BANDS = [

@@ -91,6 +91,19 @@
    "default": "12"
   },
   {
+   "fieldname": "default_window_start",
+   "fieldtype": "Time",
+   "label": "Default run window from",
+   "default": "06:00:00",
+   "description": "For a section whose pump has no Irrigation Pump Profile. A profile with its own windows always wins."
+  },
+  {
+   "fieldname": "default_window_end",
+   "fieldtype": "Time",
+   "label": "Default run window to",
+   "default": "18:00:00"
+  },
+  {
    "fieldname": "col_runsheet",
    "fieldtype": "Column Break"
   },

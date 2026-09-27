@@ -29,6 +29,9 @@ def shift_need(members, settings):
 		if raw <= 0:
 			continue
 		end_today = float(m.get("depletion_mm") or 0) + float(m.get("mean_etc_mm") or 0)
+		taw_mm = float(m.get("taw_mm") or 0)
+		if taw_mm:
+			end_today = min(end_today, taw_mm)  # the root zone cannot be drier than empty
 		score = end_today / raw
 		if worst is None or score > worst[0]:
 			worst = (score, end_today, m)
