@@ -27,9 +27,28 @@
     <a href="/app" title="Frappe Desk">Desk</a>
   </nav>
   <div class="topbar__right">
+    <button class="topbar__btn" id="tb-refresh" type="button" title="Refresh this view"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span>Refresh</span></button>
+    <button class="topbar__btn" id="tb-guide" type="button" title="How this dashboard works" aria-controls="guide"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Guide</span></button>
     <span>{{ current_user }}</span>
     <div class="avatar">{{ user_initials }}</div>
   </div>
+</div>
+
+<div class="guide" id="guide" hidden>
+  <div class="guide__back"></div>
+  <aside class="guide__panel" role="dialog" aria-label="Dashboard guide">
+    <div class="guide__head"><h2>Guide</h2><button class="guide__close" type="button" aria-label="Close guide">&times;</button></div>
+    <p class="guide__lead">Filters in the sidebar (farm, period, dates) apply to every view. Records live in the desk under <a href="/desk/upande-irrigation">Upande Irrigation</a>.</p>
+    <section data-guide="overview"><h3>Overview</h3><p>The morning check. KPI tiles for this week's water, energy and plan, and a <b>Needs attention</b> list: deficits, stale sensors, overrides left on, missing weather readings. Each alert links to where you fix it.</p></section>
+    <section data-guide="planner"><h3>Planning</h3><p>The weekly irrigation plan, one row per shift. Hours come from evaporation (pan × Kc) minus effective rain, capped by pump capacity. Adjust a shift here; the Irrigation Planner record is the source of truth.</p></section>
+    <section data-guide="weather"><h3>Weather</h3><p>Daily Weather Reading: pan evaporation, rain, min/mean/max temperature (the shaded band is the day's range). Log today's reading in the form at the top. <b>Irrigation sections</b> summarises the shift mapping; <b>Blocks</b> shows the latest irrometer tension per block.</p></section>
+    <section data-guide="compare"><h3>Compare</h3><p>The same period across years, so you can see whether this season is drier or wetter than the last.</p></section>
+    <section data-guide="iot"><h3>IoT Sensors</h3><p><b>All sensors</b> shows every device: its latest value, <b>Live</b> or <b>Stale</b> (silent for more than 6 h), battery, RSSI and SNR. Click a card to chart that sensor below. <b>Recent readings</b> lists the newest raw rows. Use the period in the sidebar to look further back.</p></section>
+    <section data-guide="resources"><h3>Water &amp; Energy</h3><p>Where the water went: pumping into the dam, transfers, and what each section used, with energy per m³. The meter tables show each reading's previous and new values; enter readings on Water Meter Reading and Electricity Meter Reading.</p></section>
+    <section data-guide="map"><h3>Field Map</h3><p>Valves in 3D over the block boundaries on Esri imagery; switch between Satellite, Hybrid and Streets. Open valves pulse green. Click a valve to see its state and set <b>Auto / On / Off</b> right there. The map follows the farm filter.</p></section>
+    <section data-guide="now"><h3>Irrigation Now</h3><p>Which shifts are running right now, how long they have left, and what comes next.</p></section>
+    <section data-guide="control"><h3>Valve Control</h3><p>Every valve with its effective state: the schedule, unless an operator override says otherwise. Override one valve, a whole group (<b>On all / Off all / Auto all</b>), or everything in view with <b>Close all</b>, <b>Open all</b> and <b>Reset all to Auto</b>. Each bulk action asks you to confirm the count. <b>Show on map</b> jumps to a valve's location.</p></section>
+  </aside>
 </div>
 
 <div id="ui-root">

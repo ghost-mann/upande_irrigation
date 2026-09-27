@@ -1829,3 +1829,115 @@ a {
 		letter-spacing: -0.9px;
 	}
 }
+
+/* ══════════════════════════════════════════════ topbar actions + guide */
+.topbar__btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 1px solid var(--hairline);
+	background: var(--surface-2);
+	color: var(--ink-4);
+	font: 500 12px var(--sans);
+	padding: 7px 12px;
+	border-radius: 999px;
+	cursor: pointer;
+}
+
+.topbar__btn:hover {
+	color: var(--ink);
+	border-color: var(--ink);
+}
+
+.topbar__btn svg {
+	width: 14px;
+	height: 14px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.guide {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+}
+
+.guide[hidden] {
+	display: none;
+}
+
+.guide__back {
+	position: absolute;
+	inset: 0;
+	background: rgba(10, 10, 10, 0.28);
+}
+
+.guide__panel {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: min(420px, 100%);
+	background: var(--surface-2);
+	box-shadow: -12px 0 40px rgba(10, 10, 10, 0.18);
+	padding: 24px 26px 40px;
+	overflow-y: auto;
+	font: 400 13px/1.55 var(--sans);
+	color: var(--ink-3);
+}
+
+.guide__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+.guide__head h2 {
+	font: 600 20px var(--serif, var(--sans));
+	margin: 0;
+	color: var(--ink);
+}
+
+.guide__close {
+	border: 0;
+	background: transparent;
+	font-size: 26px;
+	line-height: 1;
+	cursor: pointer;
+	color: var(--ink-4);
+}
+
+.guide__lead {
+	color: var(--ink-mute);
+	margin: 0 0 18px;
+}
+
+.guide section {
+	padding: 12px 14px;
+	border-radius: 12px;
+	margin-bottom: 6px;
+}
+
+.guide section.on {
+	background: rgba(10, 10, 10, 0.04);
+}
+
+.guide section h3 {
+	font: 600 14px var(--sans);
+	color: var(--ink);
+	margin: 0 0 4px;
+}
+
+.guide section p {
+	margin: 0;
+}
+
+@media (max-width: 700px) {
+	.topbar__btn span {
+		display: none;
+	}
+}

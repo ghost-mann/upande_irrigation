@@ -80,6 +80,7 @@ const PERIODS = [
 	[30, "Last 30 days"],
 	[90, "Last 90 days"],
 	[365, "Last year"],
+	[730, "Last 2 years"],
 	[1825, "Last 5 years"],
 	[3650, "All time"],
 ];
@@ -440,7 +441,38 @@ export class Shell {
 
 	start() {
 		this.render();
+		this.bindTopbar();
 		this.go(this.hashView(), { force: true });
+	}
+
+	/* The topbar lives in the page template, outside the shell's root: a
+	 * page-wide Refresh for the active view, and the Guide drawer. */
+	bindTopbar() {
+		const refresh = document.getElementById("tb-refresh");
+		if (refresh) {
+			refresh.addEventListener("click", () => {
+				if (this.active && this.active.refresh) this.safeRefresh();
+			});
+		}
+		const drawer = document.getElementById("guide");
+		const open = document.getElementById("tb-guide");
+		if (!drawer || !open) return;
+		const setOpen = (on) => {
+			drawer.hidden = !on;
+			document.body.classList.toggle("guide-open", on);
+			if (on) {
+				const here = drawer.querySelector(`[data-guide="${this.activeId}"]`);
+				drawer.querySelectorAll("[data-guide]").forEach((s) => s.classList.toggle("on", s === here));
+				if (here) here.scrollIntoView({ block: "nearest" });
+				drawer.querySelector(".guide__close").focus();
+			}
+		};
+		open.addEventListener("click", () => setOpen(drawer.hidden));
+		drawer.querySelector(".guide__close").addEventListener("click", () => setOpen(false));
+		drawer.querySelector(".guide__back").addEventListener("click", () => setOpen(false));
+		document.addEventListener("keydown", (e) => {
+			if (e.key === "Escape" && !drawer.hidden) setOpen(false);
+		});
 	}
 }
 

@@ -7,6 +7,12 @@
 
 import { pagehead, kpi, statusStrip, icon } from "./shell.js";
 
+/* Prev/New meter reading cells for the Water and Electricity tables. */
+function meterCells(r) {
+	const n = (v) => (v == null ? "—" : Number(v).toLocaleString());
+	return `<td class="num">${n(r.previous_reading)}</td><td class="num">${n(r.new_reading)}</td>`;
+}
+
 const SECTION_COLORS = [
 	"var(--ui-teal)",
 	"var(--ui-ok)",
@@ -155,14 +161,14 @@ ${pagehead(
 	<div class="card">
 		<div class="card__head"><h3>Water meter</h3><span class="meta" id="r-water-count"></span></div>
 		<div class="tablewrap scroll"><table class="table">
-			<thead><tr><th>Date</th><th>Section</th><th class="num">Used m³</th></tr></thead>
+			<thead><tr><th>Date</th><th>Section</th><th class="num">Prev</th><th class="num">New</th><th class="num">Used m³</th></tr></thead>
 			<tbody id="r-water-rows"></tbody>
 		</table></div>
 	</div>
 	<div class="card">
 		<div class="card__head"><h3>Electricity meter</h3><span class="meta" id="r-elec-count"></span></div>
 		<div class="tablewrap scroll"><table class="table">
-			<thead><tr><th>Date</th><th>Section</th><th class="num">kWh</th></tr></thead>
+			<thead><tr><th>Date</th><th>Section</th><th class="num">Prev</th><th class="num">New</th><th class="num">kWh</th></tr></thead>
 			<tbody id="r-elec-rows"></tbody>
 		</table></div>
 	</div>
@@ -264,7 +270,9 @@ ${pagehead(
 	<div class="s">${charts.esc(n.s)}</div>
 </div>`;
 			if (i < arrows.length) {
-				html += `<div class="flow__arrow"><div class="line"></div><div class="lbl">${charts.esc(arrows[i])}</div></div>`;
+				/* The moving dot Meniscus drew along each link; staggered so the
+				 * three links read as one flow. CSS drops it under reduced motion. */
+				html += `<div class="flow__arrow"><div class="line"><i class="flow__dot" style="background:${n.c};animation-delay:${(i * 0.6).toFixed(1)}s"></i></div><div class="lbl">${charts.esc(arrows[i])}</div></div>`;
 			}
 		});
 		this.el.querySelector("#r-flow").innerHTML = html;
@@ -486,9 +494,9 @@ ${pagehead(
 			? water
 					.slice()
 					.reverse()
-					.map((r) => `<tr><td>${charts.fmtDate(r.date)}</td><td>${charts.esc(shortSection(r.section))}</td><td class="num"><b style="color:${T.water}">${(r.units_used || 0).toFixed(1)}</b></td></tr>`)
+					.map((r) => `<tr><td>${charts.fmtDate(r.date)}</td><td>${charts.esc(shortSection(r.section))}</td>${meterCells(r)}<td class="num"><b style="color:${T.water}">${(r.units_used || 0).toFixed(1)}</b></td></tr>`)
 					.join("")
-			: '<tr><td colspan="3"><div class="empty small">No readings</div></td></tr>';
+			: '<tr><td colspan="5"><div class="empty small">No readings</div></td></tr>';
 
 		const elec = data.electricity.all_readings || [];
 		this.el.querySelector("#r-elec-count").textContent = `${elec.length} ${elec.length === 1 ? "reading" : "readings"}`;
@@ -496,9 +504,9 @@ ${pagehead(
 			? elec
 					.slice()
 					.reverse()
-					.map((r) => `<tr><td>${charts.fmtDate(r.date)}</td><td>${charts.esc(shortSection(r.section))}</td><td class="num"><b style="color:${T.elec}">${(r.units_used || 0).toFixed(1)}</b></td></tr>`)
+					.map((r) => `<tr><td>${charts.fmtDate(r.date)}</td><td>${charts.esc(shortSection(r.section))}</td>${meterCells(r)}<td class="num"><b style="color:${T.elec}">${(r.units_used || 0).toFixed(1)}</b></td></tr>`)
 					.join("")
-			: '<tr><td colspan="3"><div class="empty small">No readings</div></td></tr>';
+			: '<tr><td colspan="5"><div class="empty small">No readings</div></td></tr>';
 	},
 
 	unmount() {
