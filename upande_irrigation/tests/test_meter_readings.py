@@ -50,6 +50,22 @@ class TestMeterReadings(NoCommit, FrappeTestCase):
 		self.assertEqual(nxt.previous_reading, 1000)
 		self.assertEqual(nxt.units_used, 10)
 
+	def test_a_back_dated_reading_takes_the_reading_before_it(self):
+		"""An operator filling in a missed day: its baseline is the reading before
+		that date, not the newest one (which would reject it as going backwards)."""
+		self.reading("Electricity Meter Reading", date="2026-09-01", previous_reading=0, new_reading=12300).submit()
+		self.reading("Electricity Meter Reading", date="2026-09-03", previous_reading=12400, new_reading=12500).submit()
+		missed = self.reading("Electricity Meter Reading", date="2026-09-02", new_reading=12400)
+		self.assertEqual(missed.previous_reading, 12300)
+		self.assertEqual(missed.units_used, 100)
+
+	def test_a_typed_previous_reading_is_kept(self):
+		"""A new or replaced meter: the operator states its starting register."""
+		self.reading("Electricity Meter Reading", previous_reading=0, new_reading=90000).submit()
+		fresh = self.reading("Electricity Meter Reading", date="2026-09-02", previous_reading=15, new_reading=40)
+		self.assertEqual(fresh.previous_reading, 15)
+		self.assertEqual(fresh.units_used, 25)
+
 	def test_cancelled_readings_are_not_a_baseline(self):
 		first = self.reading("Electricity Meter Reading", previous_reading=0, new_reading=500)
 		first.submit()

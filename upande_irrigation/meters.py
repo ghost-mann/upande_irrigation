@@ -30,11 +30,16 @@ def apply_meter_rules(doc):
 
 
 def latest_reading(doc):
-	"""The New Reading of the most recent non-cancelled reading on the same meter.
+	"""The New Reading of the latest non-cancelled reading on the same meter
+	dated on or before this one.
 
-	A meter is identified by its irrigation_section; readings without one (all
-	310 v15 electricity rows) share a single meter."""
+	"On or before" is what lets an operator back-fill a missed day: its baseline
+	is the day before, not the newest reading (which would reject it as the
+	meter going backwards). A meter is identified by its irrigation_section;
+	readings without one (all 310 v15 electricity rows) share a single meter."""
 	filters = {"docstatus": ["<", 2], "name": ["!=", doc.name or ""]}
+	if doc.date:
+		filters["date"] = ["<=", doc.date]
 	filters["irrigation_section"] = doc.irrigation_section or ["is", "not set"]
 	rows = frappe.get_all(
 		doc.doctype, filters=filters, fields=["new_reading"], order_by="date desc, creation desc", limit=1

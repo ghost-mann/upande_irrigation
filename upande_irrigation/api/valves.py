@@ -179,7 +179,7 @@ def list_states(farm=None):
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def set_override(valve, state):
 	"""Operator override of a valve's manual state."""
 	if state not in _VALID_OVERRIDES:
@@ -226,6 +226,10 @@ def set_override_bulk(state, valves=None, section=None, farm=None, all_valves=0)
 
 	if isinstance(valves, str):
 		valves = json.loads(valves) if valves.strip() else None
+	if isinstance(valves, str):  # a lone JSON string: one valve, not its characters
+		valves = [valves]
+	if valves is not None and not isinstance(valves, list | tuple):
+		frappe.throw("`valves` must be a list of valve names.")
 	all_valves = frappe.utils.cint(all_valves)
 	if not (valves or section or farm or all_valves):
 		frappe.throw("Choose valves, a section or a farm — or pass all_valves=1 to override every valve.")
@@ -268,10 +272,15 @@ def blocks_geojson(farm=None):
 	if not meta.has_field("custom_raw_geojson"):
 		return empty
 
-	filters = {"disabled": 0, "is_group": 0}
-	if frappe.db.exists("Warehouse Type", "Block"):
-		filters["warehouse_type"] = "Block"
-	if farm and meta.has_field("custom_farm"):
+	# Without a "Block" warehouse type there is no way to tell blocks from any
+	# other mapped warehouse (Kaitet has 52 greenhouses with geometry), and
+	# without custom_farm the farm filter cannot apply — say so, don't guess.
+	if not frappe.db.exists("Warehouse Type", "Block"):
+		return {**empty, "meta": {**empty["meta"], "reason": "no Block warehouse type"}}
+	if farm and not meta.has_field("custom_farm"):
+		return {**empty, "meta": {**empty["meta"], "reason": "Warehouse has no custom_farm"}}
+	filters = {"disabled": 0, "is_group": 0, "warehouse_type": "Block"}
+	if farm:
 		filters["custom_farm"] = farm
 	fields = ["name", "warehouse_name", "parent_warehouse", "custom_raw_geojson"]
 	if meta.has_field("custom_farm"):

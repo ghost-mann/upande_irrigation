@@ -51,8 +51,7 @@
    "fieldname": "previous_reading",
    "fieldtype": "Float",
    "label": "Previous Reading",
-   "read_only": 1,
-   "description": "The last reading's New Reading for this section; filled on save."
+   "description": "Filled from the last reading on or before this date. Type a value only for a new or replaced meter."
   },
   {
    "fieldname": "new_reading",

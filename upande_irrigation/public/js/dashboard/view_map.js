@@ -64,6 +64,9 @@ const STATES = [
 	["Forced Closed", "Off", "off"],
 ];
 
+/* Thrown by a build() that a newer mount/unmount/farm change has superseded. */
+const STALE = new Error("stale map build");
+
 /* "#map?valve=X" → "X". */
 function hashParam(key) {
 	const q = (location.hash || "").split("?")[1] || "";
@@ -289,6 +292,12 @@ export default {
 		this.valveFeatures = new Map();
 		this.initialised = false;
 		this.initialising = null;
+		/* The view object outlives each visit. A build left running by the last
+		 * visit must neither mark this one failed nor draw into its canvas, so
+		 * every visit (and teardown) starts a new generation. */
+		this.gen = (this.gen || 0) + 1;
+		this.mapFailed = false;
+		this.builtFarm = undefined;
 
 		el.innerHTML = `
 ${pagehead(
@@ -345,6 +354,7 @@ ${pagehead(
 
 	/* Tear the map down so the next refresh rebuilds it for a new farm. */
 	teardown() {
+		this.gen = (this.gen || 0) + 1;
 		if (this.labelMarkers) this.labelMarkers.forEach((m) => m.remove());
 		this.labelMarkers = [];
 		if (this.popup) this.popup.remove();
@@ -371,23 +381,36 @@ ${pagehead(
 		await this.paintState();
 
 		if (this.initialised || this.mapFailed) return;
+		const gen = this.gen;
 		if (!this.initialising) this.initialising = this.build();
 		try {
 			await this.initialising;
-			/* build() is what counts the block boundaries, so repaint the tiles
-			 * now that blockCount is known and light the valves in the layer. */
-			await this.paintState();
-			this.focusFromHash();
 		} catch (err) {
-			/* build() has already written an explanation into the overlay. */
-			this.mapFailed = true;
+			/* A superseded build says nothing about this visit's map. Otherwise
+			 * build() has already written an explanation into the overlay. */
+			if (err !== STALE && gen === this.gen) this.mapFailed = true;
+			return;
 		}
+		if (gen !== this.gen) return;
+		/* The farm changed while the first build ran: rebuild for the new one. */
+		if (this.builtFarm !== (this.ctx.filters.farm || "")) {
+			this.teardown();
+			return this.refresh();
+		}
+		/* build() is what counts the block boundaries, so repaint the tiles
+		 * now that blockCount is known and light the valves in the layer. */
+		await this.paintState();
+		this.focusFromHash();
 	},
 
 	async build() {
 		const { api, charts, filters } = this.ctx;
 		const farm = filters.farm || "";
 		this.builtFarm = farm;
+		const gen = this.gen;
+		const checkStale = () => {
+			if (gen !== this.gen) throw STALE;
+		};
 		const status = this.el.querySelector("#map-status");
 		const overlay = this.el.querySelector("#map-overlay");
 
@@ -400,6 +423,7 @@ ${pagehead(
 			this.initialising = null;
 			throw err;
 		}
+		checkStale();
 		const { maplibregl, THREE: three } = libs;
 
 		/* Valves and blocks fetch in parallel; either can fail alone. */
@@ -420,6 +444,7 @@ ${pagehead(
 				}),
 		]);
 
+		checkStale();
 		valves.forEach((f) => {
 			const name = (f.properties || {}).asset_name;
 			if (name) this.valveFeatures.set(name, f);
@@ -467,6 +492,8 @@ ${pagehead(
 			});
 			setTimeout(() => done(false), 15000);
 		});
+		/* unmount()/teardown() already removed this map. */
+		checkStale();
 
 		if (!loaded) {
 			if (overlay) {
@@ -685,6 +712,7 @@ ${pagehead(
 	},
 
 	unmount() {
+		this.gen = (this.gen || 0) + 1;
 		if (this.unsubscribe) this.unsubscribe();
 		if (this.onHash) window.removeEventListener("hashchange", this.onHash);
 		if (this.labelMarkers) this.labelMarkers.forEach((m) => m.remove());

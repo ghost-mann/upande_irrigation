@@ -107,7 +107,9 @@ def remove_legacy_desk():
 	Only the auto-generated sidebar (standard=0) is removed — a standard one
 	would belong to some app's shipped files, which this app does not own.
 	"""
-	if frappe.db.exists("Workspace", LEGACY):
+	# Only ours: another app shipping a workspace of that name must not be
+	# deleted (and re-created) on every migrate.
+	if frappe.db.exists("Workspace", {"name": LEGACY, "module": ["in", ["Upande Irrigation", ""]]}):
 		frappe.delete_doc("Workspace", LEGACY, ignore_permissions=True, force=True)
 	if frappe.db.exists("Workspace Sidebar", {"name": LEGACY, "standard": 0}):
 		frappe.delete_doc("Workspace Sidebar", LEGACY, ignore_permissions=True, force=True)

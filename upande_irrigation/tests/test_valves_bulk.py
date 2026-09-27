@@ -71,6 +71,15 @@ class TestSetOverrideBulk(NoCommit, FrappeTestCase):
 		self.assertEqual(out["updated"], [self.a1])
 		self.assertEqual(self.state(self.a2), "Auto")
 
+	def test_a_lone_valve_string_is_one_valve(self):
+		out = api.set_override_bulk("Forced Closed", valves=json.dumps(self.a1))
+		self.assertEqual(out["updated"], [self.a1])
+
+	def test_state_changes_are_post_only(self):
+		"""A GET that changes a valve can be triggered by a link or an <img>."""
+		for fn in (api.set_override, api.set_override_bulk):
+			self.assertEqual(frappe.allowed_http_methods_for_whitelisted_func[fn], ["POST"], fn.__name__)
+
 	def test_no_scope_is_refused(self):
 		with self.assertRaises(frappe.ValidationError):
 			api.set_override_bulk("Forced Closed")
