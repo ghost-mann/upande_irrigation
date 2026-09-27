@@ -86,7 +86,10 @@ required_apps = ["erpnext", "upande_core"]
 # The app's DocPerms name Roles that no app in a clean site's inventory
 # creates (ERPNext v16 dropped the Agriculture roles). Without this the
 # DocTypes are unreachable for every non-Administrator -- see install.py.
-after_install = "upande_irrigation.install.after_install"
+after_install = "upande_irrigation.setup.after_install"
+# The desk shell (navigation block, Desktop Icon, legacy cleanup) must be
+# re-asserted on every migrate -- see setup.py.
+after_migrate = "upande_irrigation.setup.after_migrate"
 
 # Uninstallation
 # ------------
@@ -169,6 +172,8 @@ website_redirects = [
     {"source": "/meniscus", "target": "/upande-irrigation"},
     {"source": "/irrigation-now", "target": "/upande-irrigation#now"},
     {"source": "/irrigation-control", "target": "/upande-irrigation#control"},
+    # The v15 workspace was renamed to match its sidebar (the upande_travel pattern).
+    {"source": "/app/smart-irrigation", "target": "/desk/upande-irrigation"},
 ]
 
 # The /apps launcher tile. The logo is copied into this app rather than read from
@@ -180,7 +185,7 @@ add_to_apps_screen = [
 		"name": "upande_irrigation",
 		"logo": "/assets/upande_irrigation/images/upande-logo.png",
 		"title": "Upande Irrigation",
-		"route": "/app/smart-irrigation",
+		"route": "/desk/upande-irrigation",
 	}
 ]
 
@@ -280,9 +285,6 @@ scheduler_events = {
 
 fixtures = [
     {"doctype": "Property Setter", "filters": [["module", "=", "Upande Irrigation"]]},
-    # Custom HTML Blocks owned by this module
-    {
-        "doctype": "Custom HTML Block",
-        "filters": [["name", "in", ["Smart Irrigation Dashboard"]]],
-    },
+    # The workspace's Custom HTML Block is upserted by setup.py from
+    # custom_html_block/, not shipped as a fixture.
 ]

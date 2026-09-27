@@ -1,0 +1,22 @@
+{
+ "app": "upande_irrigation",
+ "bg_color": "gray",
+ "creation": "2026-09-27 12:00:00",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 1,
+ "icon_type": "App",
+ "idx": 0,
+ "label": "Upande Irrigation",
+ "link": "/desk/upande-irrigation",
+ "link_to": "Upande Irrigation",
+ "link_type": "Workspace Sidebar",
+ "logo_url": "/assets/upande_irrigation/images/upande-logo.png",
+ "modified": "2026-09-27 12:47:47.436405",
+ "modified_by": "Administrator",
+ "name": "Upande Irrigation",
+ "owner": "Administrator",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}

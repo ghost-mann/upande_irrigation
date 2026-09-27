@@ -32,10 +32,16 @@ class TestWorkspaceSidebar(FrappeTestCase):
 	def test_the_sidebar_exists(self):
 		self.assertTrue(frappe.db.exists("Workspace Sidebar", "Upande Irrigation"))
 
-	def test_it_links_the_smart_irrigation_workspace(self):
+	def test_it_links_the_upande_irrigation_workspace(self):
 		doc = frappe.get_doc("Workspace Sidebar", "Upande Irrigation")
 		targets = {i.link_to for i in doc.items if i.link_type == "Workspace"}
-		self.assertIn("Smart Irrigation", targets)
+		self.assertIn("Upande Irrigation", targets)
+
+	def test_every_item_has_an_icon(self):
+		"""Travel's sidebar carries an icon on every row; a bare row reads as broken."""
+		doc = frappe.get_doc("Workspace Sidebar", "Upande Irrigation")
+		bare = [i.label for i in doc.items if not i.icon]
+		self.assertEqual(bare, [], f"sidebar rows without an icon: {bare}")
 
 	def test_every_doctype_link_resolves(self):
 		"""The bug being locked out: a sidebar item pointing at a DocType that is

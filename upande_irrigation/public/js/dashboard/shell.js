@@ -151,7 +151,7 @@ export class Shell {
 			<nav class="side__nav">
 				${nav}
 				<div class="side__sep"></div>
-				<a class="side__link" href="/app/smart-irrigation" title="Smart Irrigation workspace">${icon("desk")}<span>Desk</span></a>
+				<a class="side__link" href="/desk/upande-irrigation" title="Upande Irrigation workspace">${icon("desk")}<span>Desk</span></a>
 			</nav>
 		</div>
 

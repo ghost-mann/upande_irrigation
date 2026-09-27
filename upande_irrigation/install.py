@@ -39,4 +39,8 @@ def ensure_roles():
 
 
 def after_install():
-	ensure_roles()
+	"""Kept for sites whose hooks cache still names this path; the hook itself
+	now points at setup.after_install, which calls ensure_roles()."""
+	from upande_irrigation.setup import after_install as _setup_after_install
+
+	_setup_after_install()
