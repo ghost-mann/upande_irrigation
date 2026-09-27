@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "creation": "2026-09-28 06:00:00.000000",
+ "custom": 0,
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "day",
+  "start_time",
+  "end_time"
+ ],
+ "fields": [
+  {
+   "fieldname": "day",
+   "fieldtype": "Select",
+   "label": "Day",
+   "options": "Every day\nMonday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday",
+   "default": "Every day",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "start_time",
+   "fieldtype": "Time",
+   "label": "From",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "end_time",
+   "fieldtype": "Time",
+   "label": "To",
+   "in_list_view": 1,
+   "reqd": 1,
+   "description": "An end before the start runs past midnight."
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-28 06:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Irrigation",
+ "name": "Irrigation Run Window",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "editable_grid": 1
+}

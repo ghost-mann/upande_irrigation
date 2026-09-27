@@ -14,7 +14,7 @@
  "default_email_template": null,
  "default_print_format": null,
  "default_view": null,
- "description": null,
+ "description": "Retired 2026-09-28: the weekly planner, kept as read-only history. Irrigation is now planned daily by the water balance and the Irrigation Run Sheet.",
  "docstatus": 0,
  "doctype": "DocType",
  "document_type": "",
@@ -23,9 +23,14 @@
  "email_append_to": 0,
  "engine": "InnoDB",
  "fields": [
-  {"fieldname": "block", "fieldtype": "Data", "label": "Shift", "reqd": 1,
+  {
+   "fieldname": "block",
+   "fieldtype": "Data",
+   "label": "Shift",
+   "reqd": 1,
    "in_list_view": 1,
-   "description": "Shift name, e.g. 70HA - SHIFT 20. Blocks are on Irrigation Scheduler."},
+   "description": "Shift name, e.g. 70HA - SHIFT 20. Blocks are on Irrigation Scheduler."
+  },
   {
    "alignment": null,
    "allow_bulk_edit": 0,
@@ -2530,10 +2535,10 @@
  "nsm_parent_field": null,
  "permissions": [
   {
-   "amend": 1,
-   "cancel": 1,
-   "create": 1,
-   "delete": 1,
+   "amend": 0,
+   "cancel": 0,
+   "create": 0,
+   "delete": 0,
    "email": 1,
    "export": 1,
    "if_owner": 0,
@@ -2547,14 +2552,14 @@
    "role": "System Manager",
    "select": 1,
    "share": 1,
-   "submit": 1,
-   "write": 1
+   "submit": 0,
+   "write": 0
   },
   {
-   "amend": 1,
-   "cancel": 1,
-   "create": 1,
-   "delete": 1,
+   "amend": 0,
+   "cancel": 0,
+   "create": 0,
+   "delete": 0,
    "email": 1,
    "export": 1,
    "if_owner": 0,
@@ -2568,14 +2573,14 @@
    "role": "Agriculture Manager",
    "select": 0,
    "share": 1,
-   "submit": 1,
-   "write": 1
+   "submit": 0,
+   "write": 0
   },
   {
    "amend": 0,
    "cancel": 0,
-   "create": 1,
-   "delete": 1,
+   "create": 0,
+   "delete": 0,
    "email": 1,
    "export": 1,
    "if_owner": 0,
@@ -2590,7 +2595,7 @@
    "select": 0,
    "share": 1,
    "submit": 0,
-   "write": 1
+   "write": 0
   }
  ],
  "protect_attached_files": 0,

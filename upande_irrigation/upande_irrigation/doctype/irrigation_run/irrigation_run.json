@@ -1,0 +1,172 @@
+{
+ "actions": [],
+ "creation": "2026-09-28 06:00:00.000000",
+ "custom": 0,
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "shift",
+  "section",
+  "pump",
+  "kind",
+  "cycle_no",
+  "cycles",
+  "cb_plan",
+  "planned_start",
+  "planned_end",
+  "planned_hours",
+  "net_mm",
+  "urgency",
+  "sb_actual",
+  "status",
+  "actual_start",
+  "actual_end",
+  "actual_hours",
+  "cb_actual",
+  "skip_reason",
+  "reason",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "shift",
+   "fieldtype": "Data",
+   "label": "Shift",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section",
+   "fieldtype": "Data",
+   "label": "Section",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pump",
+   "fieldtype": "Data",
+   "label": "Pump",
+   "read_only": 1
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "Due\nAhead",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cycle_no",
+   "fieldtype": "Int",
+   "label": "Cycle",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "cycles",
+   "fieldtype": "Int",
+   "label": "Of",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_plan",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "planned_start",
+   "fieldtype": "Datetime",
+   "label": "Planned start",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "planned_end",
+   "fieldtype": "Datetime",
+   "label": "Planned end",
+   "read_only": 1
+  },
+  {
+   "fieldname": "planned_hours",
+   "fieldtype": "Float",
+   "label": "Planned hours",
+   "in_list_view": 1,
+   "read_only": 1,
+   "precision": "2"
+  },
+  {
+   "fieldname": "net_mm",
+   "fieldtype": "Float",
+   "label": "Net depth (mm)",
+   "read_only": 1,
+   "precision": "1"
+  },
+  {
+   "fieldname": "urgency",
+   "fieldtype": "Float",
+   "label": "Urgency (D/RAW)",
+   "read_only": 1,
+   "precision": "2"
+  },
+  {
+   "fieldname": "sb_actual",
+   "fieldtype": "Section Break",
+   "label": "Actual"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Planned\nRunning\nDone\nPartial\nSkipped\nNot placed",
+   "default": "Planned",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "actual_start",
+   "fieldtype": "Datetime",
+   "label": "Actual start"
+  },
+  {
+   "fieldname": "actual_end",
+   "fieldtype": "Datetime",
+   "label": "Actual end"
+  },
+  {
+   "fieldname": "actual_hours",
+   "fieldtype": "Float",
+   "label": "Actual hours",
+   "precision": "2",
+   "description": "For Partial: hours actually run."
+  },
+  {
+   "fieldname": "cb_actual",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "skip_reason",
+   "fieldtype": "Data",
+   "label": "Skip reason"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Why / warnings",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Operator notes"
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-28 06:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Irrigation",
+ "name": "Irrigation Run",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "index_web_pages_for_search": 0,
+ "istable": 1
+}

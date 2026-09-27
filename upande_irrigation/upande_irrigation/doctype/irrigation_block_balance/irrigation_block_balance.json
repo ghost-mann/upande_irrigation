@@ -1,0 +1,208 @@
+{
+ "actions": [],
+ "creation": "2026-09-28 06:00:00.000000",
+ "custom": 0,
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "block",
+  "farm",
+  "date",
+  "depletion_mm",
+  "depletion_pct",
+  "cb1",
+  "taw_mm",
+  "raw_mm",
+  "sb_in",
+  "epan_mm",
+  "etc_mm",
+  "rain_mm",
+  "effective_rain_mm",
+  "cb2",
+  "irrigation_mm",
+  "irrigation_source",
+  "irrometer_cb",
+  "irrometer_adjusted",
+  "weather_estimated"
+ ],
+ "fields": [
+  {
+   "fieldname": "block",
+   "fieldtype": "Link",
+   "label": "Block",
+   "options": "Warehouse",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "farm",
+   "fieldtype": "Link",
+   "label": "Farm",
+   "options": "Farm",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "depletion_mm",
+   "fieldtype": "Float",
+   "label": "Depletion (mm)",
+   "in_list_view": 1,
+   "precision": "1"
+  },
+  {
+   "fieldname": "depletion_pct",
+   "fieldtype": "Percent",
+   "label": "Depletion % of TAW",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "taw_mm",
+   "fieldtype": "Float",
+   "label": "TAW (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "raw_mm",
+   "fieldtype": "Float",
+   "label": "RAW (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "sb_in",
+   "fieldtype": "Section Break",
+   "label": "Day's water"
+  },
+  {
+   "fieldname": "epan_mm",
+   "fieldtype": "Float",
+   "label": "Pan evaporation (mm)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "etc_mm",
+   "fieldtype": "Float",
+   "label": "Crop use ETc (mm)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "rain_mm",
+   "fieldtype": "Float",
+   "label": "Rain (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "effective_rain_mm",
+   "fieldtype": "Float",
+   "label": "Effective rain (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "cb2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "irrigation_mm",
+   "fieldtype": "Float",
+   "label": "Irrigation net (mm)",
+   "precision": "1"
+  },
+  {
+   "fieldname": "irrigation_source",
+   "fieldtype": "Select",
+   "label": "Irrigation from",
+   "options": "\nRun Sheet\nValve Log"
+  },
+  {
+   "fieldname": "irrometer_cb",
+   "fieldtype": "Float",
+   "label": "Irrometer (cb)"
+  },
+  {
+   "fieldname": "irrometer_adjusted",
+   "fieldtype": "Check",
+   "label": "Corrected by irrometer"
+  },
+  {
+   "fieldname": "weather_estimated",
+   "fieldtype": "Check",
+   "label": "Weather estimated"
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-28 06:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Irrigation",
+ "name": "Irrigation Block Balance",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "permlevel": 0,
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  },
+  {
+   "role": "Agriculture Manager",
+   "permlevel": 0,
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 0,
+   "share": 0,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  },
+  {
+   "role": "Irrigation User",
+   "permlevel": 0,
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 0,
+   "print": 0,
+   "email": 0,
+   "share": 0,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "index_web_pages_for_search": 0,
+ "autoname": "hash",
+ "naming_rule": "Random",
+ "in_create": 1,
+ "title_field": "block"
+}

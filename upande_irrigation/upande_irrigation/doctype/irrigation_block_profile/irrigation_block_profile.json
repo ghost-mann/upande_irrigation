@@ -1,0 +1,282 @@
+{
+ "actions": [],
+ "creation": "2026-09-28 06:00:00.000000",
+ "custom": 0,
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sb_block",
+  "block",
+  "farm",
+  "section",
+  "cb_block",
+  "is_active",
+  "using_defaults",
+  "sb_trees",
+  "area_ha",
+  "tree_count",
+  "planting_year",
+  "cb_trees",
+  "canopy_cover_pct",
+  "root_depth_m",
+  "sb_soil",
+  "soil_texture",
+  "depletion_fraction",
+  "cb_soil",
+  "emitters_per_tree",
+  "emitter_flow_lph",
+  "application_efficiency",
+  "sb_derived",
+  "tree_age_years",
+  "application_rate_mm_hr",
+  "block_flow_m3_hr",
+  "cb_derived",
+  "awc_mm_per_m",
+  "taw_mm",
+  "raw_mm"
+ ],
+ "fields": [
+  {
+   "fieldname": "sb_block",
+   "fieldtype": "Section Break",
+   "label": "Block"
+  },
+  {
+   "fieldname": "block",
+   "fieldtype": "Link",
+   "label": "Block",
+   "options": "Warehouse",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "farm",
+   "fieldtype": "Link",
+   "label": "Farm",
+   "options": "Farm",
+   "fetch_from": "block.custom_farm",
+   "read_only": 1,
+   "in_standard_filter": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section",
+   "fieldtype": "Link",
+   "label": "Section",
+   "options": "Warehouse",
+   "fetch_from": "block.parent_warehouse",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "cb_block",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Irrigated",
+   "default": "1",
+   "description": "Untick for fallow or not-yet-planted blocks."
+  },
+  {
+   "fieldname": "using_defaults",
+   "fieldtype": "Small Text",
+   "label": "Using farm defaults for",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sb_trees",
+   "fieldtype": "Section Break",
+   "label": "Trees",
+   "description": "Leave a field blank to use the farm default from Irrigation Settings."
+  },
+  {
+   "fieldname": "area_ha",
+   "fieldtype": "Float",
+   "label": "Area (ha)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "tree_count",
+   "fieldtype": "Int",
+   "label": "Trees"
+  },
+  {
+   "fieldname": "planting_year",
+   "fieldtype": "Int",
+   "label": "Planting year"
+  },
+  {
+   "fieldname": "cb_trees",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "canopy_cover_pct",
+   "fieldtype": "Percent",
+   "label": "Canopy ground cover %",
+   "description": "Blank = from tree age."
+  },
+  {
+   "fieldname": "root_depth_m",
+   "fieldtype": "Float",
+   "label": "Root depth (m)",
+   "description": "Blank = from tree age."
+  },
+  {
+   "fieldname": "sb_soil",
+   "fieldtype": "Section Break",
+   "label": "Soil and emitters"
+  },
+  {
+   "fieldname": "soil_texture",
+   "fieldtype": "Select",
+   "label": "Soil texture",
+   "options": "\nSand\nLoamy sand\nSandy loam\nLoam\nSilt loam\nClay loam\nClay"
+  },
+  {
+   "fieldname": "depletion_fraction",
+   "fieldtype": "Float",
+   "label": "Irrigate at depletion (p)",
+   "description": "Fraction of the root-zone water used before irrigating. Blank = farm default (0.5)."
+  },
+  {
+   "fieldname": "cb_soil",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "emitters_per_tree",
+   "fieldtype": "Float",
+   "label": "Emitters per tree"
+  },
+  {
+   "fieldname": "emitter_flow_lph",
+   "fieldtype": "Float",
+   "label": "Emitter flow (L/h)"
+  },
+  {
+   "fieldname": "application_efficiency",
+   "fieldtype": "Float",
+   "label": "Application efficiency (0\u20131)"
+  },
+  {
+   "fieldname": "sb_derived",
+   "fieldtype": "Section Break",
+   "label": "Derived (read only)"
+  },
+  {
+   "fieldname": "tree_age_years",
+   "fieldtype": "Float",
+   "label": "Tree age (years)",
+   "read_only": 1,
+   "precision": "1"
+  },
+  {
+   "fieldname": "application_rate_mm_hr",
+   "fieldtype": "Float",
+   "label": "Application rate (mm/h)",
+   "read_only": 1,
+   "precision": "3",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "block_flow_m3_hr",
+   "fieldtype": "Float",
+   "label": "Block flow (m\u00b3/h)",
+   "read_only": 1,
+   "precision": "2"
+  },
+  {
+   "fieldname": "cb_derived",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "awc_mm_per_m",
+   "fieldtype": "Float",
+   "label": "Available water (mm/m)",
+   "read_only": 1,
+   "precision": "1"
+  },
+  {
+   "fieldname": "taw_mm",
+   "fieldtype": "Float",
+   "label": "TAW (mm)",
+   "read_only": 1,
+   "precision": "1"
+  },
+  {
+   "fieldname": "raw_mm",
+   "fieldtype": "Float",
+   "label": "RAW \u2014 irrigate at (mm)",
+   "read_only": 1,
+   "precision": "1"
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-28 06:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Irrigation",
+ "name": "Irrigation Block Profile",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "permlevel": 0,
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  },
+  {
+   "role": "Agriculture Manager",
+   "permlevel": 0,
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  },
+  {
+   "role": "Irrigation User",
+   "permlevel": 0,
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 0,
+   "print": 1,
+   "email": 0,
+   "share": 0,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "index_web_pages_for_search": 0,
+ "autoname": "field:block",
+ "naming_rule": "By fieldname",
+ "title_field": "block",
+ "track_changes": 1,
+ "quick_entry": 0
+}

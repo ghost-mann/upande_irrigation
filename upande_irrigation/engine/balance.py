@@ -151,3 +151,69 @@ def project(d0, mean_etc, raw_mm, horizon=7):
 		if trigger is None and d >= float(raw_mm):
 			trigger = k
 	return {"trigger_day": trigger, "depletion_by_day": series}
+
+
+#: Profile fields that fall back to a farm default when blank.
+PROFILE_DEFAULTS = (
+	"planting_year", "soil_texture", "emitters_per_tree", "emitter_flow_lph",
+	"application_efficiency", "depletion_fraction",
+)
+
+
+def resolve_profile(raw, defaults, bands, soils, year):
+	"""A block's own values over the farm defaults, plus everything derived.
+
+	`raw`: the Irrigation Block Profile's fields (blank = use default).
+	`defaults`: default_<field> values, plus default_plant_density (trees/ha) for a
+	block with no tree count. `bands`: age bands; `soils`: {texture: mm per m}.
+	Returns (resolved, defaulted_field_names).
+	"""
+	used = []
+
+	def pick(field):
+		v = raw.get(field)
+		if v in (None, "", 0, 0.0):
+			used.append(field)
+			return defaults.get(f"default_{field}")
+		return v
+
+	vals = {f: pick(f) for f in PROFILE_DEFAULTS}
+	area = float(raw.get("area_ha") or 0)
+	trees = int(raw.get("tree_count") or 0)
+	if not trees and area and defaults.get("default_plant_density"):
+		trees = int(round(area * float(defaults["default_plant_density"])))
+		used.append("tree_count")
+
+	planted = int(vals["planting_year"] or 0)
+	age = max(0.0, float(year) - planted) if planted else float(defaults.get("default_tree_age_years") or 10)
+	band = band_for(age, bands) or {}
+	root = float(raw.get("root_depth_m") or 0) or float(band.get("root_depth_m") or 0.6)
+	if not raw.get("root_depth_m"):
+		used.append("root_depth_m")
+	canopy = float(raw.get("canopy_cover_pct") or 0) or float(band.get("canopy_pct") or 70)
+	if not raw.get("canopy_cover_pct"):
+		used.append("canopy_cover_pct")
+	awc = float((soils or {}).get(vals["soil_texture"] or "", 0) or 0) or float(defaults.get("default_awc_mm_per_m") or 160)
+
+	emitters = float(vals["emitters_per_tree"] or 0)
+	lph = float(vals["emitter_flow_lph"] or 0)
+	rate = rate_mm_hr(trees, emitters, lph, area)
+	taw_mm = taw(awc, root)
+	p = float(vals["depletion_fraction"] or 0.5)
+	return {
+		"area_ha": area,
+		"tree_count": trees,
+		"age_years": round(age, 1),
+		"soil_texture": vals["soil_texture"],
+		"awc_mm_per_m": awc,
+		"root_depth_m": root,
+		"canopy_pct": canopy,
+		"emitters_per_tree": emitters,
+		"emitter_flow_lph": lph,
+		"rate_mm_hr": round(rate, 4),
+		"block_flow_m3_hr": round(trees * emitters * lph / 1000.0, 3),
+		"application_efficiency": float(vals["application_efficiency"] or 0.9),
+		"depletion_fraction": p,
+		"taw_mm": round(taw_mm, 2),
+		"raw_mm": round(p * taw_mm, 2),
+	}, used

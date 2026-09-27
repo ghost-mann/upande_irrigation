@@ -24,6 +24,160 @@
  "engine": "InnoDB",
  "fields": [
   {
+   "fieldname": "sec_balance",
+   "fieldtype": "Section Break",
+   "label": "Water balance (daily)",
+   "description": "The daily soil water balance behind the run sheet. These are starting values \u2014 calibrate them against irrometer readings."
+  },
+  {
+   "fieldname": "kpan",
+   "fieldtype": "Float",
+   "label": "Pan coefficient Kp",
+   "default": "0.75",
+   "description": "Class A pan \u2192 reference evaporation. Typical 0.7\u20130.85."
+  },
+  {
+   "fieldname": "rain_loss_mm",
+   "fieldtype": "Float",
+   "label": "Rain lost per event (mm)",
+   "default": "2",
+   "description": "Small showers that never reach the root zone."
+  },
+  {
+   "fieldname": "rain_efficiency",
+   "fieldtype": "Float",
+   "label": "Rain efficiency (0\u20131)",
+   "default": "0.9"
+  },
+  {
+   "fieldname": "col_balance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "depletion_fraction",
+   "fieldtype": "Float",
+   "label": "Irrigate at depletion p (0\u20131)",
+   "default": "0.5",
+   "description": "Fraction of the root zone's water (TAW) used before a block is due. 0.5 is typical for avocado."
+  },
+  {
+   "fieldname": "irrometer_weight",
+   "fieldtype": "Float",
+   "label": "Irrometer correction weight (0\u20131)",
+   "default": "0.5",
+   "description": "How far a reading pulls the modelled depletion toward what the tensiometer implies."
+  },
+  {
+   "fieldname": "balance_start_date",
+   "fieldtype": "Date",
+   "label": "Balance starts",
+   "description": "The balance assumes a full root zone on this date. Blank = 60 days before today."
+  },
+  {
+   "fieldname": "sec_runsheet",
+   "fieldtype": "Section Break",
+   "label": "Run sheet"
+  },
+  {
+   "fieldname": "min_run_hours",
+   "fieldtype": "Float",
+   "label": "Shortest run (h)",
+   "default": "0.5"
+  },
+  {
+   "fieldname": "max_run_hours_per_day",
+   "fieldtype": "Float",
+   "label": "Longest run per shift per day (h)",
+   "default": "12"
+  },
+  {
+   "fieldname": "col_runsheet",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "irrigate_ahead_days",
+   "fieldtype": "Int",
+   "label": "Fill spare pump time with shifts due within (days)",
+   "default": "1"
+  },
+  {
+   "fieldname": "sec_block_defaults",
+   "fieldtype": "Section Break",
+   "label": "Block defaults",
+   "description": "Used for any block whose Irrigation Block Profile leaves the field blank."
+  },
+  {
+   "fieldname": "default_soil_texture",
+   "fieldtype": "Select",
+   "label": "Soil texture",
+   "options": "Sand\nLoamy sand\nSandy loam\nLoam\nSilt loam\nClay loam\nClay",
+   "default": "Loam"
+  },
+  {
+   "fieldname": "default_planting_year",
+   "fieldtype": "Int",
+   "label": "Planting year",
+   "description": "Blank = trees treated as 10 years old."
+  },
+  {
+   "fieldname": "default_emitters_per_tree",
+   "fieldtype": "Float",
+   "label": "Emitters per tree",
+   "default": "1"
+  },
+  {
+   "fieldname": "col_block_defaults",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_emitter_flow_lph",
+   "fieldtype": "Float",
+   "label": "Emitter flow (L/h)",
+   "default": "70"
+  },
+  {
+   "fieldname": "default_application_efficiency",
+   "fieldtype": "Float",
+   "label": "Application efficiency (0\u20131)",
+   "default": "0.9"
+  },
+  {
+   "fieldname": "default_depletion_fraction",
+   "fieldtype": "Float",
+   "label": "Irrigate at depletion p",
+   "default": "0.5"
+  },
+  {
+   "fieldname": "sec_tables",
+   "fieldtype": "Section Break",
+   "label": "Agronomy tables"
+  },
+  {
+   "fieldname": "age_bands",
+   "fieldtype": "Table",
+   "label": "Tree age bands (root depth, canopy, Kc by month)",
+   "options": "Irrigation Age Band"
+  },
+  {
+   "fieldname": "soil_textures",
+   "fieldtype": "Table",
+   "label": "Soil available water",
+   "options": "Irrigation Soil Texture"
+  },
+  {
+   "fieldname": "tension_points",
+   "fieldtype": "Table",
+   "label": "Irrometer \u2192 depletion",
+   "options": "Irrigation Tension Point"
+  },
+  {
+   "fieldname": "sec_legacy",
+   "fieldtype": "Section Break",
+   "label": "Weather Reading and legacy weekly planner",
+   "collapsible": 1,
+   "description": "Used by the Weather Reading form (ET crop, GDD, SWD) and the retired weekly planner."
+  },
+  {
    "alignment": null,
    "allow_bulk_edit": 0,
    "allow_in_quick_entry": 0,

@@ -36,6 +36,8 @@ def after_install():
 
 def after_migrate():
 	ensure_roles()
+	ensure_agronomy_defaults()
+	seed_block_profiles()
 	ensure_navigation_block()
 	ensure_desktop_icon()
 	remove_legacy_desk()
@@ -168,3 +170,122 @@ def sync_desktop_layouts():
 		if kept != layout:
 			doc.layout = json.dumps(kept)
 			doc.save(ignore_permissions=True)
+
+
+# ── Water balance ───────────────────────────────────────────────
+# Starting values for the daily balance (engine/balance.py). They are seeded
+# only into empty tables and blank fields, so anything calibrated on site stays.
+
+SCALAR_DEFAULTS = {
+	"rain_loss_mm": 2.0, "rain_efficiency": 0.9, "depletion_fraction": 0.5, "irrometer_weight": 0.5,
+	"min_run_hours": 0.5, "max_run_hours_per_day": 12.0, "irrigate_ahead_days": 1,
+	"default_soil_texture": "Loam", "default_emitters_per_tree": 1.0, "default_emitter_flow_lph": 70.0,
+	"default_application_efficiency": 0.9, "default_depletion_fraction": 0.5,
+}
+SOILS = [("Sand", 60), ("Loamy sand", 90), ("Sandy loam", 120), ("Loam", 160), ("Silt loam", 190), ("Clay loam", 170), ("Clay", 150)]
+AGE_BANDS = [
+	(0, 2, 0.3, 20, [0.45] * 12),
+	(3, 4, 0.45, 45, [0.60] * 12),
+	# Mature avocado: higher use through the Jan–Mar dry season.
+	(5, 999, 0.6, 70, [0.80, 0.80, 0.80] + [0.75] * 9),
+]
+TENSION = [(0, 0.0), (10, 0.1), (30, 0.5), (60, 0.8), (100, 1.0)]
+MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+
+def ensure_agronomy_defaults():
+	if not frappe.db.exists("DocType", "Irrigation Age Band"):
+		return
+	s = frappe.get_single("Irrigation Settings")
+	changed = False
+	for field, value in SCALAR_DEFAULTS.items():
+		if s.meta.has_field(field) and s.get(field) in (None, ""):
+			s.set(field, value)
+			changed = True
+	if s.meta.has_field("kpan") and not s.get("kpan"):
+		# The old settings carried the right figure as default_kpan; the weekly
+		# engine used pan_to_crop_coefficient (0.95) instead.
+		s.kpan = float(s.get("default_kpan") or 0.75)
+		changed = True
+	if not s.get("soil_textures"):
+		for texture, awc in SOILS:
+			s.append("soil_textures", {"texture": texture, "awc_mm_per_m": awc})
+		changed = True
+	if not s.get("age_bands"):
+		for lo, hi, root, canopy, kcs in AGE_BANDS:
+			s.append("age_bands", {"age_from": lo, "age_to": hi, "root_depth_m": root, "canopy_pct": canopy,
+			                       **{f"kc_{m}": kc for m, kc in zip(MONTHS, kcs)}})
+		changed = True
+	if not s.get("tension_points"):
+		for cb, frac in TENSION:
+			s.append("tension_points", {"centibars": cb, "depletion_fraction": frac})
+		changed = True
+	if changed:
+		s.flags.ignore_mandatory = True
+		s.save(ignore_permissions=True)
+
+
+def _ring_area_m2(ring):
+	"""Planar area of a lon/lat ring (shoelace on a local equirectangular projection).
+	Accurate to well under 1% at block scale near the equator."""
+	import math
+
+	if len(ring) < 3:
+		return 0.0
+	lat0 = math.radians(sum(p[1] for p in ring) / len(ring))
+	m_lon = 111320.0 * math.cos(lat0)
+	m_lat = 110574.0
+	pts = [(p[0] * m_lon, p[1] * m_lat) for p in ring]
+	return abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1]))) / 2.0
+
+
+def _geometry_props(raw):
+	"""area_m2 / tree_count for a block from its Raw GeoJSON: the properties the
+	Lokitela outlines carry, else the polygon's own area (the Endebess outlines
+	have geometry but no properties)."""
+	try:
+		geo = json.loads(raw or "")
+	except (TypeError, ValueError):
+		return {}
+	feats = geo.get("features") if isinstance(geo, dict) and geo.get("type") == "FeatureCollection" else [geo]
+	area = 0.0
+	for f in feats or []:
+		props = (f or {}).get("properties") or {}
+		if props.get("area_m2") or props.get("tree_count"):
+			return props
+		g = (f or {}).get("geometry") or (f if (f or {}).get("type") in ("Polygon", "MultiPolygon") else {})
+		polys = [g.get("coordinates")] if g.get("type") == "Polygon" else (g.get("coordinates") or []) if g.get("type") == "MultiPolygon" else []
+		for poly in polys:
+			if poly:
+				area += _ring_area_m2(poly[0]) - sum(_ring_area_m2(h) for h in poly[1:])
+	return {"area_m2": area} if area > 0 else {}
+
+
+def seed_block_profiles():
+	"""One Irrigation Block Profile per block warehouse; fills area and tree count
+	from the block geometry where the profile leaves them blank. Never overwrites."""
+	if not frappe.db.exists("DocType", "Irrigation Block Profile"):
+		return
+	meta = frappe.get_meta("Warehouse")
+	filters = {"is_group": 0, "disabled": 0}
+	if frappe.db.exists("Warehouse Type", "Block"):
+		filters["warehouse_type"] = "Block"
+	else:
+		return
+	fields = ["name"] + (["custom_raw_geojson"] if meta.has_field("custom_raw_geojson") else [])
+	for wh in frappe.get_all("Warehouse", filters=filters, fields=fields, limit_page_length=0):
+		props = _geometry_props(wh.get("custom_raw_geojson"))
+		area = round(float(props.get("area_m2") or 0) / 10000.0, 2) or None
+		trees = int(props.get("tree_count") or 0) or None
+		if frappe.db.exists("Irrigation Block Profile", wh.name):
+			doc = frappe.get_doc("Irrigation Block Profile", wh.name)
+			dirty = False
+			if not doc.area_ha and area:
+				doc.area_ha, dirty = area, True
+			if not doc.tree_count and trees:
+				doc.tree_count, dirty = trees, True
+			if dirty:
+				doc.save(ignore_permissions=True)
+			continue
+		frappe.get_doc({"doctype": "Irrigation Block Profile", "block": wh.name, "area_ha": area,
+		                "tree_count": trees, "is_active": 1}).insert(ignore_permissions=True)

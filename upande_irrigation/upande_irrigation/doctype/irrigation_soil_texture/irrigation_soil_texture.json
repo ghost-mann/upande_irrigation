@@ -1,0 +1,41 @@
+{
+ "actions": [],
+ "creation": "2026-09-28 06:00:00.000000",
+ "custom": 0,
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "texture",
+  "awc_mm_per_m"
+ ],
+ "fields": [
+  {
+   "fieldname": "texture",
+   "fieldtype": "Select",
+   "label": "Texture",
+   "options": "Sand\nLoamy sand\nSandy loam\nLoam\nSilt loam\nClay loam\nClay",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "awc_mm_per_m",
+   "fieldtype": "Float",
+   "label": "Available water (mm per m of soil)",
+   "in_list_view": 1,
+   "reqd": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-28 06:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Irrigation",
+ "name": "Irrigation Soil Texture",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "editable_grid": 1
+}

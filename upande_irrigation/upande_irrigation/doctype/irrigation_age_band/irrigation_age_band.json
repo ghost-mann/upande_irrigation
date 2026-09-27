@@ -1,0 +1,138 @@
+{
+ "actions": [],
+ "creation": "2026-09-28 06:00:00.000000",
+ "custom": 0,
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "age_from",
+  "age_to",
+  "root_depth_m",
+  "canopy_pct",
+  "kc_jan",
+  "kc_feb",
+  "kc_mar",
+  "kc_apr",
+  "kc_may",
+  "kc_jun",
+  "kc_jul",
+  "kc_aug",
+  "kc_sep",
+  "kc_oct",
+  "kc_nov",
+  "kc_dec"
+ ],
+ "fields": [
+  {
+   "fieldname": "age_from",
+   "fieldtype": "Float",
+   "label": "Age from (years)",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "age_to",
+   "fieldtype": "Float",
+   "label": "Age to (years)",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "root_depth_m",
+   "fieldtype": "Float",
+   "label": "Root depth (m)",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "canopy_pct",
+   "fieldtype": "Percent",
+   "label": "Canopy cover %",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kc_jan",
+   "fieldtype": "Float",
+   "label": "Kc Jan",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kc_feb",
+   "fieldtype": "Float",
+   "label": "Kc Feb",
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "kc_mar",
+   "fieldtype": "Float",
+   "label": "Kc Mar",
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "kc_apr",
+   "fieldtype": "Float",
+   "label": "Kc Apr",
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "kc_may",
+   "fieldtype": "Float",
+   "label": "Kc May",
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "kc_jun",
+   "fieldtype": "Float",
+   "label": "Kc Jun",
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "kc_jul",
+   "fieldtype": "Float",
+   "label": "Kc Jul",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kc_aug",
+   "fieldtype": "Float",
+   "label": "Kc Aug",
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "kc_sep",
+   "fieldtype": "Float",
+   "label": "Kc Sep",
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "kc_oct",
+   "fieldtype": "Float",
+   "label": "Kc Oct",
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "kc_nov",
+   "fieldtype": "Float",
+   "label": "Kc Nov",
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "kc_dec",
+   "fieldtype": "Float",
+   "label": "Kc Dec",
+   "in_list_view": 0
+  }
+ ],
+ "links": [],
+ "modified": "2026-09-28 06:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Irrigation",
+ "name": "Irrigation Age Band",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "editable_grid": 1
+}
