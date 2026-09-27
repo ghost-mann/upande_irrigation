@@ -301,3 +301,188 @@ def _fetch(days, site_name, sensor_type, deveui, start_dt, end_dt):
         "series": series,
         "stats": stats,
     }
+
+
+# ─────────────────────────────────────────────────────────────────
+# Fleet overview — every sensor at once
+# ─────────────────────────────────────────────────────────────────
+# Meniscus opened on this: one card per device, fleet KPIs and a raw readings
+# table. fetch() above answers "tell me about this one sensor"; fleet() answers
+# "is everything reporting?", which is the first thing an operator checks.
+
+# Raw rows for the Recent Readings table.
+FLEET_READINGS_LIMIT = 200
+# Points in each card's sparkline.
+_SPARK_POINTS = 24
+
+
+def _fleet_empty(days, start_dt, end_dt):
+    return {
+        "meta": {"days": days, "start": str(start_dt), "end": str(end_dt), "unavailable": True},
+        "kpis": {"sensors": 0, "readings": 0, "avg_battery": None, "avg_rssi": None, "online": 0},
+        "devices": [],
+        "readings": [],
+    }
+
+
+@frappe.whitelist()
+def fleet(days=30, site_name="", sensor_type=""):
+    """Every (device, measurement) in the window with its latest reading, plus
+    fleet KPIs and the newest raw rows. Guarded like fetch()."""
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        days = 30
+    days = max(1, min(days, 3650))
+    end_dt = frappe.utils.now_datetime()
+    start_dt = frappe.utils.add_to_date(end_dt, days=-days)
+
+    return _guard(
+        "sensors fleet",
+        lambda: _fleet(days, (site_name or "").strip(), (sensor_type or "").strip(), start_dt, end_dt),
+        default=_fleet_empty(days, start_dt, end_dt),
+    )
+
+
+def _num(v, places=3):
+    return round(float(v), places) if v is not None else None
+
+
+def _fleet(days, site_name, sensor_type, start_dt, end_dt):
+    args = {"start": start_dt, "end": end_dt}
+    where = "r.timestamp >= %(start)s AND r.timestamp <= %(end)s"
+    if site_name:
+        where += " AND r.site_name = %(site_name)s"
+        args["site_name"] = site_name
+    if sensor_type:
+        where += " AND r.sensor_type = %(sensor_type)s"
+        args["sensor_type"] = sensor_type
+
+    # One row per (device, measurement): same identity rule as fetch()'s roster.
+    agg = frappe.db.sql(
+        f"""
+        SELECT r.deveui, r.sensor_type,
+               MAX(r.sensor_name)             AS sensor_name,
+               MAX(COALESCE(r.site_name, '')) AS site_name,
+               MAX(r.units)                   AS units,
+               COUNT(*)                       AS reading_count,
+               MIN(r.value)                   AS min_value,
+               MAX(r.value)                   AS max_value,
+               MAX(r.timestamp)               AS last_seen
+        FROM `tabSensor Readings` r
+        WHERE {where}
+        GROUP BY r.deveui, r.sensor_type
+        ORDER BY MAX(r.sensor_name), r.deveui
+        """,
+        args,
+        as_dict=True,
+    )
+
+    # The latest row per (device, measurement): value, battery and link quality.
+    latest = frappe.db.sql(
+        f"""
+        SELECT r.deveui, r.sensor_type, r.value, r.battery, r.rssi, r.snr, r.timestamp
+        FROM `tabSensor Readings` r
+        INNER JOIN (
+            SELECT deveui, sensor_type, MAX(timestamp) AS ts
+            FROM `tabSensor Readings` r
+            WHERE {where}
+            GROUP BY deveui, sensor_type
+        ) m ON m.deveui = r.deveui AND m.sensor_type = r.sensor_type AND m.ts = r.timestamp
+        """,
+        args,
+        as_dict=True,
+    )
+    last_by = {(x["deveui"], x["sensor_type"]): x for x in latest}
+
+    bucket = max(60, int(days * 86400 / _SPARK_POINTS))
+    args["bucket"] = bucket
+    spark_rows = frappe.db.sql(
+        f"""
+        SELECT r.deveui, r.sensor_type,
+               FLOOR(UNIX_TIMESTAMP(r.timestamp) / %(bucket)s) AS slot,
+               AVG(r.value) AS v
+        FROM `tabSensor Readings` r
+        WHERE {where}
+        GROUP BY r.deveui, r.sensor_type, slot
+        ORDER BY slot ASC
+        """,
+        args,
+        as_dict=True,
+    )
+    spark_by = {}
+    for x in spark_rows:
+        spark_by.setdefault((x["deveui"], x["sensor_type"]), []).append(_num(x["v"]))
+
+    now = frappe.utils.now_datetime()
+    devices = []
+    for a in agg:
+        key = (a["deveui"], a["sensor_type"])
+        last = last_by.get(key, {})
+        seen = a["last_seen"]
+        hours = int((now - seen).total_seconds() // 3600) if seen else None
+        devices.append({
+            "deveui": a["deveui"],
+            "sensor_name": a["sensor_name"] or a["deveui"],
+            "sensor_type": a["sensor_type"],
+            "site_name": a["site_name"],
+            "units": (a["units"] or "").strip(),
+            "reading_count": int(a["reading_count"] or 0),
+            "min_value": _num(a["min_value"]),
+            "max_value": _num(a["max_value"]),
+            "latest_value": _num(last.get("value")),
+            "latest_at": str(seen) if seen else None,
+            "hours_silent": hours,
+            "stale": hours is None or hours > STALE_HOURS,
+            "battery": _num(last.get("battery"), 2),
+            "rssi": _num(last.get("rssi"), 1),
+            "snr": _num(last.get("snr"), 1),
+            "spark": spark_by.get(key, []),
+        })
+
+    readings = frappe.db.sql(
+        f"""
+        SELECT r.timestamp, r.sensor_name, r.deveui, r.sensor_type, r.value, r.units,
+               r.battery, r.rssi, r.snr
+        FROM `tabSensor Readings` r
+        WHERE {where}
+        ORDER BY r.timestamp DESC
+        LIMIT {FLEET_READINGS_LIMIT}
+        """,
+        args,
+        as_dict=True,
+    )
+
+    # Physical devices, not (device, measurement) pairs: one node reporting
+    # temperature and humidity is one sensor to the person counting them.
+    by_device = {}
+    for d in devices:
+        by_device.setdefault(d["deveui"], d)
+    batteries = [d["battery"] for d in by_device.values() if d["battery"] is not None]
+    rssis = [d["rssi"] for d in by_device.values() if d["rssi"] is not None]
+
+    return {
+        "meta": {"days": days, "start": str(start_dt), "end": str(end_dt), "unavailable": False,
+                 "stale_hours": STALE_HOURS},
+        "kpis": {
+            "sensors": len(by_device),
+            "readings": sum(d["reading_count"] for d in devices),
+            "avg_battery": round(sum(batteries) / len(batteries), 2) if batteries else None,
+            "avg_rssi": round(sum(rssis) / len(rssis), 1) if rssis else None,
+            "online": len({d["deveui"] for d in devices if not d["stale"]}),
+        },
+        "devices": devices,
+        "readings": [
+            {
+                "timestamp": str(r["timestamp"]) if r["timestamp"] else None,
+                "sensor_name": r["sensor_name"] or r["deveui"],
+                "sensor_type": r["sensor_type"],
+                "value": _num(r["value"]),
+                "units": (r["units"] or "").strip(),
+                "battery": _num(r["battery"], 2),
+                "rssi": _num(r["rssi"], 1),
+                "snr": _num(r["snr"], 1),
+            }
+            for r in readings
+        ],
+    }

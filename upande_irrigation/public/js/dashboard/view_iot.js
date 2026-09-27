@@ -8,6 +8,11 @@
  * bucket's min–max behind it so a sampled average does not hide how much the
  * reading actually moved. Everything else on the page describes that same
  * sensor, so there is only ever one thing being looked at.
+ *
+ * Above the drill-down sits the fleet overview Meniscus opened with
+ * (api.sensors.fleet): fleet KPIs, one card per device with its latest value,
+ * Live/Stale, battery/RSSI/SNR and a sparkline, and — below — the newest raw
+ * readings. Clicking a card drills into that sensor.
  */
 
 import { pagehead, kpi, statusStrip, icon } from "./shell.js";
@@ -57,6 +62,15 @@ ${pagehead(
 )}
 <div class="status" id="iot-status"></div>
 
+<div class="kpi-grid stagger" id="iot-fleet-kpis">${'<div class="skel skel-kpi"></div>'.repeat(5)}</div>
+<div class="card card--padded">
+	<div class="card__head">
+		<h3>${icon("iot")}All sensors</h3>
+		<span class="meta" id="iot-fleet-meta"></span>
+	</div>
+	<div class="sensor-grid stagger" id="iot-fleet"><div class="skel skel-card" style="height:180px"></div></div>
+</div>
+
 <div class="card">
 	<div class="entry" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
 		<div>
@@ -96,6 +110,19 @@ ${pagehead(
 			<tbody></tbody>
 		</table>
 	</div>
+</div>
+
+<div class="card card--padded">
+	<div class="card__head">
+		<h3>${icon("trend")}Recent readings</h3>
+		<span class="meta" id="iot-readings-meta"></span>
+	</div>
+	<div class="tablewrap scroll" style="max-height:420px">
+		<table class="table" id="iot-readings">
+			<thead><tr><th>Time</th><th>Sensor</th><th>Type</th><th class="num">Value</th><th class="num">Battery</th><th class="num">RSSI</th><th class="num">SNR</th></tr></thead>
+			<tbody></tbody>
+		</table>
+	</div>
 </div>`;
 
 		el.querySelector("#iot-refresh").addEventListener("click", () => this.refresh());
@@ -123,6 +150,17 @@ ${pagehead(
 		const status = this.el.querySelector("#iot-status");
 		statusStrip(status, "");
 
+		/* The fleet follows the site filter only: it is the "is everything
+		 * reporting?" view, so narrowing it to one measurement would hide the
+		 * silent sensors it exists to show. */
+		const fleetReq = api
+			.get("upande_irrigation.api.sensors.fleet", { days: filters.days, site_name: this.sel.site_name })
+			.then(({ data: f }) => f)
+			.catch((err) => {
+				console.warn("[irrigation] sensor fleet failed", err);
+				return null;
+			});
+
 		let data;
 		try {
 			({ data } = await api.get("upande_irrigation.api.sensors.fetch", {
@@ -136,6 +174,7 @@ ${pagehead(
 			return;
 		}
 		if (!data) return;
+		this.fleet = await fleetReq;
 
 		this.data = data;
 		this.sel = { ...data.selection };
@@ -146,6 +185,97 @@ ${pagehead(
 		this.renderStats();
 		this.renderChart();
 		this.renderRoster();
+		this.renderFleet();
+		this.renderReadings();
+	},
+
+	renderFleet() {
+		const { charts } = this.ctx;
+		const f = this.fleet;
+		const kpis = this.el.querySelector("#iot-fleet-kpis");
+		const grid = this.el.querySelector("#iot-fleet");
+		const meta = this.el.querySelector("#iot-fleet-meta");
+		if (!f || (f.meta && f.meta.unavailable)) {
+			kpis.innerHTML = "";
+			grid.innerHTML = '<div class="empty">Sensor telemetry is not available on this site (upande_sensors is not installed or has no readings).</div>';
+			meta.textContent = "";
+			return;
+		}
+		const k = f.kpis || {};
+		const sig = signalTone(k.avg_rssi);
+		kpis.innerHTML = [
+			kpi("var(--trap-700)", "Sensors", k.sensors, "", "devices in this period"),
+			kpi("var(--trap-500)", "Readings", charts.fmtNum(k.readings, 0), "", `last ${f.meta.days} days`),
+			kpi(batteryTone(k.avg_battery), "Avg battery", k.avg_battery == null ? null : Number(k.avg_battery).toFixed(2), "V", "latest per device"),
+			kpi("var(--ui-cool)", "Avg RSSI", k.avg_rssi, "dBm", sig.txt),
+			kpi(k.online === k.sensors ? "var(--sev-low)" : "var(--sev-mod)", "Online", k.online, `/ ${k.sensors}`, `reported in the last ${STALE_HOURS} h`),
+		].join("");
+
+		const devices = f.devices || [];
+		meta.textContent = devices.length ? `${devices.length} measurement${devices.length === 1 ? "" : "s"} · click one to chart it` : "";
+		if (!devices.length) {
+			grid.innerHTML = `<div class="empty">No sensor reported in the last ${f.meta.days} days. Widen the period in the sidebar.</div>`;
+			return;
+		}
+		grid.innerHTML = devices
+			.map((d) => {
+				const accent = typeAccent(d.sensor_type);
+				const s = signalTone(d.rssi);
+				const on = d.deveui === this.sel.deveui && d.sensor_type === this.sel.sensor_type;
+				return `<div class="sensor${on ? " on" : ""}" style="--kc:${accent};cursor:pointer" data-dev="${charts.esc(d.deveui)}" data-type="${charts.esc(d.sensor_type)}" data-site="${charts.esc(d.site_name || "")}">
+	<div class="sensor__head">
+		<div><div class="t">${charts.esc(d.sensor_name)}</div><div class="id">${charts.esc(d.sensor_type)} · ${charts.esc(String(d.deveui).slice(-8))}</div></div>
+		<span class="sev ${d.stale ? "mo" : "lo"}">${d.stale ? "Stale" : "Live"}</span>
+	</div>
+	<div class="sensor__value"><b>${d.latest_value == null ? "—" : charts.fmtNum(d.latest_value)}</b><span>${charts.esc(d.units || "")}</span></div>
+	<div class="sensor__meta">${charts.timeAgo(d.latest_at)} · range ${d.min_value == null ? "—" : charts.fmtNum(d.min_value)}–${d.max_value == null ? "—" : charts.fmtNum(d.max_value)}${d.site_name ? ` · ${charts.esc(d.site_name)}` : ""}</div>
+	${charts.sparkline(d.spark, accent, 26)}
+	<div class="sensor__foot">
+		<div><small>Battery</small><b style="color:${batteryTone(d.battery)}">${d.battery == null ? "—" : `${Number(d.battery).toFixed(2)} V`}</b></div>
+		<div><small>RSSI</small><b>${d.rssi == null ? "—" : `${d.rssi}`}</b><small>${s.txt}</small></div>
+		<div><small>SNR</small><b>${d.snr == null ? "—" : `${d.snr} dB`}</b></div>
+	</div>
+</div>`;
+			})
+			.join("");
+
+		grid.querySelectorAll("[data-dev]").forEach((card) => {
+			card.addEventListener("click", () => {
+				this.sel = {
+					site_name: this.sel.site_name,
+					sensor_type: card.getAttribute("data-type"),
+					deveui: card.getAttribute("data-dev"),
+				};
+				this.el.querySelector("#iot-chart").innerHTML = '<div class="skel skel-card" style="height:320px"></div>';
+				this.refresh();
+				this.el.querySelector("#iot-chart").scrollIntoView({ behavior: "smooth", block: "center" });
+			});
+		});
+	},
+
+	renderReadings() {
+		const { charts } = this.ctx;
+		const body = this.el.querySelector("#iot-readings tbody");
+		const meta = this.el.querySelector("#iot-readings-meta");
+		const rows = (this.fleet && this.fleet.readings) || [];
+		meta.textContent = rows.length ? `newest ${rows.length}` : "";
+		if (!rows.length) {
+			body.innerHTML = '<tr><td colspan="7"><div class="empty small">No readings in this period.</div></td></tr>';
+			return;
+		}
+		body.innerHTML = rows
+			.map(
+				(r) => `<tr>
+	<td>${charts.esc(charts.fmtDayClock(r.timestamp))}</td>
+	<td><b>${charts.esc(r.sensor_name)}</b></td>
+	<td>${charts.esc(r.sensor_type || "—")}</td>
+	<td class="num">${r.value == null ? "—" : charts.fmtNum(r.value)}${r.units ? ` <small>${charts.esc(r.units)}</small>` : ""}</td>
+	<td class="num">${r.battery == null ? "—" : Number(r.battery).toFixed(2)}</td>
+	<td class="num">${r.rssi == null ? "—" : r.rssi}</td>
+	<td class="num">${r.snr == null ? "—" : r.snr}</td>
+</tr>`
+			)
+			.join("");
 	},
 
 	renderFilters() {
@@ -238,7 +368,7 @@ ${pagehead(
 				"Battery",
 				s.battery == null ? null : Number(s.battery).toFixed(2),
 				"V",
-				`signal ${s.rssi == null ? "—" : `${s.rssi} dBm`} · ${sig.txt}`
+				`signal ${s.rssi == null ? "—" : `${s.rssi} dBm`} · ${sig.txt}${s.snr == null ? "" : ` · SNR ${s.snr} dB`}`
 			),
 		].join("");
 	},

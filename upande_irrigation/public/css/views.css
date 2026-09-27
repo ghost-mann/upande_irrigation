@@ -1340,3 +1340,8 @@
 	white-space: nowrap;
 	pointer-events: none;
 }
+
+/* The fleet card currently charted below. */
+.sensor.on {
+	box-shadow: 0 0 0 2px var(--kc, var(--ink)), var(--shadow-card);
+}
