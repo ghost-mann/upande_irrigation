@@ -69,64 +69,37 @@ def list_states(farm=None):
 	if not valves:
 		return {"valves": [], "generated_at": now_str, "now": now_str}
 
-	# ── Build the lookup: valve.block → active planner row ───────
-	# A valve's `block` is a sub-block warehouse (e.g. "AIRSTRIP BLK 1 - KL").
-	# Sub-blocks roll up to a shift via `Irrigation Shift Block`, the child
-	# table of the Irrigation Scheduler single (parenttype/parentfield below
-	# pin it to that table specifically, since child rows are shared storage).
-	# A planner row (Irrigation Planner) holds the scheduled_start/end for
-	# each shift. The active planner for a sub-block right now satisfies:
-	#   sb.block = <valve.block>
-	#   p.block  = sb.shift     (the shift name)
-	#   p.scheduled_start <= NOW <= p.scheduled_end
-	# No is_active filter: Blocks List never had one, and adding one here
-	# would silently change which valves report a schedule.
-	active = frappe.db.sql(
+	# ── Build the lookup: valve.block → the run-sheet cycle running now ──
+	# A valve's `block` belongs to shifts via `Irrigation Shift Block` (the child
+	# table of the Irrigation Scheduler single). A cycle on today's Irrigation Run
+	# Sheet that is Planned or Running and whose window contains NOW turns every
+	# valve of that shift's blocks ON. Replaces the retired weekly planner windows.
+	cycles = frappe.db.sql(
 		"""
-		SELECT
-			sb.block          AS sub_block,
-			p.name            AS planner,
-			p.block           AS shift,
-			p.scheduled_start AS start_dt,
-			p.scheduled_end   AS end_dt,
-			p.shift_hours     AS shift_hours
-		FROM `tabIrrigation Shift Block` sb
-		INNER JOIN `tabIrrigation Planner` p ON p.block = sb.shift
-		WHERE sb.parenttype = 'Irrigation Scheduler'
-		  AND sb.parentfield = 'shift_blocks'
-		  AND p.docstatus < 2
-		  AND p.scheduled_start IS NOT NULL
-		  AND p.scheduled_end IS NOT NULL
-		  AND %(now)s BETWEEN p.scheduled_start AND p.scheduled_end
+		SELECT sb.block AS sub_block, r.parent AS planner, r.shift AS shift,
+		       r.planned_start AS start_dt, r.planned_end AS end_dt, r.planned_hours AS shift_hours,
+		       r.status AS status
+		FROM `tabIrrigation Run` r
+		INNER JOIN `tabIrrigation Shift Block` sb
+		        ON sb.shift = r.shift AND sb.parenttype = 'Irrigation Scheduler' AND sb.parentfield = 'shift_blocks'
+		WHERE r.parenttype = 'Irrigation Run Sheet'
+		  AND r.status IN ('Planned', 'Running')
+		  AND r.planned_start IS NOT NULL
+		  AND (r.planned_start > %(now)s OR r.planned_end >= %(now)s OR r.status = 'Running')
+		ORDER BY r.planned_start ASC
 		""",
 		{"now": now_str},
 		as_dict=True,
 	)
-	active_by_subblock = {row["sub_block"]: row for row in active}
-
-	# ── Resolve next ON for OFF valves (so UI can show "Next at HH:MM") ──
-	#   For each sub-block where there's NO active planner right now,
-	#   find the next planner whose scheduled_start is in the future.
-	off_subblocks = [v["block"] for v in valves if v["block"] and v["block"] not in active_by_subblock]
+	now_dt = frappe.utils.get_datetime(now_str)
+	active_by_subblock = {}
 	next_by_subblock = {}
-	if off_subblocks:
-		upcoming = frappe.db.sql(
-			"""
-			SELECT sb.block          AS sub_block,
-			       MIN(p.scheduled_start) AS next_start
-			FROM `tabIrrigation Shift Block` sb
-			INNER JOIN `tabIrrigation Planner` p ON p.block = sb.shift
-			WHERE sb.parenttype = 'Irrigation Scheduler'
-			  AND sb.parentfield = 'shift_blocks'
-			  AND p.docstatus < 2
-			  AND p.scheduled_start > %(now)s
-			  AND sb.block IN %(blocks)s
-			GROUP BY sb.block
-			""",
-			{"now": now_str, "blocks": tuple(off_subblocks)},
-			as_dict=True,
-		)
-		next_by_subblock = {row["sub_block"]: row["next_start"] for row in upcoming}
+	for c in cycles:
+		start, end = frappe.utils.get_datetime(c["start_dt"]), frappe.utils.get_datetime(c["end_dt"])
+		if c["status"] == "Running" or start <= now_dt <= end:
+			active_by_subblock.setdefault(c["sub_block"], c)
+		elif start > now_dt:
+			next_by_subblock.setdefault(c["sub_block"], c["start_dt"])
 
 	# ── Stitch state per valve ───────────────────────────────────
 	out = []
@@ -179,6 +152,17 @@ def list_states(farm=None):
 	}
 
 
+def log_event(doc, before, source="Operator"):
+	"""Append a Valve Event for a manual-state change. The water balance reads these
+	open intervals as the strongest record of what was actually irrigated."""
+	if before == doc.manual_state or not frappe.db.exists("DocType", "Valve Event"):
+		return
+	frappe.get_doc({
+		"doctype": "Valve Event", "valve": doc.name, "block": doc.block, "at": frappe.utils.now_datetime(),
+		"from_state": before, "to_state": doc.manual_state, "source": source, "user": frappe.session.user,
+	}).insert(ignore_permissions=True)
+
+
 @frappe.whitelist(methods=["POST"])
 def set_override(valve, state):
 	"""Operator override of a valve's manual state."""
@@ -191,9 +175,11 @@ def set_override(valve, state):
 	if doc.asset_type != "Valve":
 		frappe.throw(f"{valve} is not a Valve (asset_type={doc.asset_type}).")
 
+	before = doc.manual_state or "Auto"
 	doc.manual_state = state
 	# manual_state_set_at/by are stamped in the validate() controller hook
 	doc.save(ignore_permissions=False)
+	log_event(doc, before)
 	frappe.db.commit()
 
 	return {
@@ -251,8 +237,10 @@ def set_override_bulk(state, valves=None, section=None, farm=None, all_valves=0)
 		doc = frappe.get_doc("Tank And Valve", name)
 		if doc.manual_state == state:
 			continue
+		before = doc.manual_state or "Auto"
 		doc.manual_state = state
 		doc.save()
+		log_event(doc, before)
 		updated.append(name)
 	frappe.db.commit()
 

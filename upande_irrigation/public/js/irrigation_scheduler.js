@@ -1,123 +1,28 @@
-// Irrigation Scheduler — form behavior
-//   - Status headline reflecting last_run_status
-//   - "Run Now" primary button calling upande_irrigation.api.scheduler.run
-//   - "View Last Run" / "View All Runs" shortcuts when total_runs > 0
+// Irrigation Scheduler — form behaviour.
 //
-// Was previously the "Irrigation Scheduler - Run Now Button" Client Script.
+// Since 2026-09-28 the scheduler generates a daily Irrigation Run Sheet per farm
+// at `run_hour` (from the daily water balance); the weekly planner fields are
+// hidden. "Generate today's run sheet" runs it now.
 
 frappe.ui.form.on('Irrigation Scheduler', {
-    refresh: function(frm) {
-        // ── Status headline ──────────────────────────────────────
-        if (frm.doc.last_run_status === 'Success') {
-            frm.dashboard.set_headline(
-                '<div style="padding:8px 0">' +
-                '<span class="indicator-pill green">Last run: Success</span> ' +
-                '<span style="color:#666;margin-left:8px">' +
-                (frm.doc.last_run_summary || '') + '</span>' +
-                '</div>'
-            );
-        } else if (frm.doc.last_run_status === 'Partial') {
-            frm.dashboard.set_headline(
-                '<div style="padding:8px 0">' +
-                '<span class="indicator-pill orange">Last run: Partial</span> ' +
-                '<span style="color:#666;margin-left:8px">' +
-                (frm.doc.last_run_summary || '') + '</span>' +
-                '</div>'
-            );
-        } else if (frm.doc.last_run_status === 'Failed' || frm.doc.last_run_status === 'Aborted') {
-            frm.dashboard.set_headline(
-                '<div style="padding:8px 0">' +
-                '<span class="indicator-pill red">Last run: ' + frm.doc.last_run_status + '</span> ' +
-                '<span style="color:#666;margin-left:8px">' +
-                (frm.doc.last_run_summary || '') + '</span>' +
-                '</div>'
-            );
-        }
+    refresh(frm) {
+        ['week_starts_on', 'plan_for', 'run_day_of_week', 'skip_existing', 'commit_on_partial_failure',
+         'max_errors_before_abort', 'last_run_status', 'last_run_at', 'last_run_summary', 'total_runs']
+            .forEach((f) => frm.set_df_property(f, 'hidden', 1));
+        frm.set_df_property('run_hour', 'description', __('Hour of the day (0–23) the morning run sheet is generated.'));
 
-        // ── Run Now button ───────────────────────────────────────
-        frm.add_custom_button(__('Run Now'), function() {
-            frappe.confirm(
-                'Run the irrigation scheduler now?<br><br>' +
-                'This will create planners for the configured planning window ' +
-                '(<b>' + (frm.doc.plan_for || 'Current Week') + '</b>). ' +
-                'Existing planners will be skipped.',
-                function() {
-                    frappe.call({
-                        method: 'upande_irrigation.api.scheduler.run',
-                        args: { triggered_by: 'Manual' },
-                        freeze: true,
-                        freeze_message: __('Running scheduler — this may take 30-60 seconds...'),
-                        callback: function(r) {
-                            if (r.message && r.message.ok) {
-                                const m = r.message;
-                                let color = 'green';
-                                if (m.status === 'Partial') color = 'orange';
-                                if (m.status === 'Failed' || m.status === 'Aborted') color = 'red';
-
-                                frappe.msgprint({
-                                    title: __('Scheduler Run Complete'),
-                                    message:
-                                        '<div style="font-size:14px;line-height:1.8">' +
-                                        '<b>Status:</b> <span class="indicator-pill ' + color + '">' +
-                                            m.status + '</span><br>' +
-                                        '<b>Run ID:</b> <a href="/app/irrigation-scheduler-run/' +
-                                            m.run + '">' + m.run + '</a><br>' +
-                                        '<b>Created:</b> ' + m.created + ' planners<br>' +
-                                        '<b>Skipped:</b> ' + m.skipped + ' (already existed)<br>' +
-                                        '<b>Failed:</b> ' + m.failed + '<br>' +
-                                        '<br><i>' + m.summary + '</i>' +
-                                        '</div>',
-                                    indicator: color,
-                                    primary_action: {
-                                        label: __('View Run Log'),
-                                        action: function() {
-                                            frappe.set_route('Form', 'Irrigation Scheduler Run', m.run);
-                                        }
-                                    }
-                                });
-                                frm.reload_doc();
-                            } else {
-                                frappe.msgprint({
-                                    title: __('Scheduler Failed'),
-                                    message: (r.message && r.message.reason) ||
-                                             (r.message && r.message.error) ||
-                                             'Unknown error. Check Error Log.',
-                                    indicator: 'red'
-                                });
-                            }
-                        },
-                        error: function() {
-                            frappe.msgprint({
-                                title: __('Scheduler Error'),
-                                message: 'The scheduler endpoint returned an error. ' +
-                                         'Check browser console and Error Log for details.',
-                                indicator: 'red'
-                            });
-                        }
-                    });
-                }
-            );
-        }, null, 'primary');
-
-        // ── Run-log shortcuts ────────────────────────────────────
-        if (frm.doc.total_runs && frm.doc.total_runs > 0) {
-            frm.add_custom_button(__('View Last Run'), function() {
-                frappe.db.get_list('Irrigation Scheduler Run', {
-                    fields: ['name'],
-                    order_by: 'creation desc',
-                    limit: 1
-                }).then(rs => {
-                    if (rs.length > 0) {
-                        frappe.set_route('Form', 'Irrigation Scheduler Run', rs[0].name);
-                    } else {
-                        frappe.msgprint('No run logs found.');
-                    }
-                });
-            }, __('Run Log'));
-
-            frm.add_custom_button(__('View All Runs'), function() {
-                frappe.set_route('List', 'Irrigation Scheduler Run');
-            }, __('Run Log'));
-        }
-    }
+        frm.add_custom_button(__("Generate today's run sheet"), () => {
+            frappe.call({
+                method: 'upande_irrigation.api.runsheet.generate',
+                freeze: true,
+                freeze_message: __('Updating the water balance and planning today…'),
+                callback(r) {
+                    const rows = (r.message || []).map((x) =>
+                        `<li><a href="/app/irrigation-run-sheet/${encodeURIComponent(x.run_sheet)}">${frappe.utils.escape_html(x.farm)}</a>: ${frappe.utils.escape_html(x.summary)}</li>`).join('');
+                    frappe.msgprint({ title: __('Run sheet ready'), message: `<ul>${rows || '<li>No farm has block profiles yet.</li>'}</ul>`, indicator: 'green' });
+                },
+            });
+        }).addClass('btn-primary');
+        frm.add_custom_button(__('Open the irrigation plan'), () => { window.location.href = '/upande-irrigation#planner'; });
+    },
 });

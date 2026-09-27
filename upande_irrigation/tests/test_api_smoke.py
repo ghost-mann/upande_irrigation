@@ -21,7 +21,7 @@ is not in every site's app inventory, so the whole call is wrapped in the same
 `_guard` and degrades to an empty payload. That makes assertIsNotNone equally
 worthless for it, so it asserts the Error Log delta too.
 
-`planner.py`, `resources.py`, `valves.py`, and `scheduler.live_sections` were
+`runsheet.py`, `balance.py`, `resources.py` and `valves.py` were
 checked for the same pattern and do not swallow sub-query exceptions (their only
 try/except blocks are TypeError/ValueError guards around parsing the `days`
 input) — see task-10-report.md for the module-by-module check.
@@ -31,7 +31,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from upande_irrigation.api import (
-	overview, planner, resources, scheduler, sensors, valves, weather
+	balance, overview, resources, runsheet, sensors, valves, weather
 )
 
 FARM = "Lokitela"
@@ -67,27 +67,16 @@ class TestEndpointsDoNotRaise(FrappeTestCase):
 		self.assertIsInstance(result["week"], dict)
 		self.assertIn("planners", result["week"])
 
-	def test_planner_fetch(self):
-		result = planner.fetch(farm=FARM)
-		self.assertIsNotNone(result)
-		self.assertIsInstance(result.get("week"), dict)
-		self.assertIsInstance(result.get("weeks"), list)
-		self.assertIsInstance(result.get("days"), list)
-		self.assertIsInstance(result.get("gantt"), dict)
-		self.assertIsInstance(result["gantt"].get("sections"), list)
-		self.assertIsInstance(result.get("pump_load"), dict)
-		self.assertIsInstance(result["pump_load"].get("pumps"), list)
-		self.assertIsInstance(result.get("balance"), dict)
+	def test_runsheet_today_and_week(self):
+		today = runsheet.today(farm=FARM)
+		self.assertIsInstance(today.get("sheets"), list)
+		week = runsheet.week(farm=FARM)
+		self.assertIsInstance(week.get("farms"), list)
+		for f in week["farms"]:
+			self.assertEqual(len(f["days"]), 7)
 
-	def test_planner_explain(self):
-		name = frappe.db.get_value("Irrigation Planner", {}, "name")
-		if not name:
-			self.skipTest("no planners on this site")
-		result = planner.explain(planner=name)
-		self.assertIsNotNone(result)
-		self.assertEqual(result.get("planner"), name)
-		self.assertIsInstance(result.get("steps"), list)
-		self.assertGreater(len(result["steps"]), 0)
+	def test_balance_block_status(self):
+		self.assertIsInstance(balance.block_status(farm=FARM), list)
 
 	def test_resources_fetch(self):
 		result = resources.fetch(days=30, farm=FARM)
@@ -157,10 +146,6 @@ class TestEndpointsDoNotRaise(FrappeTestCase):
 		self.assertIsInstance(result.get("blocks"), list)
 		self.assertIsInstance(result.get("kpis"), dict)
 
-	def test_scheduler_live_sections(self):
-		result = scheduler.live_sections(farm=FARM)
-		self.assertIsNotNone(result)
-		self.assertIsInstance(result.get("farms"), list)
 
 
 class TestSensorsDegradesInsteadOfRaising(FrappeTestCase):

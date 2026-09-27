@@ -146,9 +146,6 @@ after_migrate = "upande_irrigation.setup.after_migrate"
 # Hook on document methods and events
 
 doc_events = {
-	"Irrigation Planner": {
-		"before_save": "upande_irrigation.events.irrigation_planner.compute_shift",
-	},
 	"Weather Reading": {
 		"before_save": "upande_irrigation.events.weather_reading.compute_derived",
 	},
@@ -159,7 +156,6 @@ doc_events = {
 
 # Client-side form scripts (DB Client Scripts moved into app source)
 doctype_js = {
-	"Irrigation Planner":        "public/js/irrigation_planner.js",
 	"Irrigation Scheduler":      "public/js/irrigation_scheduler.js",
 	"Reservoir Pumping Record":  "public/js/reservoir_pumping_record.js",
 }
@@ -192,12 +188,11 @@ add_to_apps_screen = [
 # Scheduled Tasks
 # ---------------
 scheduler_events = {
-	"cron": {
-		# Friday 06:00 — weekly irrigation planner generation
-		"0 6 * * 5": [
-			"upande_irrigation.scheduled.weekly.run_weekly_scheduler",
-		],
-	},
+	# The morning run sheet: hourly, acting once at Irrigation Scheduler.run_hour.
+	# Replaced the Friday 06:00 weekly planner generation on 2026-09-28.
+	"hourly": [
+		"upande_irrigation.scheduled.daily.maybe_run",
+	],
 }
 
 # Fixtures consolidated below near end of file.

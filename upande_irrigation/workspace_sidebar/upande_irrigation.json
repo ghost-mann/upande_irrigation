@@ -44,14 +44,38 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "calendar-check",
+   "icon": "clipboard-check",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Irrigation Planner",
+   "label": "Run Sheets",
    "link_type": "DocType",
+   "link_to": "Irrigation Run Sheet",
    "show_arrow": 0,
-   "type": "Link",
-   "link_to": "Irrigation Planner"
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "sprout",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Block Profiles",
+   "link_type": "DocType",
+   "link_to": "Irrigation Block Profile",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "droplets",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Block Water Balance",
+   "link_type": "DocType",
+   "link_to": "Irrigation Block Balance",
+   "show_arrow": 0,
+   "type": "Link"
   },
   {
    "child": 1,
@@ -64,18 +88,6 @@
    "show_arrow": 0,
    "type": "Link",
    "link_to": "Irrigation Scheduler"
-  },
-  {
-   "child": 1,
-   "collapsible": 1,
-   "icon": "history",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Scheduler Runs",
-   "link_type": "DocType",
-   "show_arrow": 0,
-   "type": "Link",
-   "link_to": "Irrigation Scheduler Run"
   },
   {
    "child": 0,
@@ -198,6 +210,18 @@
   {
    "child": 1,
    "collapsible": 1,
+   "icon": "history",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Valve Events",
+   "link_type": "DocType",
+   "link_to": "Valve Event",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
    "icon": "tractor",
    "indent": 0,
    "keep_closed": 0,
@@ -218,6 +242,41 @@
    "show_arrow": 0,
    "type": "Link",
    "link_to": "Warehouse"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "archive",
+   "indent": 1,
+   "keep_closed": 0,
+   "label": "History",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "calendar-x",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Weekly Planners (retired)",
+   "link_type": "DocType",
+   "link_to": "Irrigation Planner",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "history",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Scheduler Runs",
+   "link_type": "DocType",
+   "link_to": "Irrigation Scheduler Run",
+   "show_arrow": 0,
+   "type": "Link"
   },
   {
    "child": 0,
@@ -248,7 +307,7 @@
    "icon": "calendar-range",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Planning",
+   "label": "Irrigation Plan",
    "link_type": "URL",
    "show_arrow": 0,
    "type": "Link",

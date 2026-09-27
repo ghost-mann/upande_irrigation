@@ -9,6 +9,7 @@ The bug being locked out: a bulk call with no scope at all must not quietly mean
 the whole estate. It needs all_valves=1 spelled out.
 """
 
+import datetime
 import json
 
 import frappe
@@ -159,3 +160,40 @@ class TestBlockInfo(NoCommit, FrappeTestCase):
 	def test_an_unknown_block_is_refused(self):
 		with self.assertRaises(frappe.DoesNotExistError):
 			api.block_info("_No Such Block - XX")
+
+
+class TestValvesFollowTheRunSheet(NoCommit, FrappeTestCase):
+	"""The valves' scheduled state now comes from the run sheet, and every manual
+	change is logged as a Valve Event — the water balance's strongest record."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		make_farm(FARM_A)
+		cls.section = make_warehouse("_Test VRS Section", is_group=1, farm=FARM_A)
+		cls.block = make_warehouse("_Test VRS Block", parent=cls.section, farm=FARM_A)
+		cls.valve = _valve("_TV VRS", FARM_A, cls.block)
+		frappe.get_doc({"doctype": "Irrigation Shift Block", "parent": "Irrigation Scheduler", "parenttype": "Irrigation Scheduler",
+		                "parentfield": "shift_blocks", "shift": "_TVRS - SHIFT 1", "block": cls.block, "farm": FARM_A, "is_active": 1}).db_insert()
+		now = frappe.utils.now_datetime()
+		frappe.get_doc({"doctype": "Irrigation Run Sheet", "farm": FARM_A, "date": now.date(), "runs": [{
+			"shift": "_TVRS - SHIFT 1", "status": "Planned", "planned_hours": 2,
+			"planned_start": now - datetime.timedelta(minutes=30), "planned_end": now + datetime.timedelta(minutes=90)}]}).insert(ignore_permissions=True)
+
+	def test_a_valve_is_on_inside_its_planned_cycle(self):
+		v = next(x for x in api.list_states(farm=FARM_A)["valves"] if x["name"] == self.valve)
+		self.assertEqual(v["schedule_state"], "ON")
+		self.assertEqual(v["schedule_shift"], "_TVRS - SHIFT 1")
+
+	def test_an_override_is_logged(self):
+		api.set_override(self.valve, "Forced Closed")
+		ev = frappe.get_all("Valve Event", filters={"valve": self.valve}, fields=["from_state", "to_state", "source"], order_by="creation desc", limit=1)
+		self.assertEqual((ev[0].from_state, ev[0].to_state, ev[0].source), ("Auto", "Forced Closed", "Operator"))
+
+	def test_the_weekly_planner_is_retired(self):
+		from upande_irrigation import hooks
+
+		self.assertNotIn("Irrigation Planner", hooks.doc_events)
+		self.assertIn("upande_irrigation.scheduled.daily.maybe_run", hooks.scheduler_events["hourly"])
+		perms = frappe.get_meta("Irrigation Planner").permissions
+		self.assertFalse(any(p.write or p.create for p in perms))
