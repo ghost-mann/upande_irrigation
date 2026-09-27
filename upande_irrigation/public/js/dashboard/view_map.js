@@ -24,38 +24,8 @@
  */
 
 import { pagehead, kpi, statusStrip, icon } from "./shell.js";
+import { BASEMAPS, MAP_MAX_ZOOM, basemapStyle, bounds, loadLibs, setBasemap as applyBasemap } from "./maplib.js";
 
-const MAPLIBRE_JS = "https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js";
-const MAPLIBRE_CSS = "https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css";
-const THREE_ESM = "https://unpkg.com/three@0.160.0/build/three.module.js";
-const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/";
-/* Past z18 Esri answers with grey "Map data not available" tiles over Kenya. */
-const SAT_MAXZOOM = 18;
-const esri = (path, attribution) => ({
-	type: "raster",
-	tiles: [`${ESRI}${path}/MapServer/tile/{z}/{y}/{x}`],
-	tileSize: 256,
-	maxzoom: SAT_MAXZOOM,
-	attribution,
-});
-const BASEMAPS = {
-	satellite: ["base-sat"],
-	hybrid: ["base-sat", "base-ref"],
-	streets: ["base-streets"],
-};
-const BASEMAP_STYLE = {
-	version: 8,
-	sources: {
-		sat: esri("World_Imagery", "Imagery © Esri, Maxar"),
-		ref: esri("Reference/World_Boundaries_and_Places", ""),
-		streets: esri("World_Street_Map", "© Esri"),
-	},
-	layers: [
-		{ id: "base-sat", type: "raster", source: "sat" },
-		{ id: "base-ref", type: "raster", source: "ref" },
-		{ id: "base-streets", type: "raster", source: "streets", layout: { visibility: "none" } },
-	],
-};
 /* Block names appear once the blocks are big enough on screen to carry them. */
 const LABEL_MIN_ZOOM = 15.5;
 const STATES = [
@@ -77,58 +47,6 @@ const BLOCK_FILL = "#c25a2e";
 const BLOCK_LINE = "#7c2f16";
 const WHEEL_CLOSED = 0xd9962e;
 const WHEEL_OPEN = 0x3f8f4f;
-
-let libsPromise = null;
-
-/* Load the map libraries once per page life. MapLibre is a UMD global; Three is
- * an ES module. */
-function loadLibs() {
-	if (libsPromise) return libsPromise;
-	libsPromise = (async () => {
-		if (!document.querySelector(`link[href="${MAPLIBRE_CSS}"]`)) {
-			const link = document.createElement("link");
-			link.rel = "stylesheet";
-			link.href = MAPLIBRE_CSS;
-			document.head.appendChild(link);
-		}
-		if (!window.maplibregl) {
-			await new Promise((resolve, reject) => {
-				const s = document.createElement("script");
-				s.src = MAPLIBRE_JS;
-				s.onload = resolve;
-				s.onerror = () => reject(new Error("could not load MapLibre"));
-				document.head.appendChild(s);
-			});
-		}
-		const THREE = await import(/* webpackIgnore: true */ THREE_ESM);
-		return { maplibregl: window.maplibregl, THREE };
-	})().catch((err) => {
-		libsPromise = null;
-		throw err;
-	});
-	return libsPromise;
-}
-
-function bounds(features) {
-	let minX = Infinity;
-	let maxX = -Infinity;
-	let minY = Infinity;
-	let maxY = -Infinity;
-	const visit = (c) => {
-		if (typeof c[0] === "number") {
-			if (c[0] < minX) minX = c[0];
-			if (c[0] > maxX) maxX = c[0];
-			if (c[1] < minY) minY = c[1];
-			if (c[1] > maxY) maxY = c[1];
-		} else {
-			c.forEach(visit);
-		}
-	};
-	features.forEach((f) => {
-		if (f && f.geometry) visit(f.geometry.coordinates);
-	});
-	return { minX, maxX, minY, maxY, empty: !isFinite(minX) };
-}
 
 /* Custom MapLibre layer rendering each valve as a Three.js group. */
 function makeValvesLayer(THREE, maplibregl, features) {
@@ -345,11 +263,7 @@ ${pagehead(
 		this.el.querySelectorAll("#map-basemap button").forEach((b) => {
 			b.classList.toggle("on", b.getAttribute("data-base") === key);
 		});
-		if (!this.map) return;
-		const visible = new Set(BASEMAPS[key]);
-		["base-sat", "base-ref", "base-streets"].forEach((id) => {
-			if (this.map.getLayer(id)) this.map.setLayoutProperty(id, "visibility", visible.has(id) ? "visible" : "none");
-		});
+		applyBasemap(this.map, key);
 	},
 
 	/* Tear the map down so the next refresh rebuilds it for a new farm. */
@@ -467,10 +381,10 @@ ${pagehead(
 
 		const map = new maplibregl.Map({
 			container: "map-canvas",
-			style: BASEMAP_STYLE,
+			style: basemapStyle(),
 			center,
 			zoom: 15.5,
-			maxZoom: 19,
+			maxZoom: MAP_MAX_ZOOM,
 			pitch: 55,
 			attributionControl: { compact: true },
 		});

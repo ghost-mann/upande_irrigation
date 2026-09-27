@@ -6,6 +6,7 @@
  * recalculated here — the browser only collects the four operator inputs.
  */
 
+import { irrometerMap } from "./irrometer_map.js";
 import { pagehead, kpi, statusStrip, icon } from "./shell.js";
 
 const T = {
@@ -111,8 +112,9 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 <div class="card">
 	<div class="card__head">
 		<h3>Soil tension · irrometers</h3>
-		<span class="meta">centibars · latest reading per block</span>
+		<span class="meta">centibars · latest reading per block · click a block for its readings</span>
 	</div>
+	<div id="wx-irro-map"></div>
 	<div class="stabs" id="wx-irro-tabs"></div>
 	<div class="scrollbox"><div class="irro-grid stagger" id="wx-irro"></div></div>
 	<div class="clegend" style="margin-top:12px">
@@ -330,6 +332,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		this.renderKpis(data.kpis, weather);
 		this.renderCharts(weather, meta);
 		this.renderIrrometer(blocks);
+		this.renderIrrometerMap(blocks);
 		this.renderSections(await sectionsReq);
 		this.renderBlocks(blocks);
 	},
@@ -514,6 +517,14 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 	/* One tab per irrigation section, gauges for the selected one in a panel
 	 * that scrolls on its own. Stacking every section as open <details> made a
 	 * farm with 78 blocks push the rest of the page off screen. */
+	renderIrrometerMap(blocks) {
+		if (!this.irroMap) {
+			this.irroMap = irrometerMap(this.el.querySelector("#wx-irro-map"), this.ctx, { tension, shortSection });
+		}
+		/* The map loads its own libraries and geometry; never hold the view up. */
+		this.irroMap.render(blocks, this.ctx.filters.farm).catch((err) => console.warn("[irrigation] irrometer map", err));
+	},
+
 	renderIrrometer(blocks) {
 		const { charts } = this.ctx;
 		const tabsHost = this.el.querySelector("#wx-irro-tabs");
@@ -619,5 +630,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 
 	unmount() {
 		if (this.unsubscribe) this.unsubscribe();
+		if (this.irroMap) this.irroMap.destroy();
+		this.irroMap = null;
 	},
 };

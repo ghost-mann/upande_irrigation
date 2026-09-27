@@ -1370,3 +1370,156 @@
 .sensor.on {
 	box-shadow: 0 0 0 2px var(--kc, var(--ink)), var(--shadow-card);
 }
+
+/* ══════════════════════════════════════════════ irrometer map */
+.irm {
+	margin-bottom: 18px;
+}
+
+.irm__bar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-bottom: 12px;
+}
+
+.irm__search {
+	flex: 0 1 260px;
+	min-width: 180px;
+}
+
+.irm__bar .meta {
+	color: var(--ink-mute);
+	font-size: 12px;
+	margin-right: auto;
+}
+
+.irm__wrap {
+	position: relative;
+}
+
+.irm__map {
+	height: 460px;
+}
+
+.irm__card {
+	position: absolute;
+	top: 12px;
+	left: 12px;
+	width: min(300px, calc(100% - 24px));
+	max-height: calc(100% - 24px);
+	overflow-y: auto;
+	background: var(--surface-2);
+	border-radius: 14px;
+	box-shadow: 0 8px 28px rgba(10, 10, 10, 0.22);
+	padding: 16px 18px;
+	z-index: 3;
+	font: 400 12.5px/1.45 var(--sans);
+	color: var(--ink-3);
+}
+
+.irm__card[hidden] {
+	display: none;
+}
+
+.irm__close {
+	position: absolute;
+	top: 8px;
+	right: 10px;
+	border: 0;
+	background: transparent;
+	font-size: 22px;
+	line-height: 1;
+	cursor: pointer;
+	color: var(--ink-4);
+}
+
+.irm__title {
+	font: 600 15px var(--sans);
+	color: var(--ink);
+	padding-right: 24px;
+}
+
+.irm__meta {
+	color: var(--ink-mute);
+	margin: 2px 0 10px;
+}
+
+.irm__readings {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+	margin: 6px 0 4px;
+}
+
+.irm__reading {
+	background: rgba(10, 10, 10, 0.03);
+	border-radius: 10px;
+	padding: 10px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.irm__reading small,
+.irm__spark small {
+	font: 500 9px var(--sans);
+	text-transform: uppercase;
+	letter-spacing: 0.8px;
+	color: var(--ink-mute);
+}
+
+.irm__reading b {
+	font: 600 26px var(--sans);
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+}
+
+.irm__reading .sev {
+	align-self: flex-start;
+}
+
+.irm__spark {
+	margin: 10px 0 6px;
+}
+
+.irm__table {
+	font-size: 12px;
+}
+
+.irm__empty {
+	color: var(--ink-mute);
+	padding: 8px 0 2px;
+}
+
+.irm-pin {
+	min-width: 28px;
+	height: 28px;
+	padding: 0 7px;
+	border-radius: 999px;
+	border: 2px solid #fafaf6;
+	color: #fff;
+	font: 600 11px var(--sans);
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+	box-shadow: 0 2px 8px rgba(10, 10, 10, 0.35);
+	background: var(--ui-mute);
+}
+
+.irm-pin.ok { background: var(--ui-ok); }
+.irm-pin.warn { background: var(--ui-warn); }
+.irm-pin.clay { background: var(--ui-clay); }
+.irm-pin.hot { background: var(--ui-hot); }
+
+@media (max-width: 700px) {
+	.irm__map {
+		height: 360px;
+	}
+
+	.irm__card {
+		position: static;
+		width: auto;
+		margin-top: 10px;
+	}
+}
