@@ -99,11 +99,15 @@ ${pagehead(
 	<div class="flow" id="r-flow"></div>
 </div>
 
-<div class="row-3">
-	<div class="card"><div class="card__head"><h3>Monthly pump volume</h3><span class="meta">m³</span></div><div id="r-mon-pump"></div></div>
-	<div class="card"><div class="card__head"><h3>Monthly electricity</h3><span class="meta">kWh</span></div><div id="r-mon-elec"></div></div>
-	<div class="card"><div class="card__head"><h3>Pump efficiency</h3><span class="meta">m³ per kWh</span></div><div id="r-mon-eff"></div></div>
+<div class="row-3-eq">
+	<div class="card"><div class="card__head"><h3>Monthly pump volume</h3><span class="meta">m³</span></div><div id="r-mon-pump"></div>
+		<div class="clegend"><span><i style="background:${T.pump}"></i>Water pumped (pumping records)</span></div></div>
+	<div class="card"><div class="card__head"><h3>Monthly electricity</h3><span class="meta">kWh</span></div><div id="r-mon-elec"></div>
+		<div class="clegend"><span><i style="background:${T.elec}"></i>Electricity meter</span><span><i class="ln" style="background:var(--ui-ink4)"></i>Pumping sessions</span></div></div>
+	<div class="card"><div class="card__head"><h3>Pump efficiency</h3><span class="meta">m³ per kWh</span></div><div id="r-mon-eff"></div>
+		<div class="clegend"><span><i class="ln" style="background:${T.water}"></i>Water pumped ÷ session electricity</span></div></div>
 </div>
+<p class="r-mon-note" id="r-mon-note"></p>
 
 <div class="row-2-eq">
 	<div class="card">
@@ -278,6 +282,12 @@ ${pagehead(
 		this.el.querySelector("#r-flow").innerHTML = html;
 	},
 
+	/* Three monthly charts over ONE continuous month axis, so a bar in one
+	 * sits under the same month in the others. A month with no records is a
+	 * gap, never a zero: "nothing logged" and "nothing pumped" are different
+	 * facts. Electricity has two sources that disagree (the meter covers every
+	 * load, sessions only the pump), so the chart shows both; efficiency uses
+	 * the session figures, the only ones paired with a volume. */
 	renderMonthly(data) {
 		const { charts } = this.ctx;
 		const pm = {};
@@ -293,24 +303,65 @@ ${pagehead(
 			em[m] = (em[m] || 0) + (r.units_used || 0);
 		});
 		/* Guard against the 1900-ish rows that exist in the meter history. */
-		const months = [...new Set([...Object.keys(pm), ...Object.keys(em)])]
+		const seen = [...new Set([...Object.keys(pm), ...Object.keys(em)])]
 			.filter((m) => /^\d{4}-\d{2}$/.test(m) && m > "2020-01")
 			.sort();
+		const months = [];
+		if (seen.length) {
+			let [y, mo] = seen[0].split("-").map(Number);
+			const [y1, m1] = seen[seen.length - 1].split("-").map(Number);
+			while (y < y1 || (y === y1 && mo <= m1)) {
+				months.push(`${y}-${String(mo).padStart(2, "0")}`);
+				mo += 1;
+				if (mo > 12) {
+					mo = 1;
+					y += 1;
+				}
+			}
+		}
 		const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 		const labels = months.map((m) => {
 			const [y, mo] = m.split("-");
 			return `${MON[+mo - 1]} ${y.slice(2)}`;
 		});
-		const opts = { xLabels: labels, xRaw: true, tooltip: true, margin: { t: 12, r: 14, b: 28, l: 46 } };
-		charts.mkChart(this.el.querySelector("#r-mon-pump"), [{ label: "m³", color: T.pump, type: "bar", values: months.map((m) => +(pm[m]?.vol || 0).toFixed(0)), unit: "m³" }], 420, 170, opts);
-		charts.mkChart(this.el.querySelector("#r-mon-elec"), [{ label: "kWh", color: T.elec, type: "bar", values: months.map((m) => +(em[m] || 0).toFixed(0)), unit: "kWh" }], 420, 170, opts);
+		const hosts = ["#r-mon-pump", "#r-mon-elec", "#r-mon-eff"].map((sel) => this.el.querySelector(sel));
+		if (!months.length) {
+			hosts.forEach((h) => {
+				h.innerHTML = '<div class="empty small">No pumping or meter records in this period.</div>';
+			});
+			return;
+		}
+
+		const vol = months.map((m) => (pm[m] ? +pm[m].vol.toFixed(0) : null));
+		const meter = months.map((m) => (em[m] != null ? +em[m].toFixed(0) : null));
+		const session = months.map((m) => (pm[m] ? +pm[m].kwh.toFixed(0) : null));
+		const eff = months.map((m) => (pm[m] && pm[m].kwh > 0 ? +(pm[m].vol / pm[m].kwh).toFixed(2) : null));
+
+		/* Identical geometry for all three so their plots and month ticks line up. */
+		const W = 420;
+		const H = 190;
+		const opts = { xLabels: labels, xRaw: true, tooltip: true, margin: { t: 12, r: 14, b: 28, l: 50 } };
+		charts.mkChart(hosts[0], [{ label: "Pumped", color: T.pump, type: "bar", values: vol, unit: "m³" }], W, H, opts);
 		charts.mkChart(
-			this.el.querySelector("#r-mon-eff"),
-			[{ label: "m³/kWh", color: T.water, values: months.map((m) => (pm[m] && pm[m].kwh > 0 ? +(pm[m].vol / pm[m].kwh).toFixed(2) : null)), unit: "m³/kWh", dec: 2 }],
-			420,
-			170,
+			hosts[1],
+			[
+				{ label: "Meter", color: T.elec, type: "bar", values: meter, unit: "kWh" },
+				{ label: "Pumping sessions", color: "var(--ui-ink4)", values: session, unit: "kWh", width: 2, dash: "5 4" },
+			],
+			W,
+			H,
 			{ ...opts, noFill: true }
 		);
+		charts.mkChart(hosts[2], [{ label: "m³/kWh", color: T.water, values: eff, unit: "m³/kWh", dec: 2 }], W, H, { ...opts, noFill: true });
+
+		const gaps = months.filter((m) => !pm[m]);
+		const note = this.el.querySelector("#r-mon-note");
+		if (note) {
+			const fmt = (m) => labels[months.indexOf(m)];
+			note.textContent = gaps.length
+				? `Blank months have no records, not zero use — no pumping sessions logged for ${gaps.map(fmt).join(", ")}.`
+				: "";
+		}
 	},
 
 	renderBars(data, weeks) {

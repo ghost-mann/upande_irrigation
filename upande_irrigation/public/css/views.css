@@ -1630,3 +1630,13 @@
 	border-color: var(--ink);
 	color: #fafaf6;
 }
+
+.r-mon-note {
+	margin: -8px 2px 18px;
+	font: 400 12px var(--sans);
+	color: var(--ink-mute);
+}
+
+.r-mon-note:empty {
+	display: none;
+}
