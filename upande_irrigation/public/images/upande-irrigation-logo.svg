@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Upande Irrigation">
+  <!--
+    Upande Irrigation mark, the sibling of upande_crm's envelope mark. Plays
+    once on load: a garden tap's handle turns, water runs from the spout and
+    fills the badge, the Upande arrow rises out of the water and grows to full
+    size, and the tap and water drain away. It comes to rest as the plain Upande
+    arrow badge (the same artwork as upande-logo.png), so a tile that has
+    finished animating is indistinguishable from the static brand mark.
+
+    Pure CSS, no script: the desk draws this through <img>, where scripts never
+    run anyway, and it is served to every desk user. With reduced motion set,
+    only the resting mark is shown.
+  -->
+  <style>
+    .arrow  { transform-box: view-box; transform-origin: 50px 50px;
+              animation: rise 2.4s cubic-bezier(.3,.7,.2,1) both; }
+    .handle { transform-box: view-box; transform-origin: 31px 14px;
+              animation: turn 2.4s ease-in-out both; }
+    .stream { transform-box: view-box; transform-origin: 50px 38px;
+              animation: pour 2.4s linear both; }
+    .pool   { animation: fill 2.4s ease-out both; }
+    .tap    { animation: away 2.4s ease-in both; }
+    @keyframes turn {
+      0%, 6%     { transform: rotate(0deg); }
+      20%, 100%  { transform: rotate(90deg); }
+    }
+    @keyframes pour {
+      /* runs down from the spout, then thins out as the tap drains away */
+      0%, 18%    { transform: scaleY(0); opacity: 1; }
+      32%, 50%   { transform: scaleY(1); opacity: 1; }
+      60%, 100%  { transform: scaleY(1); opacity: 0; }
+    }
+    @keyframes fill {
+      0%, 26%    { transform: translate(0, 34px); opacity: 1; }
+      52%        { transform: translate(0, 0); opacity: 1; }
+      74%, 100%  { transform: translate(0, 6px); opacity: 0; }
+    }
+    @keyframes rise {
+      /* small and hidden under the water, up out of it, then home */
+      0%, 40%    { transform: translate(0, 26px) scale(.3); opacity: 0; }
+      46%        { opacity: 1; }
+      60%, 66%   { transform: translate(0, 4px) scale(.38); opacity: 1; }
+      94%, 100%  { transform: translate(0, 0) scale(1); opacity: 1; }
+    }
+    @keyframes away {
+      0%, 56%    { opacity: 1; transform: translate(0, 0); }
+      76%, 100%  { opacity: 0; transform: translate(0, -8px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .arrow { animation: none; }
+      .tap, .water { display: none; }
+    }
+  </style>
+
+  <defs>
+    <clipPath id="badge"><circle cx="50" cy="50" r="49"/></clipPath>
+  </defs>
+
+  <circle cx="50" cy="50" r="49.3" fill="#ffffff" stroke="#1c1b19" stroke-width="0.7"/>
+
+  <g class="water">
+    <!-- the water filling the badge, behind the arrow -->
+    <g clip-path="url(#badge)">
+      <path class="pool" fill="#8ec5ea"
+            d="M0,68 Q12.5,64 25,68 T50,68 T75,68 T100,68 V100 H0 Z"/>
+    </g>
+    <!-- the stream running from the spout -->
+    <rect class="stream" x="48" y="38" width="4" height="32" rx="2" fill="#3f8fcf"/>
+  </g>
+
+  <!-- the garden tap: wall flange, pipe, spout and a lever handle that turns -->
+  <g class="tap">
+    <rect x="12" y="17" width="5" height="16" rx="1.2" fill="#1c1b19"/>
+    <rect x="17" y="21" width="33" height="8" rx="2" fill="#635e59"/>
+    <path d="M44,21 H50 Q54,21 54,25 V36 H46 V29 H44 Z" fill="#45433f"/>
+    <rect x="45" y="35" width="10" height="3" rx="1" fill="#1c1b19"/>
+    <rect x="29" y="15" width="4" height="6" fill="#45433f"/>
+    <g class="handle">
+      <rect x="23" y="12.5" width="16" height="3" rx="1.5" fill="#1c1b19"/>
+      <circle cx="31" cy="14" r="2.4" fill="#45433f"/>
+    </g>
+  </g>
+
+  <!-- the Upande arrow, traced from upande-logo.png -->
+  <g class="arrow">
+    <polygon points="24.4,23.8 64,23.8 64,36.3 24.4,36.3" fill="#635e59"/>
+    <polygon points="59.2,23.8 64,23.8 64,36.3 59.2,36.3" fill="#5a5752"/>
+    <polygon points="64,23.8 76.5,23.8 76.5,76.2 64,76.2" fill="#45433f"/>
+    <polygon points="24.4,64.6 50.5,38.5 64,36.3 64,47.9 35.8,76.2 24.4,76.2" fill="#45433f"/>
+    <polygon points="50,39.2 64,36.3 64,47.9 60.4,51.4 60.4,40.6" fill="#1c1b19"/>
+  </g>
+</svg>

@@ -29,7 +29,7 @@ class TestDeskShell(FrappeTestCase):
 		self.assertEqual(icon.app, "upande_irrigation")
 		self.assertEqual(icon.link_type, "Workspace Sidebar")
 		self.assertEqual(icon.link_to, "Upande Irrigation")
-		self.assertEqual(icon.logo_url, "/assets/upande_irrigation/images/upande-logo.png")
+		self.assertEqual(icon.logo_url, "/assets/upande_irrigation/images/upande-irrigation-logo.svg")
 
 	def test_the_shipped_icon_is_visible(self):
 		"""The bug being locked out: in developer mode a save of a standard
@@ -70,3 +70,35 @@ class TestDeskShell(FrappeTestCase):
 		setup.after_migrate()
 		setup.after_migrate()
 		self.assertEqual(frappe.db.count("Desktop Icon", {"app": "upande_irrigation", "icon_type": "App"}), 1)
+
+
+class TestAnimatedLogo(FrappeTestCase):
+	"""The desk tile and sidebar header draw the tile's logo as an <img>, so an
+	SVG with its own CSS animation plays there. It is served to every desk user,
+	so it must carry no script, and it must honour reduced motion."""
+
+	URL = "/assets/upande_irrigation/images/upande-irrigation-logo.svg"
+
+	def _svg(self):
+		path = os.path.join(os.path.dirname(upande_irrigation.__file__), "public", "images", "upande-irrigation-logo.svg")
+		with open(path, encoding="utf-8") as f:
+			return f.read()
+
+	def test_shipped_tile_uses_the_animated_logo(self):
+		path = os.path.join(os.path.dirname(upande_irrigation.__file__), "desktop_icon", "upande_irrigation.json")
+		with open(path) as f:
+			self.assertEqual(json.load(f)["logo_url"], self.URL)
+		self.assertEqual(setup.LOGO, self.URL)
+
+	def test_svg_carries_no_script_or_external_reference(self):
+		svg = self._svg().lower()
+		for bad in ("<script", "javascript:", "onload", "onclick", 'href="http', "@import", "url(http"):
+			self.assertNotIn(bad, svg, bad)
+
+	def test_svg_honours_reduced_motion(self):
+		self.assertIn("prefers-reduced-motion", self._svg())
+
+	def test_svg_plays_once(self):
+		svg = self._svg()
+		self.assertIn("@keyframes", svg)
+		self.assertNotIn("infinite", svg)

@@ -26,7 +26,11 @@ from upande_irrigation.install import ensure_roles
 NAVIGATION_BLOCK = "Irrigation Navigation"
 DESKTOP_ICON = "Upande Irrigation"
 WORKSPACE = "Upande Irrigation"
-LOGO = "/assets/upande_irrigation/images/upande-logo.png"
+# Animated SVG, the sibling of upande_crm's envelope mark: a tap turns on, water
+# fills the badge and the Upande arrow rises out of it, once, then rests as the
+# plain Upande badge. The desk tile and the sidebar header draw it through <img>,
+# where its CSS animation plays. The /apps launcher and the www page keep the PNG.
+LOGO = "/assets/upande_irrigation/images/upande-irrigation-logo.svg"
 LEGACY = "Smart Irrigation"
 
 
