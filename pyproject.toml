@@ -1,27 +1,42 @@
 [project]
 name = "upande_irrigation"
 authors = [
-    { name = "Upande", email = "dev@upnade.com"}
+    { name = "Upande", email = "dev@upande.com"}
 ]
 description = "Smart Irrigation System"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 readme = "README.md"
 dynamic = ["version"]
+# No third-party Python packages at runtime: the app uses only the standard
+# library and Frappe. Frappe apps are declared below, not here.
 dependencies = [
-    # "frappe~=15.0.0" # Installed and managed by bench.
+    # "frappe~=16.0.0" # Installed and managed by bench.
 ]
 
 [build-system]
 requires = ["flit_core >=3.4,<4"]
 build-backend = "flit_core.buildapi"
 
+# Frappe apps this app needs, checked by bench / Frappe Cloud at install time.
+# Mirrors required_apps in hooks.py: Farm, Warehouse sections/blocks and the
+# block custom fields come from upande_core; Warehouse and Company from erpnext.
+[tool.bench.frappe-dependencies]
+frappe = ">=16.0.0,<17.0.0"
+erpnext = ">=16.0.0,<17.0.0"
+upande_core = ">=0.0.1"
+
 # These dependencies are only installed when developer mode is enabled
 [tool.bench.dev-dependencies]
-# package_name = "~=1.1.0"
+# docs/build_process_docx.py builds the process document.
+python-docx = "~=1.2"
+
+# These apt dependencies will be installed from Ubuntu repositories when you host your app on Frappe Cloud
+[deploy.dependencies.apt]
+packages = []
 
 [tool.ruff]
 line-length = 110
-target-version = "py310"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [
