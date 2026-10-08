@@ -387,6 +387,65 @@ def live_sections(farm=None):
 
 
 @frappe.whitelist()
+def reservoir_budget(farm=None, weeks=8, start=None):
+	"""Per farm per week (Monday start): water pumped from the river into the
+	reservoir (submitted Reservoir Pumping Records) against water the reservoir-fed
+	sections' meters drew out. A River-direct section never touches the reservoir,
+	so its meter is left out. The difference is what the reservoir lost (seepage,
+	evaporation, an unmetered draw) or a meter to check."""
+	weeks = max(1, min(int(weeks or 8), 52))
+	if start:
+		start = frappe.utils.getdate(start)
+	else:
+		today = frappe.utils.getdate()
+		start = frappe.utils.add_days(today, -today.weekday() - 7 * (weeks - 1))
+	args = {"start": start, "farm": farm}
+	intake_rows = frappe.db.sql(
+		f"""
+		SELECT NULLIF(farm, '') AS farm, DATE_SUB(date, INTERVAL WEEKDAY(date) DAY) AS week,
+		       SUM(volume_of_water_used_m3) AS m3
+		FROM `tabReservoir Pumping Record`
+		WHERE docstatus = 1 AND date >= %(start)s {"AND farm = %(farm)s" if farm else ""}
+		GROUP BY 1, 2
+		""",
+		args,
+		as_dict=True,
+	)
+	river = set(frappe.get_all("Irrigation Pump Profile", filters={"water_source": "River direct"}, pluck="irrigation_section"))
+	drawn_rows = frappe.db.sql(
+		f"""
+		SELECT w.custom_farm AS farm, m.irrigation_section AS section,
+		       DATE_SUB(DATE(m.date), INTERVAL WEEKDAY(m.date) DAY) AS week, SUM(m.units_used) AS m3
+		FROM `tabWater Meter Reading` m
+		INNER JOIN `tabWarehouse` w ON w.name = m.irrigation_section
+		WHERE m.docstatus = 1 AND m.date >= %(start)s {"AND w.custom_farm = %(farm)s" if farm else ""}
+		GROUP BY 1, 2, 3
+		""",
+		args,
+		as_dict=True,
+	)
+	drawn = {}
+	for r in drawn_rows:
+		if r.section not in river:
+			key = (r.farm, str(r.week))
+			drawn[key] = drawn.get(key, 0.0) + float(r.m3 or 0)
+	# Only farms that have a reservoir: an intake profile or intake records.
+	has_intake = set(frappe.get_all("Irrigation Pump Profile", filters={"pump_role": INTAKE}, pluck="farm"))
+	intake_m3 = {(r.farm, str(r.week)): float(r.m3 or 0) for r in intake_rows}
+	keys = set(intake_m3) | {k for k in drawn if k[0] in has_intake}
+	out = []
+	for f, week in sorted(keys, key=lambda k: (k[0] or "~", k[1])):
+		i = intake_m3.get((f, week))
+		d = drawn.get((f, week), 0.0)
+		loss = round(i - d, 0) if i is not None else None
+		out.append({
+			"farm": f, "week": week, "intake_m3": round(i, 0) if i is not None else None, "drawn_m3": round(d, 0),
+			"loss_m3": loss, "loss_pct": round(100.0 * loss / i, 0) if i else None,
+		})
+	return {"weeks": weeks, "from": str(start), "rows": out}
+
+
+@frappe.whitelist()
 def budget(farm=None, weeks=8):
 	"""Per section per week (Monday start): water the crop needed (ETc over the
 	block areas), water recorded as applied (gross, from the balance), and water

@@ -134,3 +134,17 @@ class TestRunSheet(NoCommit, FrappeTestCase):
 			self.assertIn("exceeds", RS.today(FARM, DAY)["sheets"][0]["supply_warning"])
 		finally:
 			frappe.delete_doc("Irrigation Pump Profile", intake.name, force=True, ignore_permissions=True)
+
+	def test_reservoir_budget_counts_only_reservoir_fed_meters(self):
+		river = make_warehouse("_Test RS River Section", is_group=1, farm=FARM)
+		frappe.get_doc({"doctype": "Irrigation Pump Profile", "farm": FARM, "irrigation_section": river, "pump_name": "_TRS River Pump",
+		                "water_source": "River direct", "pump_flow_rate_m3_per_hr": 80}).insert(ignore_permissions=True)
+		frappe.get_doc({"doctype": "Reservoir Pumping Record", "farm": FARM, "date": DAY, "volume_of_water_used_m3": 1000,
+		                "docstatus": 1}).db_insert()
+		for section, m3 in ((self.section, 600), (river, 300)):
+			frappe.get_doc({"doctype": "Water Meter Reading", "irrigation_section": section, "date": f"{DAY} 08:00:00",
+			                "units_used": m3, "docstatus": 1}).db_insert()
+		monday = frappe.utils.add_days(DAY, -frappe.utils.getdate(DAY).weekday())
+		rows = RS.reservoir_budget(FARM, start=monday)["rows"]
+		row = next(r for r in rows if r["week"] == str(monday))
+		self.assertEqual((row["intake_m3"], row["drawn_m3"], row["loss_m3"], row["loss_pct"]), (1000, 600, 400, 40))
