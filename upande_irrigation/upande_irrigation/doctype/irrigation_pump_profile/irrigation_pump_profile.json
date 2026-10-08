@@ -8,6 +8,8 @@
  "engine": "InnoDB",
  "field_order": [
   "farm",
+  "pump_role",
+  "water_source",
   "irrigation_section",
   "pump_name",
   "section_break_specs",
@@ -32,12 +34,32 @@
    "reqd": 1
   },
   {
+   "fieldname": "pump_role",
+   "fieldtype": "Select",
+   "label": "Role",
+   "options": "Section pump\nReservoir intake",
+   "default": "Section pump",
+   "in_list_view": 1,
+   "description": "Section pump: drives one section's shifts. Reservoir intake: the river pump that fills the reservoir \u2014 its flow \u00d7 run-window hours is the reservoir's daily refill"
+  },
+  {
+   "fieldname": "water_source",
+   "fieldtype": "Select",
+   "label": "Water Source",
+   "options": "Reservoir\nRiver direct",
+   "default": "Reservoir",
+   "depends_on": "eval:doc.pump_role!='Reservoir intake'",
+   "description": "Reservoir: draws from the reservoir. River direct: pumps straight from the river, so it never draws on the reservoir"
+  },
+  {
    "fieldname": "irrigation_section",
    "fieldtype": "Link",
    "label": "Section (Warehouse)",
    "options": "Warehouse",
-   "reqd": 1,
-   "description": "The section warehouse this pump serves"
+   "reqd": 0,
+   "description": "The section warehouse this pump serves",
+   "mandatory_depends_on": "eval:doc.pump_role!='Reservoir intake'",
+   "depends_on": "eval:doc.pump_role!='Reservoir intake'"
   },
   {
    "fieldname": "pump_name",
@@ -120,7 +142,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-13 00:00:00.000000",
+ "modified": "2026-10-08 06:00:00.000000",
  "modified_by": "Administrator",
  "module": "Upande Irrigation",
  "name": "Irrigation Pump Profile",

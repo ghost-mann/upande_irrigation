@@ -23,6 +23,7 @@ from upande_irrigation.engine import runsheet as R
 
 KEEP = ("Running", "Done", "Partial", "Skipped")
 DEFAULT_PUMP = "Default pump (no Pump Profile)"
+INTAKE = "Reservoir intake"
 FULL_REBUILD_GAP_DAYS = 14
 
 
@@ -42,16 +43,35 @@ def _settings():
 	}
 
 
-def pumps(farm):
-	"""{section warehouse: {pump, flow, windows(rows), rest_dates}} from Pump Profiles."""
-	out = {}
+def _pump_profiles(farm):
 	for p in frappe.get_all("Irrigation Pump Profile", filters={"farm": farm},
-	                        fields=["name", "pump_name", "irrigation_section", "pump_flow_rate_m3_per_hr", "rest_dates"]):
-		windows = frappe.get_all("Irrigation Run Window", filters={"parent": p.name, "parenttype": "Irrigation Pump Profile"},
-		                         fields=["day", "start_time", "end_time"], order_by="idx asc")
+	                        fields=["name", "pump_name", "pump_role", "water_source", "irrigation_section",
+	                                "pump_flow_rate_m3_per_hr", "rest_dates"]):
+		p.windows = frappe.get_all("Irrigation Run Window", filters={"parent": p.name, "parenttype": "Irrigation Pump Profile"},
+		                           fields=["day", "start_time", "end_time"], order_by="idx asc")
+		yield p
+
+
+def pumps(farm):
+	"""{section warehouse: {pump, flow, windows(rows), rest_dates, source}} from the
+	farm's section pumps. A blank role is a section pump; a blank source, Reservoir."""
+	out = {}
+	for p in _pump_profiles(farm):
+		if p.pump_role == INTAKE or not p.irrigation_section:
+			continue
 		out[p.irrigation_section] = {"pump": p.pump_name or p.name, "flow": float(p.pump_flow_rate_m3_per_hr or 0),
-		                             "windows": windows, "rest_dates": p.rest_dates or ""}
+		                             "windows": p.windows, "rest_dates": p.rest_dates or "",
+		                             "source": p.water_source or "Reservoir"}
 	return out
+
+
+def intake(farm):
+	"""The farm's Reservoir intake {pump, flow, windows, rest_dates}, or None."""
+	for p in _pump_profiles(farm):
+		if p.pump_role == INTAKE:
+			return {"pump": p.pump_name or p.name, "flow": float(p.pump_flow_rate_m3_per_hr or 0),
+			        "windows": p.windows, "rest_dates": p.rest_dates or ""}
+	return None
 
 
 def _ensure_balance(farm, date):

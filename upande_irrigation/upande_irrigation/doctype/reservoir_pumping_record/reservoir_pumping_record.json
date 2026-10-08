@@ -154,6 +154,14 @@
    "width": null
   },
   {
+   "description": "The farm whose reservoir this fills \u2014 needed to reconcile intake against the sections' meters",
+   "fieldname": "farm",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Farm",
+   "options": "Farm"
+  },
+  {
    "alignment": null,
    "allow_bulk_edit": 0,
    "allow_in_quick_entry": 0,
@@ -823,7 +831,7 @@
  "make_attachments_public": 0,
  "max_attachments": 0,
  "migration_hash": "9d4e1fc30cc51dacfe300058d755c2ca",
- "modified": "2026-07-30 09:44:24.931559",
+ "modified": "2026-10-08 06:00:00.000000",
  "module": "Upande Irrigation",
  "name": "Reservoir Pumping Record",
  "naming_rule": "Expression (old style)",

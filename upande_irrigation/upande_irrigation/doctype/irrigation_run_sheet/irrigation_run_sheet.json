@@ -12,6 +12,10 @@
   "generated_at",
   "sb_runs",
   "runs",
+  "sb_reservoir",
+  "reservoir_draw_m3",
+  "reservoir_refill_m3",
+  "supply_warning",
   "sb_notes",
   "summary",
   "notes"
@@ -63,6 +67,33 @@
    "options": "Irrigation Run"
   },
   {
+   "fieldname": "sb_reservoir",
+   "fieldtype": "Section Break",
+   "label": "Reservoir"
+  },
+  {
+   "fieldname": "reservoir_draw_m3",
+   "fieldtype": "Float",
+   "label": "Reservoir draw (m\u00b3)",
+   "read_only": 1,
+   "precision": "1",
+   "description": "Cycles of reservoir-fed sections \u00d7 their shift's flow"
+  },
+  {
+   "fieldname": "reservoir_refill_m3",
+   "fieldtype": "Float",
+   "label": "Intake refill (m\u00b3)",
+   "read_only": 1,
+   "precision": "1",
+   "description": "The river intake's flow \u00d7 its run-window hours today"
+  },
+  {
+   "fieldname": "supply_warning",
+   "fieldtype": "Small Text",
+   "label": "Supply check",
+   "read_only": 1
+  },
+  {
    "fieldname": "sb_notes",
    "fieldtype": "Section Break",
    "label": "Summary"
@@ -80,7 +111,7 @@
   }
  ],
  "links": [],
- "modified": "2026-09-28 06:00:00.000000",
+ "modified": "2026-10-08 06:00:00.000000",
  "modified_by": "Administrator",
  "module": "Upande Irrigation",
  "name": "Irrigation Run Sheet",
