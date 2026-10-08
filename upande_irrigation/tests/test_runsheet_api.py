@@ -111,3 +111,26 @@ class TestRunSheet(NoCommit, FrappeTestCase):
 		self.assertEqual(len(w["days"]), 7)
 		self.assertTrue(any(c["due"] for s in w["shifts"] for c in s["cells"]))
 		self.assertEqual(w["capacity"]["_TRS Pump"][DAY], 8.0)
+
+	def test_no_intake_means_supply_not_checked(self):
+		RS.generate(FARM, DAY)
+		sheet = self.sheet()
+		self.assertFalse(sheet.reservoir_refill_m3)
+		self.assertIn("not checked", sheet.supply_warning)
+		self.assertGreater(sheet.reservoir_draw_m3, 0)
+
+	def test_a_small_intake_warns_but_keeps_every_cycle(self):
+		RS.generate(FARM, DAY)
+		before = [(r.shift, r.cycle_no, r.status) for r in self.sheet().runs]
+		intake = frappe.get_doc({"doctype": "Irrigation Pump Profile", "farm": FARM, "pump_role": "Reservoir intake",
+		                         "pump_name": "_TRS Intake", "pump_flow_rate_m3_per_hr": 1,
+		                         "run_windows": [{"day": "Every day", "start_time": "06:00:00", "end_time": "07:00:00"}]}).insert(ignore_permissions=True)
+		try:
+			RS.generate(FARM, DAY)
+			sheet = self.sheet()
+			self.assertEqual(sheet.reservoir_refill_m3, 1)
+			self.assertIn("exceeds", sheet.supply_warning)
+			self.assertEqual([(r.shift, r.cycle_no, r.status) for r in sheet.runs], before)
+			self.assertIn("exceeds", RS.today(FARM, DAY)["sheets"][0]["supply_warning"])
+		finally:
+			frappe.delete_doc("Irrigation Pump Profile", intake.name, force=True, ignore_permissions=True)

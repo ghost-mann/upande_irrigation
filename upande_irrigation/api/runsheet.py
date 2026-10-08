@@ -139,6 +139,31 @@ def plan(farm, date, skip_shifts=()):
 	return requests, windows, cfg
 
 
+def shift_flows(st, members, pump_of):
+	"""{shift: m³/h} — its blocks' emitter flow, capped at its pump's flow: water
+	cannot leave the reservoir faster than the section pump moves it."""
+	out = {}
+	for shift, blocks in members.items():
+		mine = [st[b] for b in blocks if b in st]
+		if not mine:
+			continue
+		flow = sum(float(m.get("block_flow_m3_hr") or 0) for m in mine)
+		prof = pump_of.get(mine[0]["section"])
+		if prof and prof["flow"]:
+			flow = min(flow, prof["flow"])
+		out[shift] = flow
+	return out
+
+
+def supply_check(farm, date, runs):
+	"""engine.reservoir_check for the farm's sheet rows on `date`."""
+	pump_of = pumps(farm)
+	ip = intake(farm)
+	refill = ip["flow"] * R.window_hours(R.windows_for_date(date, ip["windows"], ip["rest_dates"])) if ip else None
+	flows = shift_flows(BA.state(farm, as_of=date), BA.shift_members(), pump_of)
+	return R.reservoir_check(runs, flows, {s: p["source"] for s, p in pump_of.items()}, refill)
+
+
 @frappe.whitelist(methods=["POST"])
 def generate(farm=None, date=None):
 	"""Create or refresh the farm's run sheet for `date` (default today)."""
@@ -170,6 +195,10 @@ def generate(farm=None, date=None):
 			sheet.append("runs", r)
 		planned = [r for r in rows if r["status"] == "Planned"]
 		unplaced = [r for r in rows if r["status"] == "Not placed"]
+		check = supply_check(f, date, [r.as_dict() for r in sheet.runs])
+		sheet.reservoir_draw_m3 = check["draw_m3"]
+		sheet.reservoir_refill_m3 = check["refill_m3"] or 0  # Float is NOT NULL; the note says "not checked"
+		sheet.supply_warning = check["warning"] or check["note"]
 		sheet.generated_at = frappe.utils.now_datetime()
 		sheet.summary = (
 			f"{len({r['shift'] for r in planned})} shifts in {len(planned)} cycles, "
@@ -254,6 +283,9 @@ def today(farm=None, date=None):
 			"farm": f, "date": str(date), "run_sheet": sheet.name if sheet else None,
 			"status": sheet.status if sheet else None, "summary": sheet.summary if sheet else None,
 			"generated_at": str(sheet.generated_at) if sheet and sheet.generated_at else None,
+			"supply_warning": sheet.supply_warning if sheet else None,
+			"reservoir_draw_m3": sheet.reservoir_draw_m3 if sheet else None,
+			"reservoir_refill_m3": sheet.reservoir_refill_m3 if sheet else None,
 			"runs": rows,
 		})
 	return {"date": str(date), "sheets": out}

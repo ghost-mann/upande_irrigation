@@ -132,6 +132,15 @@ def fetch(farm=None):
                       f"{hours:.1f} h did not fit the pumps' run windows. Widen a window in Irrigation Pump Profile, or they carry to tomorrow.",
                       route="/upande-irrigation#planner", count=len(unplaced))
 
+    def supply():
+        short = [sh for sh in sheets if "exceeds" in (sh.get("supply_warning") or "")]
+        if not short:
+            return None
+        return _alert("warn", "Today's runs draw more than the river intake refills",
+                      "; ".join(f"{sh['farm']}: {sh['supply_warning']}" for sh in short)
+                      + ". Check the reservoir level, or move a cycle to tomorrow.",
+                      route="/upande-irrigation#planner", count=len(short))
+
     def skipped():
         rows = [r for r in runs if r.get("status") == "Skipped"]
         if not rows:
@@ -302,6 +311,7 @@ def fetch(farm=None):
     for label, fn in (
         ("stress", stress),
         ("not placed", not_placed),
+        ("reservoir supply", supply),
         ("skipped", skipped),
         ("no run sheet", no_sheet),
         ("disease risk", disease_risk),

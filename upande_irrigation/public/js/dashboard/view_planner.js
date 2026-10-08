@@ -153,6 +153,11 @@ ${pagehead(
 		<span class="meta">${charts.esc(sh.summary || "")}${sh.generated_at ? ` · generated ${charts.esc(charts.fmtClock(sh.generated_at))}` : ""}
 			· <a href="/app/irrigation-run-sheet/${encodeURIComponent(sh.run_sheet)}" target="_blank" rel="noopener">open record</a></span>
 	</div>
+	${
+		/exceeds/.test(sh.supply_warning || "")
+			? `<p class="list__meta" style="margin:0 0 10px"><span class="sev hi">Reservoir</span> ${charts.esc(sh.supply_warning)}</p>`
+			: ""
+	}
 	${this.timeline(runs)}
 	<div class="tablewrap scroll"><table class="table rs-table">
 		<thead><tr><th>Time</th><th>Shift</th><th>Cycle</th><th class="num">Hours</th><th class="num">Refill</th><th>Blocks (depletion)</th><th>Status</th><th></th></tr></thead>
