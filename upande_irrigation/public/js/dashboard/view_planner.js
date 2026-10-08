@@ -7,8 +7,10 @@
  *           pump's planned hours against its run-window hours.
  *   Blocks  every block's root-zone depletion against its irrigation point
  *           (RAW) and capacity (TAW); click one for its 30-day balance.
- *   Budget  per section and week: water the crop needed, water recorded as
- *           applied, and water the section meter says went out.
+ *   Budget  per section and week: the weekly water balance in mm (also the
+ *           Weekly Irrigation Summary report); water the crop needed, recorded
+ *           and metered in m³; and the reservoir — river intake against what
+ *           the reservoir-fed sections drew.
  *
  * Replaces the weekly-planner Gantt (api.planner), retired 2026-09-28.
  * Tabs deep-link: #planner?tab=blocks.
@@ -396,32 +398,88 @@ ${pagehead(
 	/* ── Budget ────────────────────────────────────────────────── */
 	async renderBudget(body) {
 		const { api, charts, filters } = this.ctx;
-		const { data } = await api.get("upande_irrigation.api.runsheet.budget", { farm: filters.farm, weeks: 8 });
-		const rows = (data && data.rows) || [];
-		if (!rows.length) {
+		const [budget, weekly, reservoir] = await Promise.all([
+			api.get("upande_irrigation.api.runsheet.budget", { farm: filters.farm, weeks: 8 }),
+			api.get("upande_irrigation.api.weekly.summary", { farm: filters.farm }),
+			api.get("upande_irrigation.api.runsheet.reservoir_budget", { farm: filters.farm, weeks: 8 }),
+		]);
+		const rows = (budget.data && budget.data.rows) || [];
+		const wrows = (weekly.data && weekly.data.rows) || [];
+		const rrows = (reservoir.data && reservoir.data.rows) || [];
+		if (!rows.length && !wrows.length && !rrows.length) {
 			body.innerHTML = '<div class="card"><div class="empty">No balance history yet.</div></div>';
 			return;
 		}
 		const n = (v) => (v == null ? "—" : Number(v).toLocaleString());
+		const sec = (s) => charts.esc((s || "—").replace(/_SECTION.*$/, ""));
+		const flag = (pct, none) =>
+			pct == null
+				? `<span class="list__meta">${none}</span>`
+				: `<span class="sev ${Math.abs(pct) > 20 ? "hi" : "lo"}">${pct > 0 ? "+" : ""}${pct}%</span>`;
 		body.innerHTML = `<div class="card">
+	<div class="card__head"><h3>${icon("drop")}Weekly water balance</h3><span class="meta">mm per section per week (Monday start) · area-weighted over the section's blocks · <a href="/app/query-report/Weekly Irrigation Summary" target="_blank" rel="noopener">open as report</a></span></div>
+	<div class="tablewrap scroll"><table class="table">
+		<thead><tr><th>Section</th><th>Week of</th><th class="num">ET crop</th><th class="num">Rain</th><th class="num">Effective rain</th><th class="num">Week deficit</th><th class="num">Irrigated (net)</th><th class="num">Depletion at week end</th><th class="num">Hours planned</th><th class="num">Hours applied</th></tr></thead>
+		<tbody>${wrows
+			.map(
+				(r) => `<tr>
+	<td><b>${sec(r.section)}</b></td>
+	<td>${charts.esc(charts.fmtDate(r.week))}${r.days && r.days < 7 ? ` <span class="list__meta">${r.days} d</span>` : ""}</td>
+	<td class="num">${n(r.etc_mm)}</td>
+	<td class="num">${n(r.rain_mm)}</td>
+	<td class="num">${n(r.effective_rain_mm)}</td>
+	<td class="num">${r.deficit_mm == null ? "—" : r.deficit_mm > 0 ? n(r.deficit_mm) : '<span class="list__meta">none</span>'}</td>
+	<td class="num">${n(r.irrigation_mm)}</td>
+	<td class="num">${n(r.end_depletion_mm)}</td>
+	<td class="num">${n(r.hours_planned)}</td>
+	<td class="num">${n(r.hours_applied)}</td>
+</tr>`
+			)
+			.join("") || '<tr><td colspan="10"><div class="empty small">No balance rows in this period.</div></td></tr>'}</tbody>
+	</table></div>
+	<p class="list__meta" style="margin-top:10px">Week deficit = ET crop − effective rain, the week on its own. Depletion at week end is what the soil carries into next week — it is what the run sheet irrigates against.</p>
+</div>
+<div class="card">
 	<div class="card__head"><h3>${icon("resources")}Water budget</h3><span class="meta">m³ per section per week (Monday start) · needed = crop use over the blocks' area</span></div>
 	<div class="tablewrap scroll"><table class="table">
 		<thead><tr><th>Section</th><th>Week of</th><th class="num">Crop needed</th><th class="num">Rain supplied</th><th class="num">Irrigation recorded</th><th class="num">Metered</th><th class="num">Meter vs recorded</th></tr></thead>
 		<tbody>${rows
 			.map(
 				(r) => `<tr>
-	<td><b>${charts.esc((r.section || "—").replace(/_SECTION.*$/, ""))}</b></td>
+	<td><b>${sec(r.section)}</b></td>
 	<td>${charts.esc(charts.fmtDate(r.week))}</td>
 	<td class="num">${n(r.needed_m3)}</td>
 	<td class="num">${n(r.rain_m3)}</td>
 	<td class="num">${n(r.recorded_m3)}</td>
 	<td class="num">${n(r.metered_m3)}</td>
-	<td class="num">${r.gap_pct == null ? '<span class="list__meta">no meter</span>' : `<span class="sev ${Math.abs(r.gap_pct) > 20 ? "hi" : "lo"}">${r.gap_pct > 0 ? "+" : ""}${r.gap_pct}%</span>`}</td>
+	<td class="num">${flag(r.gap_pct, "no meter")}</td>
 </tr>`
 			)
 			.join("")}</tbody>
 	</table></div>
 	<p class="list__meta" style="margin-top:10px">A gap over 20% means the meter and the recorded runs disagree — a run not ticked on the run sheet, a leak, or a meter reading to check.</p>
+</div>
+<div class="card">
+	<div class="card__head"><h3>${icon("resources")}Reservoir</h3><span class="meta">m³ per farm per week · pumped in from the river vs drawn by the reservoir-fed sections' meters</span></div>
+	<div class="tablewrap scroll"><table class="table">
+		<thead><tr><th>Farm</th><th>Week of</th><th class="num">River → reservoir</th><th class="num">Drawn by sections</th><th class="num">Lost</th><th class="num">Lost %</th></tr></thead>
+		<tbody>${
+			rrows
+				.map(
+					(r) => `<tr>
+	<td><b>${charts.esc(r.farm || "Unassigned")}</b></td>
+	<td>${charts.esc(charts.fmtDate(r.week))}</td>
+	<td class="num">${n(r.intake_m3)}</td>
+	<td class="num">${n(r.drawn_m3)}</td>
+	<td class="num">${n(r.loss_m3)}</td>
+	<td class="num">${flag(r.loss_pct, "no intake record")}</td>
+</tr>`
+				)
+				.join("") ||
+			'<tr><td colspan="6"><div class="empty small">No Reservoir Pumping Records, and no farm has a Reservoir intake pump profile.</div></td></tr>'
+		}</tbody>
+	</table></div>
+	<p class="list__meta" style="margin-top:10px">Sections whose pump is <b>River direct</b> are left out — they never draw on the reservoir. A loss over 20% is seepage, evaporation, an unmetered draw, or a meter to check. "Unassigned" records have no farm set.</p>
 </div>`;
 	},
 

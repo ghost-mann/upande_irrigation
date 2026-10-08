@@ -75,6 +75,13 @@ class TestEndpointsDoNotRaise(FrappeTestCase):
 		for f in week["farms"]:
 			self.assertEqual(len(f["days"]), 7)
 
+	def test_runsheet_budgets_and_weekly_summary(self):
+		from upande_irrigation.api import weekly
+
+		self.assertIsInstance(runsheet.budget(farm=FARM).get("rows"), list)
+		self.assertIsInstance(runsheet.reservoir_budget(farm=FARM).get("rows"), list)
+		self.assertIsInstance(weekly.summary(farm=FARM).get("rows"), list)
+
 	def test_balance_block_status(self):
 		self.assertIsInstance(balance.block_status(farm=FARM), list)
 
