@@ -134,3 +134,44 @@ class TestPlaceAroundExistingWork(FrappeTestCase):
 		rows = R.place({"P1": [{**self.req("Z", 0, 1.4), "reasons": ["no application rate"]}]}, {"P1": [(at(6), at(18))]}, SETTINGS)
 		self.assertEqual(rows[0]["status"], "Not placed")
 		self.assertIn("no application rate", rows[0]["reason"])
+
+
+class TestReservoirCheck(FrappeTestCase):
+	FLOWS = {"S1": 50, "S2": 40, "R1": 80}
+	SOURCES = {"sec-a": "Reservoir", "sec-r": "River direct"}
+
+	def row(self, shift, section, hours, status="Planned", actual=0):
+		return {"shift": shift, "section": section, "planned_hours": hours, "status": status, "actual_hours": actual}
+
+	def test_under_refill_no_warning(self):
+		out = R.reservoir_check([self.row("S1", "sec-a", 4)], self.FLOWS, self.SOURCES, 1000)
+		self.assertEqual(out["draw_m3"], 200)
+		self.assertEqual(out["warning"], "")
+
+	def test_over_refill_warns(self):
+		out = R.reservoir_check([self.row("S1", "sec-a", 4), self.row("S2", "sec-a", 5)], self.FLOWS, self.SOURCES, 300)
+		self.assertEqual(out["draw_m3"], 400)
+		self.assertIn("exceeds", out["warning"])
+
+	def test_river_direct_is_not_drawn_from_the_reservoir(self):
+		self.assertEqual(R.reservoir_check([self.row("R1", "sec-r", 10)], self.FLOWS, self.SOURCES, 10)["draw_m3"], 0)
+
+	def test_unknown_section_counts_as_reservoir(self):
+		self.assertEqual(R.reservoir_check([self.row("S1", "sec-x", 2)], self.FLOWS, {}, 1000)["draw_m3"], 100)
+
+	def test_skipped_and_not_placed_draw_nothing(self):
+		rows = [self.row("S1", "sec-a", 4, "Skipped"), self.row("S2", "sec-a", 4, "Not placed")]
+		self.assertEqual(R.reservoir_check(rows, self.FLOWS, self.SOURCES, 1000)["draw_m3"], 0)
+
+	def test_actual_hours_preferred_for_done_and_partial(self):
+		rows = [self.row("S1", "sec-a", 4, "Done", actual=2), self.row("S2", "sec-a", 4, "Partial", actual=1)]
+		self.assertEqual(R.reservoir_check(rows, self.FLOWS, self.SOURCES, 1000)["draw_m3"], 140)
+
+	def test_no_intake_is_not_checked(self):
+		out = R.reservoir_check([self.row("S1", "sec-a", 40)], self.FLOWS, self.SOURCES, None)
+		self.assertIsNone(out["refill_m3"])
+		self.assertEqual(out["warning"], "")
+		self.assertIn("not checked", out["note"])
+
+	def test_window_hours(self):
+		self.assertEqual(R.window_hours([(at(6), at(10)), (at(12), at(14))]), 6.0)

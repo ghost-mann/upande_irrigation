@@ -10,6 +10,10 @@
                 run windows; a shift's cycles are separated by cycle_rest_hours and
                 another shift may use the pump meanwhile. Whatever does not fit is
                 returned as "Not placed" — never silently dropped.
+    reservoir_check
+                the day's draw on the reservoir (cycles of reservoir-fed sections ×
+                their shift's flow) against what the river intake can refill in its
+                run windows. A warning only: nothing is moved or removed for it.
 """
 
 import datetime
@@ -17,6 +21,7 @@ import datetime
 from upande_irrigation.engine.allocate import cycle_plan
 from upande_irrigation.engine.balance import hours_to_refill
 
+COUNTED = ("Planned", "Running", "Done", "Partial")
 _DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 
@@ -84,6 +89,32 @@ def windows_for_date(date, rows, rest_dates=""):
 			end += datetime.timedelta(days=1)
 		out.append((start, end))
 	return merge(out)
+
+
+def window_hours(windows):
+	return round(sum((b - a).total_seconds() for a, b in windows or []) / 3600.0, 2)
+
+
+def reservoir_check(rows, flows, sources, refill_m3):
+	"""`rows`: the sheet's cycles; `flows`: {shift: m³/h}; `sources`: {section:
+	"Reservoir" | "River direct"}, a section missing from it is reservoir-fed;
+	`refill_m3`: the intake's capacity for the day, None when there is no intake.
+	Only cycles that run (or ran) draw water, at their actual hours once recorded."""
+	draw = 0.0
+	for r in rows:
+		if r.get("status") not in COUNTED:
+			continue
+		if (sources.get(r.get("section")) or "Reservoir") != "Reservoir":
+			continue
+		actual = float(r.get("actual_hours") or 0)
+		hours = actual if r.get("status") in ("Done", "Partial") and actual else float(r.get("planned_hours") or 0)
+		draw += hours * float(flows.get(r.get("shift")) or 0)
+	draw = round(draw, 1)
+	if refill_m3 is None:
+		return {"draw_m3": draw, "refill_m3": None, "warning": "", "note": "no Reservoir intake profile — supply not checked"}
+	refill = round(float(refill_m3), 1)
+	warning = f"reservoir draw {draw:,.0f} m³ exceeds the river intake's {refill:,.0f} m³ today" if draw > refill else ""
+	return {"draw_m3": draw, "refill_m3": refill, "warning": warning, "note": ""}
 
 
 def merge(intervals):
