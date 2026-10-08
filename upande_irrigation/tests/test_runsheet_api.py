@@ -148,3 +148,33 @@ class TestRunSheet(NoCommit, FrappeTestCase):
 		rows = RS.reservoir_budget(FARM, start=monday)["rows"]
 		row = next(r for r in rows if r["week"] == str(monday))
 		self.assertEqual((row["intake_m3"], row["drawn_m3"], row["loss_m3"], row["loss_pct"]), (1000, 600, 400, 40))
+
+	def intake(self, flow=1, windows=True):
+		return frappe.get_doc({"doctype": "Irrigation Pump Profile", "farm": FARM, "pump_role": "Reservoir intake",
+		                       "pump_name": "_TRS Intake", "pump_flow_rate_m3_per_hr": flow,
+		                       "run_windows": [{"day": "Every day", "start_time": "06:00:00", "end_time": "07:00:00"}] if windows else []}
+		                      ).insert(ignore_permissions=True)
+
+	def test_an_intake_without_windows_is_not_checked_rather_than_warned(self):
+		ip = self.intake(flow=500, windows=False)
+		try:
+			RS.generate(FARM, DAY)
+			sheet = self.sheet()
+			self.assertNotIn("exceeds", sheet.supply_warning)
+			self.assertIn("no run windows", sheet.supply_warning)
+		finally:
+			frappe.delete_doc("Irrigation Pump Profile", ip.name, force=True, ignore_permissions=True)
+
+	def test_skipping_cycles_clears_the_supply_warning(self):
+		ip = self.intake(flow=1)
+		try:
+			RS.generate(FARM, DAY)
+			self.assertIn("exceeds", self.sheet().supply_warning)
+			for r in self.sheet().runs:
+				if r.status in ("Planned", "Running"):  # earlier tests in this class may leave one Running
+					RS.set_status(r.name, "Skipped", skip_reason="reservoir low")
+			sheet = self.sheet()
+			self.assertEqual(sheet.reservoir_draw_m3, 0, [(r.shift, r.status, r.planned_hours) for r in sheet.runs])
+			self.assertNotIn("exceeds", sheet.supply_warning)
+		finally:
+			frappe.delete_doc("Irrigation Pump Profile", ip.name, force=True, ignore_permissions=True)

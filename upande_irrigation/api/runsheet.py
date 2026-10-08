@@ -156,12 +156,29 @@ def shift_flows(st, members, pump_of):
 
 
 def supply_check(farm, date, runs):
-	"""engine.reservoir_check for the farm's sheet rows on `date`."""
+	"""engine.reservoir_check for the farm's sheet rows on `date`. An intake with no
+	run windows or no flow is a profile still being filled in, not a dry river:
+	the supply is reported unchecked rather than warned about every day."""
 	pump_of = pumps(farm)
 	ip = intake(farm)
-	refill = ip["flow"] * R.window_hours(R.windows_for_date(date, ip["windows"], ip["rest_dates"])) if ip else None
+	unset = bool(ip) and (not ip["flow"] or not ip["windows"])
+	refill = None
+	if ip and not unset:
+		refill = ip["flow"] * R.window_hours(R.windows_for_date(frappe.utils.getdate(date), ip["windows"], ip["rest_dates"]))
 	flows = shift_flows(BA.state(farm, as_of=date), BA.shift_members(), pump_of)
-	return R.reservoir_check(runs, flows, {s: p["source"] for s, p in pump_of.items()}, refill)
+	out = R.reservoir_check(runs, flows, {s: p["source"] for s, p in pump_of.items()}, refill)
+	if unset:
+		out["note"] = "the Reservoir intake profile has no run windows or no flow — supply not checked"
+	return out
+
+
+def apply_supply_check(sheet):
+	"""Write the check onto the sheet: on generation, and again whenever the
+	operator's tick changes what will run."""
+	check = supply_check(sheet.farm, sheet.date, [r.as_dict() for r in sheet.runs])
+	sheet.reservoir_draw_m3 = check["draw_m3"]
+	sheet.reservoir_refill_m3 = check["refill_m3"] or 0  # Float is NOT NULL; the note says "not checked"
+	sheet.supply_warning = check["warning"] or check["note"]
 
 
 @frappe.whitelist(methods=["POST"])
@@ -195,10 +212,7 @@ def generate(farm=None, date=None):
 			sheet.append("runs", r)
 		planned = [r for r in rows if r["status"] == "Planned"]
 		unplaced = [r for r in rows if r["status"] == "Not placed"]
-		check = supply_check(f, date, [r.as_dict() for r in sheet.runs])
-		sheet.reservoir_draw_m3 = check["draw_m3"]
-		sheet.reservoir_refill_m3 = check["refill_m3"] or 0  # Float is NOT NULL; the note says "not checked"
-		sheet.supply_warning = check["warning"] or check["note"]
+		apply_supply_check(sheet)
 		sheet.generated_at = frappe.utils.now_datetime()
 		sheet.summary = (
 			f"{len({r['shift'] for r in planned})} shifts in {len(planned)} cycles, "
@@ -252,6 +266,7 @@ def set_status(run, status, actual_hours=None, skip_reason=None, notes=None):
 			row.status = "Not placed"  # undo returns a never-placed cycle to where it was
 	if notes is not None:
 		row.notes = notes
+	apply_supply_check(sheet)
 	sheet.save(ignore_permissions=True)
 	frappe.db.commit()
 	return {"ok": True, "run": run, "status": row.status}
