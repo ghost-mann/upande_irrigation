@@ -108,16 +108,23 @@ def _organisation():
 def _irrigation_farms():
     """Farms the dashboard should offer in its filter.
 
-    Mirrors api.scheduler.run: farms flagged is_irrigation_farm, falling back to
-    every farm so a site that hasn't set the flag yet still gets a usable picker.
+    Farms flagged is_irrigation_farm, falling back to every farm so a site that
+    hasn't set the flag yet still gets a usable picker.
+
+    The flag lived on upande_kaitet's Farm (v15). upande_core's Farm, which v16
+    sites run, does not have it, and filtering on a missing column raised --
+    which landed in the except below and left the picker with no farms at all,
+    so nobody could log a reading. Filter on it only where the field exists.
     """
     try:
-        farms = frappe.get_all(
-            "Farm",
-            filters={"is_irrigation_farm": 1},
-            fields=["name"],
-            order_by="name asc",
-        )
+        farms = []
+        if frappe.get_meta("Farm").has_field("is_irrigation_farm"):
+            farms = frappe.get_all(
+                "Farm",
+                filters={"is_irrigation_farm": 1},
+                fields=["name"],
+                order_by="name asc",
+            )
         if not farms:
             farms = frappe.get_all("Farm", fields=["name"], order_by="name asc")
         return [f["name"] for f in farms]
