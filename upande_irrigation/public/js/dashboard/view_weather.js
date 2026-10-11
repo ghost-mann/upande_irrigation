@@ -7,6 +7,7 @@
  */
 
 import { irrometerMap } from "./irrometer_map.js";
+import { weatherExplorer } from "./weather_explorer.js";
 import { pagehead, kpi, statusStrip, icon } from "./shell.js";
 
 const T = {
@@ -65,35 +66,7 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 
 <div class="kpi-grid stagger" id="wx-kpis"></div>
 
-<div class="card">
-	<div class="card__head"><h3>Rainfall</h3><span class="meta" id="wx-wetdry">mm · daily, against reference ETo</span></div>
-	<div id="wx-rain"></div>
-	<div class="clegend">
-		<span><i style="background:${T.rain}"></i>Rainfall</span>
-		<span><i class="ln" style="background:${T.eto}"></i>Reference ETo</span>
-	</div>
-</div>
-
-<div class="card">
-	<div class="card__head"><h3>Temperature</h3><span class="meta">°C · min / mean / max</span></div>
-	<div id="wx-temp"></div>
-	<div class="clegend">
-		<span><i class="ln" style="background:${T.cool}"></i>Min</span>
-		<span><i class="ln" style="background:${T.clay}"></i>Mean</span>
-		<span><i class="ln" style="background:${T.heat}"></i>Max</span>
-	</div>
-</div>
-
-<div class="row-2-eq">
-	<div class="card">
-		<div class="card__head"><h3>Pan evaporation</h3><span class="meta">mm/day</span></div>
-		<div id="wx-evap"></div>
-	</div>
-	<div class="card">
-		<div class="card__head"><h3>Soil water deficit</h3><span class="meta">mm · running balance</span></div>
-		<div id="wx-swd"></div>
-	</div>
-</div>
+${weatherExplorer.markup()}
 
 <div class="card">
 	<div class="card__head">
@@ -144,6 +117,10 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		</table>
 	</div>
 </div>`;
+		/* rainfall, temperature, pan evaporation, soil deficit and the meters,
+		 * in one card with a measure dropdown (weather_explorer.js) */
+		this.wx = Object.create(weatherExplorer);
+		this.wx.init(el.querySelector("#wxx-card"), ctx);
 
 		this.unsubscribe = ctx.onFilterChange(() => {});
 	},
@@ -329,6 +306,8 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		}
 
 		this.renderEntry(data);
+		this.wx.setFarms(data.farms, filters.farm);
+		this.wx.load();
 		this.renderKpis(data.kpis, weather);
 		this.renderCharts(weather, meta);
 		this.renderIrrometer(blocks);
@@ -397,89 +376,6 @@ ${pagehead("Weather Station", "Daily observations", '<span id="wx-period"></span
 		const { charts } = this.ctx;
 		const axis = charts.dailyAxis(weather, meta.start_date, meta.end_date);
 		const dates = axis.labels;
-
-		charts.mkChart(
-			this.el.querySelector("#wx-rain"),
-			[
-				{ label: "Rainfall", color: T.rain, type: "bar", values: axis.pick("rainfall_mm"), unit: "mm" },
-				{ label: "ETo", color: T.eto, values: axis.pick("eto"), dash: "4 3", width: 1.8, unit: "mm", noPoints: true },
-			],
-			1200,
-			210,
-			{ xLabels: dates, tooltip: true }
-		);
-		const wet = weather.filter((r) => (r.rainfall_mm || 0) > 0.1).length;
-		const wd = this.el.querySelector("#wx-wetdry");
-		if (wd) wd.textContent = `${wet} wet · ${weather.length - wet} dry of ${weather.length} logged`;
-
-		/* A 0 °C reading on a Kenyan farm means "not recorded", which is exactly
-		 * how events/irrigation_planner.py treats it (temp > 0). Charting the
-		 * zeros drew the series down to the axis. */
-		const realTemp = (v) => (v == null || Number(v) <= 0 ? null : Number(v));
-		const lo = axis.pick(null, (r) => realTemp(r.minimum_temperature));
-		const hi = axis.pick(null, (r) => realTemp(r.maximum_temperature));
-		const mean = axis.pick(null, (r) => {
-			const a = realTemp(r.minimum_temperature);
-			const b = realTemp(r.maximum_temperature);
-			if (r.mean_temperature != null && Number(r.mean_temperature) > 0) return Number(r.mean_temperature);
-			return a != null && b != null ? (a + b) / 2 : null;
-		});
-		const tempHost = this.el.querySelector("#wx-temp");
-		const anyTemp = lo.some((v) => v != null) || hi.some((v) => v != null);
-		if (!anyTemp) {
-			tempHost.innerHTML = '<div class="empty small">No temperature readings in this period.</div>';
-		} else {
-			const loVals = lo.filter((v) => v != null);
-			const hiVals = hi.filter((v) => v != null);
-			charts.mkChart(
-				tempHost,
-				[
-					{ label: "Max", color: T.heat, values: hi, width: 2.2, unit: "°C", noPoints: true },
-					{ label: "Mean", color: T.clay, values: mean, width: 3, unit: "°C", noPoints: true },
-					{ label: "Min", color: T.cool, values: lo, width: 2.2, unit: "°C", noPoints: true },
-				],
-				1200,
-				210,
-				{
-					xLabels: dates,
-					tooltip: true,
-					noFill: true,
-					/* The shaded min–max envelope Meniscus drew behind the lines. */
-					band: { lo, hi, color: T.heat },
-					yMin: Math.floor(Math.min(...loVals) - 2),
-					yMax: Math.ceil(Math.max(...hiVals) + 2),
-				}
-			);
-		}
-
-		charts.mkChart(
-			this.el.querySelector("#wx-evap"),
-			[{ label: "Evaporation", color: T.eto, values: axis.pick("daily_evaporation"), unit: "mm" }],
-			560,
-			190,
-			{ xLabels: dates, tooltip: true }
-		);
-
-		const swdVals = axis.pick("swd");
-		const swdHost = this.el.querySelector("#wx-swd");
-		if (swdVals.some((v) => v != null)) {
-			const present = swdVals.filter((v) => v != null);
-			charts.mkChart(
-				swdHost,
-				[{ label: "SWD", color: T.cool, values: swdVals, unit: "mm" }],
-				560,
-				190,
-				{
-					xLabels: dates,
-					tooltip: true,
-					noFill: true,
-					yMin: Math.floor(Math.min(...present, 0)),
-					yMax: Math.ceil(Math.max(...present, 0)),
-				}
-			);
-		} else {
-			swdHost.innerHTML = '<div class="empty small">No soil water deficit recorded yet.</div>';
-		}
 
 		const zVals = axis.pick("z_value");
 		const badge = this.el.querySelector("#wx-z-badge");
