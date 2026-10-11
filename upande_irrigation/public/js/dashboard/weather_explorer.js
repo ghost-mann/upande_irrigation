@@ -198,7 +198,8 @@ export const weatherExplorer = {
 		const on = new Set(s.compareShown || []);
 		const host = this.host.querySelector("#wxx-compare");
 		if (!years.length) {
-			host.innerHTML = `<span class="wxx-muted">No earlier years to compare${d.measure === "deficit_blocks" ? " — the block balance starts in 2026" : ""}</span>`;
+			const since = d.data_from ? new Date(`${d.data_from}T00:00:00`).toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : "";
+			host.innerHTML = `<span class="wxx-muted">No earlier years to compare${since ? ` — recorded since ${since}` : ""}</span>`;
 			return;
 		}
 		const cross = s.from.slice(0, 4) !== s.to.slice(0, 4);

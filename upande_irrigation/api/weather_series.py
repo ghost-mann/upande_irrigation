@@ -39,14 +39,30 @@ LABELS = {
 	"deficit_blocks": "Soil deficit (block balance)", "deficit_swd": "Soil deficit (old SWD)",
 	"water": "Water pumped", "electricity": "Electricity",
 }
-# a long-term average needs this many earlier years, each with at least this
-# share of its days recorded over the period, or it is an average of gaps
-LONG_TERM_MIN_YEARS = 3
-LONG_TERM_MIN_COVERAGE = 0.6
+# a guard on the request, not a site choice: about ten years of days
 MAX_DAYS = 3700
-# above these a temperature is a typing slip, not weather (°C)
-TEMP_MIN_CEILING = 35
-TEMP_MAX_CEILING = 50
+
+# Site choices live in Irrigation Settings ("Weather & water card"); these are
+# only the values used where a setting is blank. A Single read before its new
+# fields were ever saved gives 0 for them, so 0 also means "use the default".
+DEFAULTS = {
+	"weather_max_plausible_temp": 50.0,      # a maximum at or above this is a typing slip
+	"weather_max_plausible_min_temp": 35.0,  # the same for minimums
+	"long_term_min_years": 3,                # earlier years needed for a long-term average
+	"long_term_min_coverage_pct": 60.0,      # share of a year's days that must be read to count
+}
+
+
+def card_settings():
+	try:
+		doc = frappe.get_cached_doc("Irrigation Settings")
+	except Exception:
+		doc = None
+	out = {}
+	for key, default in DEFAULTS.items():
+		v = getattr(doc, key, None) if doc else None
+		out[key] = type(default)(v) if v not in (None, "", 0) else default
+	return out
 
 
 # ── calendar helpers ─────────────────────────────────────────────────────────
@@ -135,27 +151,29 @@ def daily_values(measure, farm, start, end):
 	if measure == "temperature":
 		# 0 °C on these farms means "not recorded", as everywhere else in the app
 		rows = _weather_rows(farm, start, end, ["minimum_temperature", "maximum_temperature", "temperature_average"])
+		cfg = card_settings()
 		acc, dropped = {}, []
 		for r in rows:
 			lo = flt(r.minimum_temperature) if flt(r.minimum_temperature) > 0 else None
 			hi = flt(r.maximum_temperature) if flt(r.maximum_temperature) > 0 else None
-			# a typed reading outside what these farms can see is a typo, not
-			# weather: 2689 for 26.89 on 28 Jul 2026 lifted a period's mean 16 °C.
-			# Dropped from the figures, and named so someone can correct it.
-			if lo is not None and not lo < TEMP_MIN_CEILING:
+			# a typed reading beyond what the site's climate allows (Irrigation
+			# Settings) is a typo, not weather -- one 2689 for 26.89 lifted a
+			# period's mean by 16 °C. Dropped from the figures, and named so
+			# someone can correct it.
+			if lo is not None and not lo < cfg["weather_max_plausible_min_temp"]:
 				dropped.append(f"{r.date:%-d %b %Y} min {lo:g}")
 				lo = None
-			if hi is not None and not hi < TEMP_MAX_CEILING:
+			if hi is not None and not hi < cfg["weather_max_plausible_temp"]:
 				dropped.append(f"{r.date:%-d %b %Y} max {hi:g}")
 				hi = None
 			# the mean is (min + max) / 2 wherever both were read; a stored average
-			# is used only when it is not and it is plausible -- some 2026 rows
-			# carry a stored "average" well above the day's maximum
+			# is used only when it is not and it is believable -- some rows carry
+			# a stored "average" well above the day's maximum
 			if lo is not None and hi is not None:
 				mean = (lo + hi) / 2
 			else:
 				stored = flt(r.temperature_average)
-				mean = stored if 0 < stored < 45 else None
+				mean = stored if 0 < stored < cfg["weather_max_plausible_temp"] else None
 			if mean is None and lo is None and hi is None:
 				continue
 			acc.setdefault(getdate(r.date), []).append((lo, mean, hi))
@@ -212,14 +230,14 @@ def daily_values(measure, farm, start, end):
 		for r in rows:
 			used = flt(r.units_used)
 			diff = flt(r.new_reading) - flt(r.previous_reading)
-			# the open v15 question: bulk-imported rows hold 10 x (new - previous)
+			# some imported rows hold 10 x (new - previous) rather than the difference
 			if diff > 0 and abs(used - 10 * diff) < 0.01 and abs(used - diff) > 0.01:
 				tenfold += 1
 			d = getdate(r.date)
 			out[d] = out.get(d, 0.0) + used
 		if tenfold:
-			notes.append(f"{tenfold} reading{'s' if tenfold != 1 else ''} in this period store usage as 10 × (new − previous), "
-			             "the open question from the v15 import; shown as recorded.")
+			notes.append(f"{tenfold} reading{'s' if tenfold != 1 else ''} in this period store usage as 10 × (new − previous) "
+			             "rather than the difference; shown as recorded. Check the meter's units before relying on them.")
 		return out, notes
 
 	frappe.throw(f"Unknown measure {measure!r}")
@@ -275,6 +293,24 @@ def headline(values, measure):
 	else:
 		xs = [v for v in values.values() if v is not None]
 	return round(sum(xs) / len(xs), 2) if xs else None
+
+
+def first_reading(measure, farm):
+	"""The earliest day this measure was recorded for the farm (all farms if none)."""
+	if measure in ("water", "electricity"):
+		doctype = "Water Meter Reading" if measure == "water" else "Electricity Meter Reading"
+		sec_filters = {"warehouse_type": "Section"}
+		if farm:
+			sec_filters["custom_farm"] = farm
+		sections = frappe.get_all("Warehouse", filters=sec_filters, pluck="name", limit_page_length=0) or ["__none__"]
+		v = frappe.db.sql(f"SELECT MIN(DATE(`date`)) FROM `tab{doctype}` WHERE irrigation_section IN %s AND docstatus != 2", (tuple(sections),))
+	elif measure == "deficit_blocks":
+		cond, args = ("WHERE farm = %s", (farm,)) if farm else ("", ())
+		v = frappe.db.sql(f"SELECT MIN(`date`) FROM `tabIrrigation Block Balance` {cond}", args)
+	else:
+		cond, args = ("WHERE farm = %s", (farm,)) if farm else ("", ())
+		v = frappe.db.sql(f"SELECT MIN(`date`) FROM `tabWeather Reading` {cond}", args)
+	return getdate(v[0][0]) if v and v[0][0] else None
 
 
 def years_with_data(measure, farm):
@@ -351,6 +387,7 @@ def series(measure="rainfall", farm="", from_date="", to_date="", granularity="m
 		})
 
 	# the long-term average: every earlier year that recorded enough of the period
+	cfg = card_settings()
 	if frappe.utils.cint(long_term) and measure != "deficit_blocks":
 		per_year = []
 		for y in available:
@@ -359,11 +396,11 @@ def series(measure="rainfall", farm="", from_date="", to_date="", granularity="m
 				continue
 			ys, ye = shift_year(start, -offset), shift_year(end, -offset)
 			vals, _ = daily_values(measure, farm, ys, ye)
-			if coverage(vals, ys, ye) >= LONG_TERM_MIN_COVERAGE:
+			if coverage(vals, ys, ye) >= cfg["long_term_min_coverage_pct"] / 100:
 				matched = {dd: v for dd, v in vals.items() if shift_year(dd, offset) in set(current)}
 				per_year.append((y, aggregate(vals, keys, granularity, measure, day_offset_years=offset),
 				                 headline(vals, measure), headline(matched, measure)))
-		if len(per_year) >= LONG_TERM_MIN_YEARS:
+		if len(per_year) >= cfg["long_term_min_years"]:
 			def mean_of(xs):
 				xs = [x for x in xs if x is not None]
 				return round(sum(xs) / len(xs), 2) if xs else None
@@ -390,9 +427,10 @@ def series(measure="rainfall", farm="", from_date="", to_date="", granularity="m
 	if measure == "deficit_swd":
 		notes.append("Old model: the single farm-level SWD stored on each weather reading, kept for history. "
 		             "Irrigation decisions now use the per-block balance.")
+	data_from = first_reading(measure, farm)
 	if measure == "deficit_blocks":
-		notes.append("Per-block daily water balance: the farm average, with the driest block beside it. "
-		             "Recorded from January 2026, so earlier years have nothing to compare.")
+		notes.append("Per-block daily water balance: the farm average, with the driest block beside it."
+		             + (f" Recorded from {data_from:%-d %b %Y}, so earlier years have nothing to compare." if data_from else ""))
 
 	return {
 		"measure": measure, "label": LABELS[measure], "unit": UNITS[measure],
@@ -401,4 +439,5 @@ def series(measure="rainfall", farm="", from_date="", to_date="", granularity="m
 		"granularity": granularity, "days": days,
 		"buckets": [str(k) for k in keys], "labels": labels,
 		"series": out_series, "years_available": available, "notes": notes,
+		"data_from": str(data_from) if data_from else None,
 	}

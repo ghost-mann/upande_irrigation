@@ -2751,6 +2751,45 @@
    "translatable": 0,
    "unique": 0,
    "width": null
+  },
+  {
+   "fieldname": "weather_card_section",
+   "fieldtype": "Section Break",
+   "label": "Weather & water card",
+   "collapsible": 1,
+   "description": "How the Weather view's Weather & water card treats readings and builds its long-term average."
+  },
+  {
+   "fieldname": "weather_max_plausible_temp",
+   "fieldtype": "Float",
+   "label": "Highest believable maximum (\u00b0C)",
+   "default": "50",
+   "description": "A maximum temperature at or above this is taken as a typing slip (e.g. 2689 for 26.89): left out of the figures and named on the card."
+  },
+  {
+   "fieldname": "weather_max_plausible_min_temp",
+   "fieldtype": "Float",
+   "label": "Highest believable minimum (\u00b0C)",
+   "default": "35",
+   "description": "The same check for minimum temperatures."
+  },
+  {
+   "fieldname": "weather_card_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "long_term_min_years",
+   "fieldtype": "Int",
+   "label": "Long-term average: years needed",
+   "default": "3",
+   "description": "The long-term average line appears only when at least this many earlier years qualify."
+  },
+  {
+   "fieldname": "long_term_min_coverage_pct",
+   "fieldtype": "Percent",
+   "label": "Long-term average: share of days read",
+   "default": "60",
+   "description": "An earlier year counts towards the long-term average only if it has readings on at least this share of the period's days."
   }
  ],
  "force_re_route_to_default_view": 0,

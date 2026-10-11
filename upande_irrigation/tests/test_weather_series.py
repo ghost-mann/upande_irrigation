@@ -78,3 +78,45 @@ class TestEndpoint(IntegrationTestCase):
 			self.assertTrue(any("2689" in n for n in notes))
 		finally:
 			frappe.db.delete("Weather Reading", {"name": wr.name})
+
+
+class TestNothingSiteSpecificIsBakedIn(IntegrationTestCase):
+	"""Limits are site settings; dates in the notes come from the data."""
+
+	def tearDown(self):
+		for f in ("weather_max_plausible_temp", "long_term_min_years"):
+			frappe.db.set_single_value("Irrigation Settings", f, 0)
+		frappe.clear_document_cache("Irrigation Settings", "Irrigation Settings")
+
+	def test_unset_settings_fall_back_to_the_defaults(self):
+		frappe.db.set_single_value("Irrigation Settings", "weather_max_plausible_temp", 0)
+		frappe.clear_document_cache("Irrigation Settings", "Irrigation Settings")
+		self.assertEqual(ws.card_settings()["weather_max_plausible_temp"], ws.DEFAULTS["weather_max_plausible_temp"])
+
+	def test_the_temperature_limit_is_the_sites_setting(self):
+		farm = frappe.get_all("Farm", pluck="name", limit=1)
+		if not farm:
+			self.skipTest("no farm on this site")
+		frappe.db.set_single_value("Irrigation Settings", "weather_max_plausible_temp", 30)
+		frappe.clear_document_cache("Irrigation Settings", "Irrigation Settings")
+		wr = frappe.get_doc({"doctype": "Weather Reading", "farm": farm[0], "date": "1999-07-01",
+		                     "minimum_temperature": 12, "maximum_temperature": 31})
+		wr.db_insert()
+		try:
+			vals, notes = ws.daily_values("temperature", farm[0], D(1999, 7, 1), D(1999, 7, 1))
+			self.assertIsNone(vals[D(1999, 7, 1)][2])  # 31 is past this site's 30
+		finally:
+			frappe.db.delete("Weather Reading", {"name": wr.name})
+
+	def test_the_long_term_years_needed_is_the_sites_setting(self):
+		frappe.db.set_single_value("Irrigation Settings", "long_term_min_years", 99)
+		frappe.clear_document_cache("Irrigation Settings", "Irrigation Settings")
+		r = ws.series(measure="rainfall", from_date="2026-01-01", to_date="2026-03-31", granularity="month", long_term=1)
+		self.assertFalse([s for s in r["series"] if s["key"] == "avg"])
+
+	def test_no_year_or_import_history_is_written_into_the_code(self):
+		import inspect, re
+		src = inspect.getsource(ws)
+		code = re.sub(r'"""[\\s\\S]*?"""|#[^\\n]*', "", src)  # docstrings and comments aside
+		self.assertNotRegex(code, r"20[12][0-9]")
+		self.assertNotIn("v15", code)
