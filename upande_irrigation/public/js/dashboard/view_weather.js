@@ -117,8 +117,8 @@ ${weatherExplorer.markup()}
 		</table>
 	</div>
 </div>`;
-		/* rainfall, temperature, pan evaporation, soil deficit and the meters,
-		 * in one card with a measure dropdown (weather_explorer.js) */
+		/* rainfall, temperature, pan evaporation and soil deficit in one card
+		 * with a measure dropdown (weather_explorer.js) */
 		this.wx = Object.create(weatherExplorer);
 		this.wx.init(el.querySelector("#wxx-card"), ctx);
 

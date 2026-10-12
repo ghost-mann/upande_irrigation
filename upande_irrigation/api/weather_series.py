@@ -1,12 +1,12 @@
 """One measure, any farm and period, bucketed by day / week / month / year,
 with the same calendar dates in other years beside it.
 
-Backs the Weather view's "Weather & water" card, which replaced four fixed
+Backs the Weather view's weather card, which replaced four fixed
 charts (rainfall, temperature, pan evaporation, soil deficit). The card picks a
 measure from a dropdown; everything here answers for whichever one it asks.
 
 Two kinds of measure:
-  * totals  -- rainfall, pan evaporation, water pumped, electricity: a bucket is
+  * totals  -- rainfall, pan evaporation: a bucket is
                the sum of its days.
   * levels  -- temperature, soil deficit: a bucket is the mean of its days.
 
@@ -26,23 +26,22 @@ import datetime
 import frappe
 from frappe.utils import add_days, date_diff, flt, getdate, nowdate
 
-TOTALS = ("rainfall", "evaporation", "water", "electricity")
+TOTALS = ("rainfall", "evaporation")
 LEVELS = ("temperature", "deficit_blocks", "deficit_swd")
 MEASURES = TOTALS + LEVELS
 
 UNITS = {
 	"rainfall": "mm", "evaporation": "mm", "temperature": "°C",
-	"deficit_blocks": "mm", "deficit_swd": "mm", "water": "m³", "electricity": "kWh",
+	"deficit_blocks": "mm", "deficit_swd": "mm",
 }
 LABELS = {
 	"rainfall": "Rainfall", "evaporation": "Pan evaporation", "temperature": "Temperature",
 	"deficit_blocks": "Soil deficit (block balance)", "deficit_swd": "Soil deficit (old SWD)",
-	"water": "Water pumped", "electricity": "Electricity",
 }
 # a guard on the request, not a site choice: about ten years of days
 MAX_DAYS = 3700
 
-# Site choices live in Irrigation Settings ("Weather & water card"); these are
+# Site choices live in Irrigation Settings ("Weather card"); these are
 # only the values used where a setting is blank. A Single read before its new
 # fields were ever saved gives 0 for them, so 0 also means "use the default".
 DEFAULTS = {
@@ -211,35 +210,6 @@ def daily_values(measure, farm, start, end):
 		# the farm average, and the driest block beside it
 		return {d: (s[0] / s[1], s[2], s[3]) for d, s in acc.items()}, notes
 
-	if measure in ("water", "electricity"):
-		doctype = "Water Meter Reading" if measure == "water" else "Electricity Meter Reading"
-		sec_filters = {"warehouse_type": "Section"}
-		if farm:
-			sec_filters["custom_farm"] = farm
-		sections = frappe.get_all("Warehouse", filters=sec_filters, pluck="name", limit_page_length=0)
-		if not sections:
-			return {}, notes
-		rows = frappe.get_all(
-			doctype,
-			filters={"date": ["between", [start, f"{end} 23:59:59"]], "docstatus": ["!=", 2],
-			         "irrigation_section": ["in", sections]},
-			fields=["date", "previous_reading", "new_reading", "units_used"],
-			limit_page_length=0,
-		)
-		out, tenfold = {}, 0
-		for r in rows:
-			used = flt(r.units_used)
-			diff = flt(r.new_reading) - flt(r.previous_reading)
-			# some imported rows hold 10 x (new - previous) rather than the difference
-			if diff > 0 and abs(used - 10 * diff) < 0.01 and abs(used - diff) > 0.01:
-				tenfold += 1
-			d = getdate(r.date)
-			out[d] = out.get(d, 0.0) + used
-		if tenfold:
-			notes.append(f"{tenfold} reading{'s' if tenfold != 1 else ''} in this period store usage as 10 × (new − previous) "
-			             "rather than the difference; shown as recorded. Check the meter's units before relying on them.")
-		return out, notes
-
 	frappe.throw(f"Unknown measure {measure!r}")
 
 
@@ -297,14 +267,7 @@ def headline(values, measure):
 
 def first_reading(measure, farm):
 	"""The earliest day this measure was recorded for the farm (all farms if none)."""
-	if measure in ("water", "electricity"):
-		doctype = "Water Meter Reading" if measure == "water" else "Electricity Meter Reading"
-		sec_filters = {"warehouse_type": "Section"}
-		if farm:
-			sec_filters["custom_farm"] = farm
-		sections = frappe.get_all("Warehouse", filters=sec_filters, pluck="name", limit_page_length=0) or ["__none__"]
-		v = frappe.db.sql(f"SELECT MIN(DATE(`date`)) FROM `tab{doctype}` WHERE irrigation_section IN %s AND docstatus != 2", (tuple(sections),))
-	elif measure == "deficit_blocks":
+	if measure == "deficit_blocks":
 		cond, args = ("WHERE farm = %s", (farm,)) if farm else ("", ())
 		v = frappe.db.sql(f"SELECT MIN(`date`) FROM `tabIrrigation Block Balance` {cond}", args)
 	else:
@@ -315,15 +278,7 @@ def first_reading(measure, farm):
 
 def years_with_data(measure, farm):
 	"""Years that hold any reading for this measure, newest first."""
-	if measure in ("water", "electricity"):
-		doctype = "Water Meter Reading" if measure == "water" else "Electricity Meter Reading"
-		sec_filters = {"warehouse_type": "Section"}
-		if farm:
-			sec_filters["custom_farm"] = farm
-		sections = frappe.get_all("Warehouse", filters=sec_filters, pluck="name", limit_page_length=0) or ["__none__"]
-		rows = frappe.db.sql(f"SELECT DISTINCT YEAR(`date`) FROM `tab{doctype}` WHERE irrigation_section IN %s AND docstatus != 2",
-		                     (tuple(sections),))
-	elif measure == "deficit_blocks":
+	if measure == "deficit_blocks":
 		cond, args = ("WHERE farm = %s", (farm,)) if farm else ("", ())
 		rows = frappe.db.sql(f"SELECT DISTINCT YEAR(`date`) FROM `tabIrrigation Block Balance` {cond}", args)
 	else:

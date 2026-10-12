@@ -1,4 +1,4 @@
-/* Weather & water — one card for every daily measure.
+/* Weather — one card for every daily weather measure.
  *
  * Replaced four fixed charts (rainfall, temperature, pan evaporation, soil
  * deficit). A dropdown picks the measure; farm, period, day/week/month/year and
@@ -6,7 +6,7 @@
  * from api.weather_series.series, which buckets the days and lines comparison
  * years up on this year's calendar dates.
  *
- * Totals (rain, evaporation, water, electricity) draw as bars, or as running
+ * Totals (rain, evaporation) draw as bars, or as running
  * totals; levels (temperature, deficit) draw as lines. A bucket with no reading
  * is a gap, never a zero, and every series says how many of its days were read.
  */
@@ -17,8 +17,6 @@ const MEASURES = [
 	["evaporation", "Pan evaporation", "var(--ui-eto)"],
 	["deficit_blocks", "Soil deficit · block balance", "var(--ui-cool)"],
 	["deficit_swd", "Soil deficit · old SWD", "var(--ui-cool)"],
-	["water", "Water pumped", "var(--ui-violet)"],
-	["electricity", "Electricity", "var(--ui-clay)"],
 ];
 const PRESETS = [["30d", "Last 30 days"], ["month", "This month"], ["ytd", "Year to date"], ["12m", "Last 12 months"]];
 const GRANS = [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]];
@@ -57,7 +55,7 @@ export const weatherExplorer = {
 	markup() {
 		return `
 <div class="card wxx" id="wxx-card">
-	<div class="card__head"><h3>Weather &amp; water</h3><span class="meta" id="wxx-meta"></span></div>
+	<div class="card__head"><h3>Weather</h3><span class="meta" id="wxx-meta"></span></div>
 	<div class="wxx-controls">
 		<label class="wxx-f"><span>Show</span><select class="select" id="wxx-measure">${MEASURES.map(
 			(m) => `<option value="${m[0]}">${m[1]}</option>`
@@ -333,7 +331,7 @@ export const weatherExplorer = {
 
 		this.drawSummary(series);
 		$("#wxx-notes").innerHTML = (d.notes || [])
-			.map((n) => `<div class="alert ${/Ignored|10 ×/.test(n) ? "warn" : "muted"}">${charts.esc(n)}</div>`)
+			.map((n) => `<div class="alert ${/Ignored/.test(n) ? "warn" : "muted"}">${charts.esc(n)}</div>`)
 			.join("");
 		const fd = (x) => new Date(`${x}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 		$("#wxx-meta").textContent = `${fd(d.from_date)} – ${fd(d.to_date)} · ${d.farm || "all farms"} · ${d.unit}`;

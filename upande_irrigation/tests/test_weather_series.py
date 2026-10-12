@@ -1,4 +1,4 @@
-"""The Weather & water card's endpoint (api.weather_series)."""
+"""The weather card's endpoint (api.weather_series)."""
 
 import datetime
 

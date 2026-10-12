@@ -2755,9 +2755,9 @@
   {
    "fieldname": "weather_card_section",
    "fieldtype": "Section Break",
-   "label": "Weather & water card",
+   "label": "Weather card",
    "collapsible": 1,
-   "description": "How the Weather view's Weather & water card treats readings and builds its long-term average."
+   "description": "How the Weather view's weather card treats readings and builds its long-term average."
   },
   {
    "fieldname": "weather_max_plausible_temp",
