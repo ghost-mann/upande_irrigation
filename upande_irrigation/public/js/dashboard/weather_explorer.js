@@ -310,7 +310,10 @@ export const weatherExplorer = {
 		} else if (d.kind === "total" && !s.running && labels.length <= 36) {
 			charts.groupedBars(chart, {
 				labels, W, H, unit: ` ${unit}`, dec: unit === "mm" ? 1 : 0,
-				groups: series.map((x) => ({ label: x.label, color: x.color, values: x.values, ...judged(x) })),
+				// with expected colouring on, only this period is bars, so green/red
+				// never sits beside another year's bar; comparisons become lines
+				groups: series.filter((x) => !ex || x.isCur).map((x) => ({ label: x.label, color: x.color, values: x.values, ...judged(x) })),
+				lines: ex ? series.filter((x) => !x.isCur).map((x) => ({ label: x.label, color: x.color, values: x.values, dash: x.dash })) : [],
 				steps: ex && ex.daily ? { values: ex.targets, label: ex.label } : undefined,
 			});
 		} else if (d.measure === "temperature") {
@@ -367,7 +370,7 @@ export const weatherExplorer = {
 		// legend: every series, so identity never rests on colour alone
 		const legend = [];
 		series.forEach((x) => {
-			const line = d.kind === "level" || s.running || (!x.isCur && labels.length > 36);
+			const line = d.kind === "level" || s.running || (!x.isCur && (labels.length > 36 || !!ex));
 			const empty = !x.isCur && !x.values.some((v) => v != null);
 			legend.push(`<span><i class="${line ? "ln" : ""}" style="background:${x.color}${x.dash && line ? ";opacity:.8" : ""}"></i>${charts.esc(x.label)}${empty ? ' <em class="wxx-muted">(no readings)</em>' : x.coverage != null && x.coverage < 0.9 ? ` <em class="wxx-muted">(${Math.round(x.coverage * 100)}% of days read)</em>` : ""}</span>`);
 		});

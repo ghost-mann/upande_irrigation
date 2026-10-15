@@ -779,13 +779,15 @@ function targetTick(x, w, yy) {
  *   refLine {value, label} — a dashed reference, e.g. the 24 h a day offers
  *   steps   {values, label} — a dashed reference that changes per position,
  *           drawn flat across each slot (a daily target that steps by month)
+ *   lines   [{label, color, values, dash}] — series drawn as lines through the
+ *           slot centres instead of bars; their values join each bar's tooltip
  *
  * Bars are thin, sit on the baseline with 4px rounded tops, and carry a 2px
  * surface gap between neighbours so adjacent fills never touch. Each bar hovers
  * for its own value; identity comes from the legend the caller renders plus the
  * bar's own title, never from colour alone.
  */
-export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "", dec = 1, yMax, refLine, steps } = {}) {
+export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "", dec = 1, yMax, refLine, steps, lines = [] } = {}) {
 	if (!host) return;
 	const gs = (groups || []).filter((g) => (g.values || []).length);
 	if (!gs.length || !(labels || []).length) {
@@ -800,6 +802,7 @@ export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "",
 	const all = gs
 		.flatMap((g) => [...(g.values || []), ...(g.targets || [])])
 		.concat(steps ? steps.values : [])
+		.concat(lines.flatMap((l) => l.values || []))
 		.filter((v) => v != null);
 	const top = yMax != null ? yMax : niceMax(Math.max(...all, refLine ? refLine.value : 0, 0.001));
 	const y = (v) => M.t + ih - (Math.max(0, v) / top) * ih;
@@ -833,7 +836,10 @@ export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "",
 			const h = Math.max(0, M.t + ih - yy);
 			const fill = (g.colors && g.colors[i]) || g.color;
 			const faded = g.faded && g.faded[i];
-			const tip = (g.tips && g.tips[i]) || "";
+			const others = lines
+				.filter((l) => (l.values || [])[i] != null)
+				.map((l) => `${l.label}: ${fmtNum(l.values[i], dec)}${unit}`);
+			const tip = [(g.tips && g.tips[i]) || "", ...others].filter(Boolean).join(" · ");
 			bars += `<rect class="gb" x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${fill}"${faded ? ` fill-opacity="0.4" stroke="${fill}" stroke-width="1.5" stroke-dasharray="3 2"` : ""} data-v="${v}" data-g="${esc(g.label)}" data-x="${esc(String(lab))}" data-t="${esc(tip)}"><title>${esc(g.label)} · ${esc(String(lab))}: ${fmtNum(v, dec)}${unit}${tip ? ` · ${esc(tip)}` : ""}</title></rect>`;
 			const t = g.targets && g.targets[i];
 			if (t != null) bars += targetTick(x - 2, bw + 4, y(t));
@@ -859,6 +865,28 @@ export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "",
 		});
 		if (d) ref += `<path class="refline refline--steps" d="${d}" fill="none"><title>${esc(steps.label || "")}</title></path>`;
 	}
+	let over = "";
+	lines.forEach((l) => {
+		/* broken at gaps, a lone reading still gets a dot */
+		let d = "";
+		let dots = "";
+		let open = false;
+		(l.values || []).forEach((v, i) => {
+			const cx = (M.l + slot * i + slot / 2).toFixed(1);
+			if (v == null) {
+				open = false;
+				return;
+			}
+			const cy = y(v).toFixed(1);
+			const prev = (l.values || [])[i - 1];
+			const next = (l.values || [])[i + 1];
+			if (prev == null && next == null) dots += `<circle cx="${cx}" cy="${cy}" r="3" fill="${l.color}"/>`;
+			d += `${open ? " L" : " M"} ${cx},${cy}`;
+			open = true;
+		});
+		if (d) over += `<path d="${d.trim()}" fill="none" stroke="${l.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"${l.dash ? ` stroke-dasharray="${l.dash}"` : ""} pointer-events="none"/>`;
+		over += dots;
+	});
 	if (refLine && refLine.value > 0 && refLine.value <= top) {
 		const yy = y(refLine.value);
 		ref = `<line class="refline" x1="${M.l}" y1="${yy.toFixed(1)}" x2="${W - M.r}" y2="${yy.toFixed(1)}"/>
@@ -866,7 +894,7 @@ export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "",
 	}
 
 	host.innerHTML = `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img">
-	${grid}${ref}${bars}
+	${grid}${ref}${bars}${over}
 </svg></div>`;
 
 	host.querySelectorAll("rect.gb").forEach((r) => {
