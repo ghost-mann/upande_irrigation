@@ -1,7 +1,8 @@
 /* Compare — several seasons of one weather measure, month by month.
  *
  * Kept lean, like the Weather card: a measure, a farm, the years to lay over
- * each other, and month-by-month or a running total. Each year is a line on
+ * each other, and month by month, a running total or an average per day. Each
+ * year is a line on
  * the same graph-paper chart (charts.graphPaper); the newest selected year is
  * drawn heavy in the measure's colour, the others thinner.
  *
@@ -45,6 +46,19 @@ function running(values) {
 	});
 }
 
+/* a month's total spread over its calendar days -- not over its readings, which
+ * on a farm that logs only rainy days would make a dry month look wet. The
+ * month still running counts only the days so far. */
+function perDay(values, year) {
+	const today = new Date();
+	return values.map((v, m) => {
+		if (v == null) return null;
+		let days = new Date(year, m + 1, 0).getDate();
+		if (year === today.getFullYear() && m === today.getMonth()) days = today.getDate();
+		return Math.round((v / days) * 100) / 100;
+	});
+}
+
 export default {
 	id: "compare",
 	label: "Compare",
@@ -54,7 +68,7 @@ export default {
 		this.el = el;
 		this.s = {
 			measure: "rainfall", farm: ctx.filters.farm || "", farmTouched: false,
-			years: null, available: [], running: false, data: null, seq: 0,
+			years: null, available: [], mode: "month", data: null, seq: 0,
 		};
 
 		el.innerHTML = `
@@ -72,6 +86,7 @@ ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
 			<div class="pillgroup" id="cmp-mode" role="group" aria-label="Show as">
 				<button type="button" data-m="month">Month by month</button>
 				<button type="button" data-m="running">Running total</button>
+				<button type="button" data-m="perday">Average per day</button>
 			</div>
 		</div>
 	</div>
@@ -114,7 +129,7 @@ ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
 		$("#cmp-mode").onclick = (e) => {
 			const b = e.target.closest("[data-m]");
 			if (!b) return;
-			this.s.running = b.dataset.m === "running";
+			this.s.mode = b.dataset.m;
 			this.paint();
 		};
 		this.unsubscribe = ctx.onFilterChange(() => {});
@@ -198,13 +213,14 @@ ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
 		const $ = (id) => this.el.querySelector(id);
 		const def = MEASURES.find((m) => m[0] === d.measure) || MEASURES[0];
 		const total = d.kind === "total";
-		const asRunning = s.running && total;
+		// running total and per-day average only mean something for totals
+		const mode = total ? s.mode : "month";
 
 		$("#cmp-title").textContent = def[1];
 		$("#cmp-measure").value = d.measure;
 		this.fillFarms();
 		$("#cmp-mode").style.display = total ? "" : "none";
-		$("#cmp-mode").querySelectorAll("button").forEach((b) => b.classList.toggle("on", (b.dataset.m === "running") === asRunning));
+		$("#cmp-mode").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.m === mode));
 		const avail = [...new Set([...s.available, ...s.years])].sort((a, b) => a - b);
 		$("#cmp-meta").textContent = `${d.farm || "All farms"} · ${avail.length} ${avail.length === 1 ? "year" : "years"} on record`;
 
@@ -214,7 +230,7 @@ ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
 		const newest = shown[0];
 		let oi = 0;
 		const colour = (y) => (y === newest ? def[2] : OLDER[oi++ % OLDER.length]);
-		const plotted = shown.map((y) => ({ ...y, color: colour(y), values: asRunning ? running(y.monthly) : y.monthly }));
+		const plotted = shown.map((y) => ({ ...y, color: colour(y), values: mode === "running" ? running(y.monthly) : mode === "perday" ? perDay(y.monthly, y.year) : y.monthly }));
 		// a selected year's chip wears its line's colour, so chip and line match
 		const chipColour = new Map(plotted.map((y) => [y.year, y.color]));
 		$("#cmp-years").innerHTML = avail
@@ -236,8 +252,8 @@ ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
 			}
 			: undefined;
 		charts.graphPaper($("#cmp-chart"), {
-			labels: MONTHS, lines, band, unit: ` ${d.unit}`, dec: 1,
-			yTitle: `${def[1]}${asRunning ? ", running total" : ""} (${d.unit})`, xTitle: "Month",
+			labels: MONTHS, lines, band, unit: ` ${d.unit}${mode === "perday" ? "/day" : ""}`, dec: 1,
+			yTitle: `${def[1]}${mode === "running" ? ", running total" : mode === "perday" ? ", average per day" : ""} (${d.unit}${mode === "perday" ? "/day" : ""})`, xTitle: "Month",
 		});
 		$("#cmp-legend").innerHTML = plotted
 			.map((y) => `<span><i class="ln" style="background:${y.color}${y === plotted[0] ? "" : ";height:2px"}"></i>${y.year}${y.headline == null ? ' <em class="wxx-muted">(no readings)</em>' : ""}</span>`)
