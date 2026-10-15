@@ -63,6 +63,8 @@ class TestEndpoint(IntegrationTestCase):
 		cmp = [s for s in r["series"] if s["key"] == "2025"]
 		self.assertTrue(cmp)
 		self.assertIn("headline_same_days", cmp[0])
+		# and to the same calendar date, for a year still under way
+		self.assertIn("headline_to_date", cmp[0])
 
 	def test_an_impossible_temperature_is_dropped_and_named(self):
 		farm = frappe.get_all("Farm", pluck="name", limit=1)

@@ -408,8 +408,11 @@ def series(measure="rainfall", farm="", from_date="", to_date="", granularity="m
 		# for, so a week not yet logged here does not read as a dry week there
 		cur_days = set(current)
 		matched = {dd: v for dd, v in vals.items() if shift_year(dd, offset) in cur_days}
+		# and up to the same calendar date, for a year still under way
+		upto = shift_year(min(end, getdate(nowdate())), -offset)
 		out_series.append({
 			"headline_same_days": headline(matched, measure),
+			"headline_to_date": headline({dd: v for dd, v in vals.items() if dd <= upto}, measure),
 			"key": str(y),
 			"label": str(y) if start.year == end.year else f"{start.year - offset}–{str(end.year - offset)[-2:]}",
 			"values": aggregate(vals, keys, granularity, measure, day_offset_years=offset),

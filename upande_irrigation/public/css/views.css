@@ -1862,6 +1862,8 @@
 }
 .wxx-f .select { min-width: 140px; }
 .wxx-f--year .select { min-width: 110px; }
+.cmp-years .side__chips { margin: 0; }
+td i.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; }
 /* graph paper: a labelled major grid, a fine minor grid, firm axes */
 .gp .gp-minor { stroke: var(--ink-faint); stroke-width: 0.5; opacity: 0.45; }
 .gp .gp-major { stroke: var(--ink-mute); stroke-width: 0.8; opacity: 0.55; }
