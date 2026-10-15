@@ -238,17 +238,14 @@ export function countUp(el, to, { dec = 1, dur = 650, prefix = "", suffix = "" }
 /* ══════════════════════════════════════════════ line / bar chart */
 
 /* series: [{label, color, values[], type:'bar'|'line', dash, width, unit, dec,
- *           noPoints, opacity, colors[], faded[], targets[], tips[]}]
- *   colors/faded/targets apply to bars: a per-bar fill, a faded bar with a
- *   dashed outline (a period still running), and a tick at a target value.
- *   tips[i] is extra tooltip text for position i.
+ *           noPoints, opacity}]
  * opts:   {xLabels[], xRaw, tooltip, yMin, yMax, margin, noFill, band} */
 export function mkChart(host, series, W, H, opts = {}) {
 	if (!host) return;
 	const M = { t: 14, r: 16, b: 30, l: 44, ...(opts.margin || {}) };
 	const iw = W - M.l - M.r;
 	const ih = H - M.t - M.b;
-	const allVals = series.flatMap((s) => [...(s.values || []), ...(s.targets || [])]).filter((v) => v != null);
+	const allVals = series.flatMap((s) => s.values || []).filter((v) => v != null);
 	const yMax = opts.yMax != null ? opts.yMax : niceMax(Math.max(...allVals, 0.001));
 	const yMin = opts.yMin != null ? opts.yMin : Math.min(0, ...allVals);
 	const ySpan = yMax - yMin || 1;
@@ -308,13 +305,7 @@ export function mkChart(host, series, W, H, opts = {}) {
 				if (v == null) return;
 				const top = y(v);
 				const h = Math.max(1, Math.abs(base - top));
-				const fill = (s.colors && s.colors[i]) || s.color;
-				const faded = s.faded && s.faded[i];
-				body += `<rect class="ui-rise" style="--d:${(i * 12).toFixed(0)}ms" x="${(x(i) - bw / 2).toFixed(1)}" y="${Math.min(base, top).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2.5" fill="${fill}" opacity="${faded ? 0.4 : s.opacity || 0.9}"${faded ? ` stroke="${fill}" stroke-width="1.5" stroke-dasharray="3 2"` : ""}/>`;
-			});
-			(s.targets || []).forEach((t, i) => {
-				if (t == null) return;
-				body += targetTick(x(i) - bw / 2 - 2, bw + 4, y(t));
+				body += `<rect class="ui-rise" style="--d:${(i * 12).toFixed(0)}ms" x="${(x(i) - bw / 2).toFixed(1)}" y="${Math.min(base, top).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2.5" fill="${s.color}" opacity="${s.opacity || 0.9}"/>`;
 			});
 			return;
 		}
@@ -406,8 +397,7 @@ export function mkChart(host, series, W, H, opts = {}) {
 				const lines = series
 					.map((s) => {
 						const v = (s.values || [])[i];
-						const tip = s.tips && s.tips[i] ? ` <span class="wxx-muted">· ${esc(s.tips[i])}</span>` : "";
-						return `<span class="sw" style="background:${(s.colors && s.colors[i]) || s.color}"></span><span class="k">${esc(s.label || "")}</span> ${v != null ? fmtNum(v, s.dec == null ? 1 : s.dec) : "—"} ${esc(s.unit || "")}${tip}`;
+						return `<span class="sw" style="background:${s.color}"></span><span class="k">${esc(s.label || "")}</span> ${v != null ? fmtNum(v, s.dec == null ? 1 : s.dec) : "—"} ${esc(s.unit || "")}`;
 					})
 					.join("<br>");
 				showTip(`<span class="d">${esc(xText(i))}</span>${lines}`, e.clientX, e.clientY);
@@ -762,32 +752,20 @@ export function mkRangeChart(host, opts) {
 	});
 }
 
-/* a short dark rule across a bar at its target, so pass/fail never rests on
- * the bar's colour alone */
-function targetTick(x, w, yy) {
-	return `<line class="target-tick" x1="${x.toFixed(1)}" y1="${yy.toFixed(1)}" x2="${(x + w).toFixed(1)}" y2="${yy.toFixed(1)}"/>`;
-}
-
 /* ══════════════════════════════════════════════ grouped bars
  *
  * groupedBars(host, {labels, groups, W, H, unit, dec, yMax, refLine})
  *
  *   labels  one per x position, e.g. the seven days of the week
- *   groups  [{label, color, values, colors?, faded?, targets?, tips?}] — one
- *           bar per group per position; colors/faded/targets/tips are per
- *           position, as in mkChart
+ *   groups  [{label, color, values}] — one bar per group per position
  *   refLine {value, label} — a dashed reference, e.g. the 24 h a day offers
- *   steps   {values, label} — a dashed reference that changes per position,
- *           drawn flat across each slot (a daily target that steps by month)
- *   lines   [{label, color, values, dash}] — series drawn as lines through the
- *           slot centres instead of bars; their values join each bar's tooltip
  *
  * Bars are thin, sit on the baseline with 4px rounded tops, and carry a 2px
  * surface gap between neighbours so adjacent fills never touch. Each bar hovers
  * for its own value; identity comes from the legend the caller renders plus the
  * bar's own title, never from colour alone.
  */
-export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "", dec = 1, yMax, refLine, steps, lines = [] } = {}) {
+export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "", dec = 1, yMax, refLine } = {}) {
 	if (!host) return;
 	const gs = (groups || []).filter((g) => (g.values || []).length);
 	if (!gs.length || !(labels || []).length) {
@@ -799,11 +777,7 @@ export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "",
 	const iw = W - M.l - M.r;
 	const ih = H - M.t - M.b;
 
-	const all = gs
-		.flatMap((g) => [...(g.values || []), ...(g.targets || [])])
-		.concat(steps ? steps.values : [])
-		.concat(lines.flatMap((l) => l.values || []))
-		.filter((v) => v != null);
+	const all = gs.flatMap((g) => g.values || []).filter((v) => v != null);
 	const top = yMax != null ? yMax : niceMax(Math.max(...all, refLine ? refLine.value : 0, 0.001));
 	const y = (v) => M.t + ih - (Math.max(0, v) / top) * ih;
 
@@ -834,59 +808,12 @@ export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "",
 			const x = x0 + gi * (bw + 2);
 			const yy = y(v);
 			const h = Math.max(0, M.t + ih - yy);
-			const fill = (g.colors && g.colors[i]) || g.color;
-			const faded = g.faded && g.faded[i];
-			const others = lines
-				.filter((l) => (l.values || [])[i] != null)
-				.map((l) => `${l.label}: ${fmtNum(l.values[i], dec)}${unit}`);
-			const tip = [(g.tips && g.tips[i]) || "", ...others].filter(Boolean).join(" · ");
-			bars += `<rect class="gb" x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${fill}"${faded ? ` fill-opacity="0.4" stroke="${fill}" stroke-width="1.5" stroke-dasharray="3 2"` : ""} data-v="${v}" data-g="${esc(g.label)}" data-x="${esc(String(lab))}" data-t="${esc(tip)}"><title>${esc(g.label)} · ${esc(String(lab))}: ${fmtNum(v, dec)}${unit}${tip ? ` · ${esc(tip)}` : ""}</title></rect>`;
-			const t = g.targets && g.targets[i];
-			if (t != null) bars += targetTick(x - 2, bw + 4, y(t));
+			bars += `<rect class="gb" x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${g.color}" data-v="${v}" data-g="${esc(g.label)}" data-x="${esc(String(lab))}"><title>${esc(g.label)} · ${esc(String(lab))}: ${fmtNum(v, dec)}${unit}</title></rect>`;
 		});
 		bars += `<text class="ax" x="${(M.l + slot * i + slot / 2).toFixed(1)}" y="${(M.t + ih + 18).toFixed(1)}" text-anchor="middle">${esc(String(lab))}</text>`;
 	});
 
 	let ref = "";
-	if (steps) {
-		/* flat across each slot, joined where neighbours both have a value */
-		let d = "";
-		let prev = null;
-		steps.values.forEach((v, i) => {
-			if (v == null) {
-				prev = null;
-				return;
-			}
-			const x0 = M.l + slot * i;
-			const yy = y(v).toFixed(1);
-			d += prev == null ? `M ${x0.toFixed(1)},${yy}` : ` L ${x0.toFixed(1)},${yy}`;
-			d += ` L ${(x0 + slot).toFixed(1)},${yy}`;
-			prev = v;
-		});
-		if (d) ref += `<path class="refline refline--steps" d="${d}" fill="none"><title>${esc(steps.label || "")}</title></path>`;
-	}
-	let over = "";
-	lines.forEach((l) => {
-		/* broken at gaps, a lone reading still gets a dot */
-		let d = "";
-		let dots = "";
-		let open = false;
-		(l.values || []).forEach((v, i) => {
-			const cx = (M.l + slot * i + slot / 2).toFixed(1);
-			if (v == null) {
-				open = false;
-				return;
-			}
-			const cy = y(v).toFixed(1);
-			const prev = (l.values || [])[i - 1];
-			const next = (l.values || [])[i + 1];
-			if (prev == null && next == null) dots += `<circle cx="${cx}" cy="${cy}" r="3" fill="${l.color}"/>`;
-			d += `${open ? " L" : " M"} ${cx},${cy}`;
-			open = true;
-		});
-		if (d) over += `<path d="${d.trim()}" fill="none" stroke="${l.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"${l.dash ? ` stroke-dasharray="${l.dash}"` : ""} pointer-events="none"/>`;
-		over += dots;
-	});
 	if (refLine && refLine.value > 0 && refLine.value <= top) {
 		const yy = y(refLine.value);
 		ref = `<line class="refline" x1="${M.l}" y1="${yy.toFixed(1)}" x2="${W - M.r}" y2="${yy.toFixed(1)}"/>
@@ -894,17 +821,161 @@ export function groupedBars(host, { labels, groups, W = 620, H = 240, unit = "",
 	}
 
 	host.innerHTML = `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img">
-	${grid}${ref}${bars}${over}
+	${grid}${ref}${bars}
 </svg></div>`;
 
 	host.querySelectorAll("rect.gb").forEach((r) => {
 		r.addEventListener("mousemove", (e) => {
 			showTip(
-				`<span class="d">${esc(r.dataset.x)}</span><span class="sw" style="background:${r.getAttribute("fill")}"></span><span class="k">${esc(r.dataset.g)}</span> ${fmtNum(Number(r.dataset.v), dec)}${unit}${r.dataset.t ? `<br><span class="wxx-muted">${esc(r.dataset.t)}</span>` : ""}`,
+				`<span class="d">${esc(r.dataset.x)}</span><span class="sw" style="background:${r.getAttribute("fill")}"></span><span class="k">${esc(r.dataset.g)}</span> ${fmtNum(Number(r.dataset.v), dec)}${unit}`,
 				e.clientX,
 				e.clientY
 			);
 		});
 		r.addEventListener("mouseleave", hideTip);
+	});
+}
+
+/* a short dark rule across a bar at its target, so pass/fail never rests on
+ * the bar's colour alone */
+function targetTick(x, w, yy) {
+	return `<line class="target-tick" x1="${x.toFixed(1)}" y1="${yy.toFixed(1)}" x2="${(x + w).toFixed(1)}" y2="${yy.toFixed(1)}"/>`;
+}
+
+/* ══════════════════════════════════════════════ graph paper
+ *
+ * graphPaper(host, {labels, bars, lines, band, unit, dec, yTitle, xTitle, W, H})
+ *
+ * A chart to read values off: titled axes, a labelled major grid at round
+ * steps with five fine lines between each, and a rule between categories.
+ *
+ *   labels  one per slot, e.g. Jan … Dec
+ *   bars    {label, color, values, colors?, faded?, targets?, tips?} — one bar
+ *           per slot; colors/faded/targets/tips per slot, as in groupedBars
+ *   lines   [{label, color, values, dash, width}] — through the slot centres
+ *   band    {lo[], hi[], color, label} — a shaded range (temperature min–max)
+ *
+ * Hovering a slot lists every series' value there.
+ */
+function niceStep(span, ticks = 5) {
+	const raw = span / ticks;
+	const p = Math.pow(10, Math.floor(Math.log10(raw)));
+	const n = raw / p;
+	return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+}
+
+export function graphPaper(host, { labels, bars, lines = [], band, unit = "", dec = 1, yTitle = "", xTitle = "", W = 1200, H = 360 } = {}) {
+	if (!host) return;
+	hideTip(); // a redraw under the pointer must not leave the old tooltip up
+	const n = (labels || []).length;
+	const all = [
+		...(bars ? [...bars.values, ...(bars.targets || [])] : []),
+		...lines.flatMap((l) => l.values || []),
+		...(band ? [...band.lo, ...band.hi] : []),
+	].filter((v) => v != null && !Number.isNaN(v));
+	if (!n || !all.length) {
+		host.innerHTML = '<div class="empty small">Nothing recorded for this year.</div>';
+		return;
+	}
+	const M = { t: 18, r: 18, b: 52, l: 70 };
+	const iw = W - M.l - M.r;
+	const ih = H - M.t - M.b;
+	let lo = Math.min(0, ...all);
+	let hi = Math.max(...all);
+	if (hi - lo < 1e-9) hi = lo + 1;
+	const step = niceStep(hi - lo);
+	lo = Math.floor(lo / step) * step;
+	hi = Math.ceil(hi / step) * step;
+	if (hi === Math.max(...all)) hi += step; // headroom above the tallest mark
+	const y = (v) => M.t + ih - ((v - lo) / (hi - lo)) * ih;
+	const slot = iw / n;
+	const cx = (i) => M.l + slot * i + slot / 2;
+	const fmtAxis = axisFormatter(hi - lo);
+
+	let grid = "";
+	const minor = step / 5;
+	for (let v = lo; v <= hi + 1e-9; v += minor) {
+		const major = Math.abs(v / step - Math.round(v / step)) < 1e-6;
+		const yy = y(v).toFixed(1);
+		grid += `<line class="${major ? "gp-major" : "gp-minor"}" x1="${M.l}" y1="${yy}" x2="${W - M.r}" y2="${yy}"/>`;
+		if (major) grid += `<text class="ax gp-tick" x="${M.l - 8}" y="${(+yy + 3.5).toFixed(1)}" text-anchor="end">${fmtAxis(v)}</text>`;
+	}
+	for (let i = 0; i <= n; i++) {
+		const xx = (M.l + slot * i).toFixed(1);
+		grid += `<line class="gp-minor" x1="${xx}" y1="${M.t}" x2="${xx}" y2="${M.t + ih}"/>`;
+	}
+	labels.forEach((lab, i) => {
+		grid += `<line class="gp-axis" x1="${cx(i).toFixed(1)}" y1="${M.t + ih}" x2="${cx(i).toFixed(1)}" y2="${M.t + ih + 5}"/>`;
+		grid += `<text class="ax gp-tick" x="${cx(i).toFixed(1)}" y="${M.t + ih + 18}" text-anchor="middle">${esc(String(lab))}</text>`;
+	});
+	const axes = `<line class="gp-axis" x1="${M.l}" y1="${M.t}" x2="${M.l}" y2="${M.t + ih}"/>`
+		+ `<line class="gp-axis" x1="${M.l}" y1="${y(Math.max(lo, 0)).toFixed(1)}" x2="${W - M.r}" y2="${y(Math.max(lo, 0)).toFixed(1)}"/>`
+		+ (lo < 0 ? `<line class="gp-axis" x1="${M.l}" y1="${M.t + ih}" x2="${W - M.r}" y2="${M.t + ih}"/>` : "")
+		+ `<text class="gp-title" x="${(M.l + iw / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(xTitle)}</text>`
+		+ `<text class="gp-title" transform="translate(16 ${(M.t + ih / 2).toFixed(1)}) rotate(-90)" text-anchor="middle">${esc(yTitle)}</text>`;
+
+	let marks = "";
+	if (band) {
+		const idx = labels.map((_, i) => i).filter((i) => band.lo[i] != null && band.hi[i] != null);
+		if (idx.length) {
+			const top = idx.map((i) => `${cx(i).toFixed(1)},${y(band.hi[i]).toFixed(1)}`);
+			const bot = idx.slice().reverse().map((i) => `${cx(i).toFixed(1)},${y(band.lo[i]).toFixed(1)}`);
+			marks += `<path d="M ${top.join(" L ")} L ${bot.join(" L ")} Z" fill="${band.color}" fill-opacity=".16"/>`;
+		}
+	}
+	if (bars) {
+		const bw = Math.min(44, slot * 0.56);
+		const base = y(Math.max(lo, 0));
+		bars.values.forEach((v, i) => {
+			if (v == null) return;
+			const top = y(v);
+			const fill = (bars.colors && bars.colors[i]) || bars.color;
+			const faded = bars.faded && bars.faded[i];
+			marks += `<rect x="${(cx(i) - bw / 2).toFixed(1)}" y="${Math.min(base, top).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, Math.abs(base - top)).toFixed(1)}" rx="2" fill="${fill}"${faded ? ` fill-opacity="0.4" stroke="${fill}" stroke-width="1.5" stroke-dasharray="3 2"` : ""}/>`;
+		});
+		(bars.targets || []).forEach((t, i) => {
+			if (t != null) marks += targetTick(cx(i) - bw / 2 - 4, bw + 8, y(t));
+		});
+	}
+	/* lines over the bars, each reading ringed so a lone month still shows */
+	lines.forEach((l) => {
+		let d = "";
+		let dots = "";
+		let open = false;
+		(l.values || []).forEach((v, i) => {
+			if (v == null) { open = false; return; }
+			d += `${open ? " L" : " M"} ${cx(i).toFixed(1)},${y(v).toFixed(1)}`;
+			open = true;
+			dots += `<circle cx="${cx(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="${l.color}" stroke="var(--card)" stroke-width="1.5"/>`;
+		});
+		if (d) marks += `<path d="${d.trim()}" fill="none" stroke="${l.color}" stroke-width="${l.width || 2}" stroke-linejoin="round"${l.dash ? ` stroke-dasharray="${l.dash}"` : ""}/>`;
+		marks += dots;
+	});
+	let hits = "";
+	for (let i = 0; i < n; i++) {
+		hits += `<rect class="tooltip-hit" x="${(M.l + slot * i).toFixed(1)}" y="${M.t}" width="${slot.toFixed(1)}" height="${ih}" data-i="${i}"/>`;
+	}
+	host.classList.add("chart");
+	host.innerHTML = `<svg class="gp" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(yTitle)} by ${esc(xTitle)}">${grid}${axes}${marks}${hits}</svg>`;
+
+	const fmt = (v) => `${fmtNum(v, dec)}${unit}`;
+	host.querySelectorAll(".tooltip-hit").forEach((el) => {
+		el.addEventListener("mousemove", (e) => {
+			const i = +el.dataset.i;
+			const rows = [];
+			if (bars) {
+				const v = bars.values[i];
+				const c = (bars.colors && bars.colors[i]) || bars.color;
+				rows.push(`<span class="sw" style="background:${c}"></span><span class="k">${esc(bars.label)}</span> ${v == null ? "—" : fmt(v)}`);
+				if (bars.tips && bars.tips[i]) rows.push(`<span style="opacity:.8">${esc(bars.tips[i])}</span>`);
+			}
+			if (band && band.lo[i] != null) rows.push(`<span class="sw" style="background:${band.color};opacity:.3"></span><span class="k">${esc(band.label || "Range")}</span> ${fmt(band.lo[i])} – ${fmt(band.hi[i])}`);
+			lines.forEach((l) => {
+				const v = (l.values || [])[i];
+				rows.push(`<span class="sw" style="background:${l.color}"></span><span class="k">${esc(l.label)}</span> ${v == null ? "—" : fmt(v)}`);
+			});
+			showTip(`<span class="d">${esc(String(labels[i]))}</span>${rows.join("<br>")}`, e.clientX, e.clientY);
+		});
+		el.addEventListener("mouseleave", hideTip);
 	});
 }

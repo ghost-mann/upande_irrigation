@@ -387,7 +387,8 @@ def series(measure="rainfall", farm="", from_date="", to_date="", granularity="m
 		"key": "current", "label": f"{start.year}" if start.year == end.year else f"{start.year}–{str(end.year)[-2:]}",
 		"values": aggregate(current, keys, granularity, measure),
 		"headline": headline(current, measure),
-		"coverage": coverage(current, start, end),
+		# days still to come cannot have been read
+		"coverage": coverage(current, start, min(end, getdate(nowdate()))),
 	}]
 
 	available = years_with_data(measure, farm)

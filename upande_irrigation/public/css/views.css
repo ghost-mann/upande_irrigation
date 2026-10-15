@@ -1226,13 +1226,6 @@
 	opacity: 0.6;
 }
 
-/* expected rainfall: the daily target steps month to month in ink, not red --
- * red there would read as "below" */
-.refline--steps {
-	stroke: var(--ink-3);
-	opacity: 0.75;
-}
-
 .target-tick {
 	stroke: var(--ink-2);
 	stroke-width: 2;
@@ -1868,22 +1861,15 @@
 	color: var(--ink-4);
 }
 .wxx-f .select { min-width: 140px; }
-.wxx-compare {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 6px;
-}
-.wxx-chip {
-	border: 1px solid var(--line, rgba(10, 10, 10, 0.12));
-	background: transparent;
-	font: 500 12px var(--sans);
-	color: var(--ink-4);
-	padding: 6px 12px;
-	border-radius: 999px;
-	cursor: pointer;
-}
-.wxx-chip.on { background: var(--ink); color: #fafaf6; border-color: var(--ink); }
+.wxx-f--year .select { min-width: 110px; }
+/* graph paper: a labelled major grid, a fine minor grid, firm axes */
+.gp .gp-minor { stroke: var(--ink-faint); stroke-width: 0.5; opacity: 0.45; }
+.gp .gp-major { stroke: var(--ink-mute); stroke-width: 0.8; opacity: 0.55; }
+.gp .gp-axis { stroke: var(--ink-3); stroke-width: 1.2; }
+.gp text.gp-tick { font-size: 11px; fill: var(--ink-4); }
+.gp .gp-title { font: 600 12px var(--sans); fill: var(--ink-3); }
+.gp .tooltip-hit { fill: transparent; }
+.gp .tooltip-hit:hover { fill: var(--ink); fill-opacity: 0.04; }
 .wxx-right { display: flex; gap: 6px; margin-left: auto; }
 .wxx-right .btn.on { background: var(--ink); color: #fafaf6; }
 .wxx-muted { color: var(--ink-4); font-size: 12px; font-style: normal; }

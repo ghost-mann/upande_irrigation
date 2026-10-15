@@ -71,3 +71,15 @@ the status, and settings validation. Then a browser check on webstore.localhost.
 ## Out of scope
 
 Temperature/evaporation targets, per-year targets, alerts.
+
+## Revision (same day): one year against one year
+
+The card's controls confused users, so they were cut to **Show, Farm, Year,
+Compare with** (one year, default the year before, or none). Day/week/year
+grouping, the date range and presets, the year chips, the long-term average and
+running totals are gone; the card always reads Jan – Dec by month on a
+graph-paper chart (`charts.graphPaper`: titled axes, labelled major grid, fine
+minor grid). The chosen year draws as bars (green/red against expected), the
+comparison year as a dashed line. The day-view target line and the per-bar
+options added to `groupedBars`/`mkChart` were removed with it. Coverage now
+counts only days up to today.
