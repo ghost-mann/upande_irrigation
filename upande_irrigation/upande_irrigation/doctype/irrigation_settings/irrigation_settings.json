@@ -2790,6 +2790,24 @@
    "label": "Long-term average: share of days read",
    "default": "60",
    "description": "An earlier year counts towards the long-term average only if it has readings on at least this share of the period's days."
+  },
+  {
+   "fieldname": "sec_rain_expected",
+   "fieldtype": "Section Break",
+   "label": "Expected rainfall",
+   "description": "How much rain each farm expects per day, month by month. With colouring on, the weather card's rainfall bars turn green when a week, month or year met the expectation and red when it fell short. A month left at 0 has no target."
+  },
+  {
+   "fieldname": "rain_expected_enabled",
+   "fieldtype": "Check",
+   "label": "Colour rainfall against expected",
+   "default": "0"
+  },
+  {
+   "fieldname": "rain_expected",
+   "fieldtype": "Table",
+   "label": "Expected rainfall (mm/day)",
+   "options": "Irrigation Expected Rainfall"
   }
  ],
  "force_re_route_to_default_view": 0,
@@ -2811,7 +2829,7 @@
  "make_attachments_public": 0,
  "max_attachments": 0,
  "migration_hash": "9d4e1fc30cc51dacfe300058d755c2ca",
- "modified": "2026-07-30 09:44:24.622797",
+ "modified": "2026-10-15 09:00:00.000000",
  "module": "Upande Irrigation",
  "name": "Irrigation Settings",
  "naming_rule": "",

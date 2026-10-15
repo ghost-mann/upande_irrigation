@@ -1,0 +1,142 @@
+{
+ "actions": [],
+ "creation": "2026-10-15 09:00:00.000000",
+ "custom": 0,
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "farm",
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "may",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "oct",
+  "nov",
+  "dec"
+ ],
+ "fields": [
+  {
+   "fieldname": "farm",
+   "fieldtype": "Link",
+   "label": "Farm",
+   "options": "Farm",
+   "in_list_view": 1,
+   "reqd": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "jan",
+   "fieldtype": "Float",
+   "label": "Jan (mm/day)",
+   "in_list_view": 1,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "feb",
+   "fieldtype": "Float",
+   "label": "Feb (mm/day)",
+   "in_list_view": 0,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "mar",
+   "fieldtype": "Float",
+   "label": "Mar (mm/day)",
+   "in_list_view": 0,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "apr",
+   "fieldtype": "Float",
+   "label": "Apr (mm/day)",
+   "in_list_view": 1,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "may",
+   "fieldtype": "Float",
+   "label": "May (mm/day)",
+   "in_list_view": 0,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "jun",
+   "fieldtype": "Float",
+   "label": "Jun (mm/day)",
+   "in_list_view": 0,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "jul",
+   "fieldtype": "Float",
+   "label": "Jul (mm/day)",
+   "in_list_view": 1,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "aug",
+   "fieldtype": "Float",
+   "label": "Aug (mm/day)",
+   "in_list_view": 0,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "sep",
+   "fieldtype": "Float",
+   "label": "Sep (mm/day)",
+   "in_list_view": 0,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "oct",
+   "fieldtype": "Float",
+   "label": "Oct (mm/day)",
+   "in_list_view": 1,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "nov",
+   "fieldtype": "Float",
+   "label": "Nov (mm/day)",
+   "in_list_view": 0,
+   "precision": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "dec",
+   "fieldtype": "Float",
+   "label": "Dec (mm/day)",
+   "in_list_view": 0,
+   "precision": "1",
+   "non_negative": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-15 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Upande Irrigation",
+ "name": "Irrigation Expected Rainfall",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "editable_grid": 1
+}

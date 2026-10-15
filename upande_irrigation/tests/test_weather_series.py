@@ -120,3 +120,100 @@ class TestNothingSiteSpecificIsBakedIn(IntegrationTestCase):
 		code = re.sub(r'"""[\\s\\S]*?"""|#[^\\n]*', "", src)  # docstrings and comments aside
 		self.assertNotRegex(code, r"20[12][0-9]")
 		self.assertNotIn("v15", code)
+
+
+class TestExpectedRainfall(IntegrationTestCase):
+	"""Bars against an expected mm/day per farm per month."""
+
+	TODAY = D(2026, 10, 15)
+
+	def buckets(self, targets, actual, start, end, gran, today=None):
+		keys = ws.bucket_keys(start, end, gran)
+		return ws.expected_buckets(targets, actual, keys, gran, start, end, today or self.TODAY)
+
+	def test_a_week_across_a_month_takes_each_months_figure(self):
+		# Mon 27 Apr – Sun 3 May 2026: four April days at 5, three May days at 7
+		out = self.buckets({4: 5.0, 5: 7.0}, [41.0], D(2026, 4, 27), D(2026, 5, 3), "week")
+		self.assertEqual(out[0]["mm"], 41.0)
+		self.assertEqual(out[0]["status"], "met")
+		self.assertFalse(out[0]["open"])
+
+	def test_the_running_month_counts_only_the_days_so_far(self):
+		out = self.buckets({10: 5.0}, [70.0], D(2026, 10, 1), D(2026, 10, 31), "month")
+		self.assertEqual((out[0]["mm"], out[0]["days"], out[0]["of_days"]), (75.0, 15, 31))
+		self.assertTrue(out[0]["open"])
+		self.assertEqual(out[0]["status"], "below")
+
+	def test_a_range_starting_mid_month_is_clipped(self):
+		out = self.buckets({9: 2.0}, [10.0], D(2026, 9, 21), D(2026, 9, 30), "month")
+		self.assertEqual((out[0]["mm"], out[0]["of_days"]), (20.0, 10))
+
+	def test_a_month_without_a_target_leaves_its_buckets_alone(self):
+		out = self.buckets({1: 1.0}, [3.0, 4.0], D(2026, 1, 1), D(2026, 2, 28), "month")
+		self.assertIsNotNone(out[0])
+		self.assertIsNone(out[1])
+
+	def test_a_bucket_with_no_readings_has_no_verdict(self):
+		out = self.buckets({3: 1.0}, [None], D(2026, 3, 1), D(2026, 3, 31), "month")
+		self.assertEqual(out[0]["mm"], 31.0)
+		self.assertIsNone(out[0]["status"])
+
+	def test_days_after_today_have_no_target(self):
+		out = self.buckets({10: 1.0, 11: 1.0}, [1.0, None], D(2026, 10, 1), D(2026, 11, 30), "month")
+		self.assertIsNone(out[1])
+
+
+class TestExpectedRainfallSettings(IntegrationTestCase):
+	def setUp(self):
+		self.farms = frappe.get_all("Farm", pluck="name", limit=2)
+		if len(self.farms) < 2:
+			self.skipTest("needs two farms")
+		doc = frappe.get_single("Irrigation Settings")
+		self.saved = (doc.rain_expected_enabled, [r.as_dict() for r in doc.rain_expected])
+
+	def tearDown(self):
+		doc = frappe.get_single("Irrigation Settings")
+		doc.rain_expected_enabled = self.saved[0]
+		doc.set("rain_expected", [])
+		for r in self.saved[1]:
+			doc.append("rain_expected", {k: r[k] for k in ("farm",) + ws.MONTHS})
+		doc.save(ignore_permissions=True)
+		frappe.clear_document_cache("Irrigation Settings", "Irrigation Settings")
+
+	def configure(self, enabled, rows):
+		doc = frappe.get_single("Irrigation Settings")
+		doc.rain_expected_enabled = enabled
+		doc.set("rain_expected", [])
+		for r in rows:
+			doc.append("rain_expected", r)
+		doc.save(ignore_permissions=True)
+		frappe.clear_document_cache("Irrigation Settings", "Irrigation Settings")
+
+	def test_switched_off_the_card_carries_nothing(self):
+		self.configure(0, [{"farm": self.farms[0], "jan": 3}])
+		self.assertIsNone(ws.expected_targets(self.farms[0]))
+		r = ws.series(measure="rainfall", farm=self.farms[0], from_date="2026-01-01", to_date="2026-01-31")
+		self.assertIsNone(r["expected"])
+
+	def test_all_farms_average_the_farms_that_set_a_figure(self):
+		a, b = self.farms
+		self.configure(1, [{"farm": a, "jan": 2, "feb": 4}, {"farm": b, "jan": 4}])
+		self.assertEqual(ws.expected_targets(""), {1: 3.0, 2: 4.0})
+		self.assertEqual(ws.expected_targets(b), {1: 4.0})  # 0 is "no target"
+
+	def test_only_rainfall_is_compared(self):
+		self.configure(1, [{"farm": self.farms[0], "jan": 3}])
+		r = ws.series(measure="evaporation", farm=self.farms[0], from_date="2026-01-01", to_date="2026-01-31")
+		self.assertIsNone(r["expected"])
+		r = ws.series(measure="rainfall", farm=self.farms[0], from_date="2026-01-01", to_date="2026-01-31",
+		              granularity="month")
+		self.assertEqual(r["expected"][0]["mm"], 93.0)
+
+	def test_a_farm_listed_twice_is_refused(self):
+		a = self.farms[0]
+		with self.assertRaises(frappe.ValidationError):
+			self.configure(1, [{"farm": a, "jan": 1}, {"farm": a, "jan": 2}])
+
+	def test_a_negative_figure_is_refused(self):
+		with self.assertRaises(frappe.ValidationError):
+			self.configure(1, [{"farm": self.farms[0], "jan": -1}])

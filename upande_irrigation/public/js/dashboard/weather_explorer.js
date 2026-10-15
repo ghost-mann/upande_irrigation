@@ -9,6 +9,12 @@
  * Totals (rain, evaporation) draw as bars, or as running
  * totals; levels (temperature, deficit) draw as lines. A bucket with no reading
  * is a gap, never a zero, and every series says how many of its days were read.
+ *
+ * Expected rainfall (Irrigation Settings, switchable): week, month and year
+ * bars turn green where the period met its farm's expected mm and red where it
+ * fell short, with a tick at the target; a period still running is faded and
+ * judged on its days so far. Day bars keep the rain colour under a dashed
+ * line at the daily target.
  */
 
 const MEASURES = [
@@ -25,6 +31,8 @@ const GRANS = [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Y
  * is in the legend, the tooltip and the table. */
 const COMPARE_COLORS = ["#8a8780", "#b3b0a8", "#cfccc4", "#a39a8c", "#c9bfae", "#9aa0a8"];
 const AVG_COLOR = "#45433f";
+const MET_COLOR = "var(--ui-ok)";
+const BELOW_COLOR = "var(--ui-hot)";
 
 const iso = (d) => {
 	const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
@@ -241,6 +249,35 @@ export const weatherExplorer = {
 		});
 	},
 
+	/* expected rainfall, per position, ready for the renderers; null when off,
+	 * not rainfall, or shown as running totals */
+	expected(labels) {
+		const s = this.s;
+		const d = s.data;
+		const ex = d.expected;
+		if (!ex || s.running || d.kind !== "total" || !ex.some(Boolean)) return null;
+		const daily = d.granularity === "day";
+		const fmt = (v) => this.ctx.charts.fmtNum(v, 1);
+		const cur = d.series.find((x) => x.key === "current");
+		return {
+			daily,
+			targets: ex.map((e) => (e ? e.mm : null)),
+			colors: ex.map((e) => (daily || !e || !e.status ? null : e.status === "met" ? MET_COLOR : BELOW_COLOR)),
+			faded: ex.map((e) => !daily && !!(e && e.open)),
+			tips: ex.map((e, i) => {
+				if (!e) return "";
+				const v = cur && cur.values[i];
+				const part = e.days < e.of_days ? ` (${e.days} of ${e.of_days} days)` : "";
+				const pc = v != null && e.mm > 0 ? ` · ${Math.round((v / e.mm) * 100)}%` : "";
+				return `expected ${fmt(e.mm)} mm${part}${pc}${e.open && !daily ? " · still running" : ""}`;
+			}),
+			any: (st) => ex.some((e) => e && e.status === st),
+			anyOpen: ex.some((e) => e && e.open),
+			label: daily ? "Expected (mm/day)" : "Expected",
+			count: labels.length,
+		};
+	},
+
 	draw() {
 		const s = this.s;
 		const d = s.data;
@@ -263,12 +300,18 @@ export const weatherExplorer = {
 		const H = 300;
 		const pick = (vals, f) => vals.map((v) => (v == null ? null : f(v)));
 		const any = series.some((x) => x.values.some((v) => v != null));
+		const ex = this.expected(labels);
+		// the current period's bars carry the verdict; comparisons keep their colours
+		const judged = (x) => (ex && x.isCur && !ex.daily
+			? { colors: ex.colors, faded: ex.faded, targets: ex.targets, tips: ex.tips }
+			: ex && x.isCur ? { tips: ex.tips } : {});
 		if (!any) {
 			chart.innerHTML = `<div class="empty small">Nothing recorded for ${charts.esc(d.label.toLowerCase())}${d.farm ? ` on ${charts.esc(d.farm)}` : ""} in these dates.</div>`;
 		} else if (d.kind === "total" && !s.running && labels.length <= 36) {
 			charts.groupedBars(chart, {
 				labels, W, H, unit: ` ${unit}`, dec: unit === "mm" ? 1 : 0,
-				groups: series.map((x) => ({ label: x.label, color: x.color, values: x.values })),
+				groups: series.map((x) => ({ label: x.label, color: x.color, values: x.values, ...judged(x) })),
+				steps: ex && ex.daily ? { values: ex.targets, label: ex.label } : undefined,
 			});
 		} else if (d.measure === "temperature") {
 			const cur = series.find((x) => x.isCur);
@@ -300,14 +343,19 @@ export const weatherExplorer = {
 			);
 		} else {
 			const all = series.flatMap((x) => x.values).filter((v) => v != null);
+			const lines = series.map((x) => ({
+				label: x.label, color: x.color, values: x.values,
+				type: x.isCur && d.kind === "total" && !s.running ? "bar" : undefined,
+				dash: x.dash, width: x.isCur ? 3 : 2, unit: ` ${unit}`,
+				noPoints: !x.isCur || labels.length > 40,
+				...judged(x),
+			}));
+			if (ex && ex.daily) {
+				lines.push({ label: ex.label, color: "var(--ink-3)", values: ex.targets, dash: "5 4", width: 1.5, unit: " mm", noPoints: true });
+			}
 			charts.mkChart(
 				chart,
-				series.map((x) => ({
-					label: x.label, color: x.color, values: x.values,
-					type: x.isCur && d.kind === "total" && !s.running ? "bar" : undefined,
-					dash: x.dash, width: x.isCur ? 3 : 2, unit: ` ${unit}`,
-					noPoints: !x.isCur || labels.length > 40,
-				})),
+				lines,
 				W, H,
 				{
 					xLabels: labels, tooltip: true, noFill: series.length > 1 || d.kind === "level",
@@ -327,6 +375,13 @@ export const weatherExplorer = {
 		if (d.measure === "deficit_blocks") legend.splice(0, legend.length,
 			`<span><i class="ln" style="background:var(--ui-cool)"></i>Farm average</span>`,
 			`<span><i class="ln" style="background:var(--ui-hot)"></i>Driest block</span>`);
+		if (ex && ex.daily) legend.push(`<span><i class="ln tick"></i>${charts.esc(ex.label)}</span>`);
+		if (ex && !ex.daily) {
+			if (ex.any("met")) legend.push(`<span><i style="background:${MET_COLOR}"></i>Met expected</span>`);
+			if (ex.any("below")) legend.push(`<span><i style="background:${BELOW_COLOR}"></i>Below expected</span>`);
+			if (ex.anyOpen) legend.push(`<span><i class="open" style="background:var(--ink-4)"></i>Still running</span>`);
+			legend.push(`<span><i class="ln tick"></i>Expected</span>`);
+		}
 		$("#wxx-legend").innerHTML = legend.join("");
 
 		this.drawSummary(series);
@@ -384,6 +439,7 @@ export const weatherExplorer = {
 			if (d.measure === "temperature") head.push(`${x.label} min`, `${x.label} mean`, `${x.label} max`);
 			else if (d.measure === "deficit_blocks") head.push(`${x.label} average`, `${x.label} driest`, "Driest block");
 			else head.push(`${x.label} (${d.unit})`);
+			if (x.isCur && d.expected) head.push(`Expected (${d.unit})`);
 		});
 		const body = d.labels.map((lab, i) => {
 			const row = [lab];
@@ -392,6 +448,7 @@ export const weatherExplorer = {
 				if (d.measure === "temperature") row.push(v ? v.min : null, v ? v.mean : null, v ? v.max : null);
 				else if (d.measure === "deficit_blocks") row.push(v ? v.mean : null, v ? v.driest : null, v ? v.driest_block : null);
 				else row.push(v);
+				if (x.isCur && d.expected) row.push(d.expected[i] ? d.expected[i].mm : null);
 			});
 			return row;
 		});

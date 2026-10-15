@@ -1226,6 +1226,31 @@
 	opacity: 0.6;
 }
 
+/* expected rainfall: the daily target steps month to month in ink, not red --
+ * red there would read as "below" */
+.refline--steps {
+	stroke: var(--ink-3);
+	opacity: 0.75;
+}
+
+.target-tick {
+	stroke: var(--ink-2);
+	stroke-width: 2;
+	stroke-linecap: round;
+	pointer-events: none;
+}
+
+.clegend i.tick {
+	height: 2px;
+	background: var(--ink-2);
+}
+
+.clegend i.open {
+	opacity: 0.4;
+	outline: 1.5px dashed var(--ink-4);
+	outline-offset: -1.5px;
+}
+
 .reftext {
 	font-size: 9.5px;
 	font-weight: 700;

@@ -244,6 +244,81 @@ def aggregate(values, keys, granularity, measure, day_offset_years=0):
 	return out
 
 
+# ── expected rainfall ────────────────────────────────────────────────────────
+# Irrigation Settings holds an expected mm/day per farm per calendar month. A
+# bucket's target adds up its days' figures, so weeks across a month boundary
+# take each month's own figure. 0 is "no target": Frappe stores a blank Float as
+# 0, and a target of nothing would make every bar pass.
+MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+
+def expected_targets(farm):
+	"""{month number: mm/day} for one farm, or the mean of the farms that set
+	one when no farm is chosen. None when colouring is switched off."""
+	try:
+		doc = frappe.get_cached_doc("Irrigation Settings")
+	except Exception:
+		return None
+	if not frappe.utils.cint(doc.get("rain_expected_enabled")):
+		return None
+	rows = [r for r in doc.get("rain_expected") or [] if not farm or r.farm == farm]
+	out = {}
+	for i, m in enumerate(MONTHS, 1):
+		xs = [flt(r.get(m)) for r in rows if flt(r.get(m)) > 0]
+		if xs:
+			out[i] = sum(xs) / len(xs)
+	return out
+
+
+def bucket_end(k, granularity):
+	if granularity == "week":
+		return k + datetime.timedelta(days=6)
+	if granularity == "month":
+		return k.replace(day=calendar.monthrange(k.year, k.month)[1])
+	if granularity == "year":
+		return k.replace(month=12, day=31)
+	return k
+
+
+def expected_buckets(targets, actual, keys, granularity, start, end, today):
+	"""One item per bucket: None, or {mm, days, of_days, open, status}.
+
+	The target covers the bucket's days inside [start, end] that are not after
+	today; `of_days` is how many of its days fall in the range at all. A bucket
+	holding today is open. Any counted day without a target leaves the bucket
+	without one. `status` is None where the bucket has no readings -- a gap is
+	never read as a dry spell."""
+	out = []
+	for i, k in enumerate(keys):
+		lo = max(k, start)
+		last = min(bucket_end(k, granularity), end)
+		hi = min(last, today)
+		if hi < lo:
+			out.append(None)
+			continue
+		mm, d = 0.0, lo
+		while d <= hi:
+			t = targets.get(d.month)
+			if t is None:
+				mm = None
+				break
+			mm += t
+			d += datetime.timedelta(days=1)
+		if mm is None:
+			out.append(None)
+			continue
+		mm = round(mm, 2)
+		v = actual[i] if i < len(actual) else None
+		out.append({
+			"mm": mm,
+			"days": date_diff(hi, lo) + 1,
+			"of_days": date_diff(last, lo) + 1,
+			"open": lo <= today <= last,
+			"status": None if v is None else ("met" if v >= mm else "below"),
+		})
+	return out
+
+
 def coverage(values, start, end):
 	"""Share of the window's days that had a reading, never above 1."""
 	span = date_diff(end, start) + 1
@@ -387,6 +462,13 @@ def series(measure="rainfall", farm="", from_date="", to_date="", granularity="m
 		notes.append("Per-block daily water balance: the farm average, with the driest block beside it."
 		             + (f" Recorded from {data_from:%-d %b %Y}, so earlier years have nothing to compare." if data_from else ""))
 
+	expected = None
+	if measure == "rainfall":
+		targets = expected_targets(farm)
+		if targets is not None:
+			expected = expected_buckets(targets, out_series[0]["values"], keys, granularity,
+			                            start, end, getdate(nowdate()))
+
 	return {
 		"measure": measure, "label": LABELS[measure], "unit": UNITS[measure],
 		"kind": "total" if measure in TOTALS else "level",
@@ -395,4 +477,5 @@ def series(measure="rainfall", farm="", from_date="", to_date="", granularity="m
 		"buckets": [str(k) for k in keys], "labels": labels,
 		"series": out_series, "years_available": available, "notes": notes,
 		"data_from": str(data_from) if data_from else None,
+		"expected": expected,
 	}
