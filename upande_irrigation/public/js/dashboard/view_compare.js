@@ -206,9 +206,6 @@ ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
 		$("#cmp-mode").style.display = total ? "" : "none";
 		$("#cmp-mode").querySelectorAll("button").forEach((b) => b.classList.toggle("on", (b.dataset.m === "running") === asRunning));
 		const avail = [...new Set([...s.available, ...s.years])].sort((a, b) => a - b);
-		$("#cmp-years").innerHTML = avail
-			.map((y) => `<button class="side__chip${s.years.includes(y) ? " on" : ""}" data-year="${y}" type="button">${y}</button>`)
-			.join("");
 		$("#cmp-meta").textContent = `${d.farm || "All farms"} · ${avail.length} ${avail.length === 1 ? "year" : "years"} on record`;
 
 		const all = this.years();
@@ -218,6 +215,16 @@ ${pagehead("Year-on-Year", "Compare seasons", '<span id="cmp-meta"></span>')}
 		let oi = 0;
 		const colour = (y) => (y === newest ? def[2] : OLDER[oi++ % OLDER.length]);
 		const plotted = shown.map((y) => ({ ...y, color: colour(y), values: asRunning ? running(y.monthly) : y.monthly }));
+		// a selected year's chip wears its line's colour, so chip and line match
+		const chipColour = new Map(plotted.map((y) => [y.year, y.color]));
+		$("#cmp-years").innerHTML = avail
+			.map((y) => {
+				const c = chipColour.get(y);
+				return c
+					? `<button class="side__chip cmp-chip on" style="--chip:${c}" data-year="${y}" type="button"><i></i>${y}</button>`
+					: `<button class="side__chip cmp-chip" data-year="${y}" type="button">${y}</button>`;
+			})
+			.join("");
 
 		const lines = plotted.slice().reverse().map((y) => ({
 			label: String(y.year), color: y.color, values: y.values, width: y === plotted[0] ? 3 : 1.75,

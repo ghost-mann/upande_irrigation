@@ -1863,6 +1863,14 @@
 .wxx-f .select { min-width: 140px; }
 .wxx-f--year .select { min-width: 110px; }
 .cmp-years .side__chips { margin: 0; }
+/* a selected year wears its line's colour: ring and dot, text stays ink */
+.side__chip.cmp-chip.on {
+	background: var(--card, #fff);
+	color: var(--ink);
+	box-shadow: inset 0 0 0 2px var(--chip);
+	font-weight: 600;
+}
+.side__chip.cmp-chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--chip); }
 td i.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; }
 /* graph paper: a labelled major grid, a fine minor grid, firm axes */
 .gp .gp-minor { stroke: var(--ink-faint); stroke-width: 0.5; opacity: 0.45; }
