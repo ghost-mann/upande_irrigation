@@ -28,7 +28,11 @@ required_apps = ["erpnext", "upande_core"]
 # app_include_css = "/assets/upande_irrigation/css/upande_irrigation.css"
 # app_include_js = "/assets/upande_irrigation/js/upande_irrigation.js"
 # Desk-side redirect for the renamed v15 workspace -- see the file.
-app_include_js = "/assets/upande_irrigation/js/desk_routes.js"
+app_include_js = [
+	"/assets/upande_irrigation/js/desk_routes.js",
+	# Animated logos play only on hover -- see the file.
+	"/assets/upande_irrigation/js/hover_logos.js",
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/upande_irrigation/css/upande_irrigation.css"
